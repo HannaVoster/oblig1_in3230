@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <string.h>
 
+
+//----------------------ARP CASHE--------------------------
 #define MAX_ARP 256
 
 // MIP ARP CASHE
@@ -40,7 +42,7 @@ void arp_update(int mip_addr, unsigned char *mac){
             return;
 		}
 	}
-	
+
 	printf("[ARP] CACHE FULL: kunne ikke lagre MIP %d\n", mip_addr);
 };
 
@@ -62,9 +64,51 @@ int arp_lookup(int mip_addr, unsigned char *mac_out) {
     return 0;
 }
 
+//----------------------HEADER--------------------------
+
+typedef uint8_t mip_header[4]; //fast størrelse på 4 bytes, bruker set/get metoder under
+
+void set_dest_addr(mip_header header, uint8_t dest_addr){}
+void set_src_addr(mip_header header, uint8_t scr_addr){}
+void set_ttl(mip_header header, uint8_t ttl){}
+void set_sdu_length(mip_header header, uint16_t sdu_length){}
+void set_sdu_type(mip_header header, uint8_t sdu_type){}
+
+uint8_t get_dest_addr(const mip_header header) {
+	return header[0]; // header i byte 0(1)
+}
+
+uint8_t get_src_addr(const mip_header header) {
+	return header[1];
+}
+
+uint8_t get_ttl(const mip_header header) {
+	return (header[2] >> 4) & 0x0F;
+
+	//flytter de fire første bitene til de fire laveste
+	//nullstiller så de fire første så bare ttl returneres 
+}
+
+//lenger siden sdu length er 9 bits
+uint16_t get_sdu_length(const mip_header header) {
+	return (header[2] );
+}
+
+uint8_t get_sdu_type(const mip_header header) {
+	//
+}
+// typedef struct {
+// 	unsigned char dest_addrs; // Destination address 	The MIP address of the destination node
+// 	unsigned char src_addrs; // Source address  	The MIP address of the source node
+// 	unsigned char ttl : 4 ; // TTL Time To Live		maximum hop count
+// 	unsigned short sdu_length : 9; //SDU length      Length of the SDU (i.e. payload) encapsulated within this MIP datagram.
+// 	unsigned char sdu_type : 3; //SDU type	The type of the SDU (i.e. upper layer protocol type)
+// } mip_header;
+
 
 // simulering av oppdatering for testing
 
+//----------------------MAIN--------------------------
 
 int main(int argc, char *argv[]) {
 
@@ -152,7 +196,12 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Skriv ut hva daemonen ville ha sendt på MIP-laget
-		// Printer både MIP-adresse og MAC-adresse i hex-format
+		// Printer både MIP-adresse og MAC-adresse i hex-format@
+
+		//int rawfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+		//sendto(rawfd, packet_data, packet_len, 0, (struct sockaddr*)&eth_addr, sizeof(eth_addr));
+
+
 		printf("[TX] Ville sendt MIP-PDU til MIP %d (MAC %02X:%02X:%02X:%02X:%02X:%02X)\n",
 			dst, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
