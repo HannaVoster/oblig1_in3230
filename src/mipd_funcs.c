@@ -64,6 +64,7 @@ int arp_lookup(int mip_addr, unsigned char *mac_out) {
 }
 
 //----------------------HEADER--------------------------
+//GET/SET
 
 typedef uint8_t mip_header[4]; //fast størrelse på 4 bytes, bruker set/get metoder under
 
@@ -117,4 +118,44 @@ uint16_t get_sdu_length(const mip_header header) {
 uint8_t get_sdu_type(const mip_header header) {
     return (header[3] & 0x0F);
 	//de fire øverste bitene nullstilt, og de fire nederste beholdes.
+}
+
+
+//------------------PDU------------------
+
+
+// pdu = header + payload
+
+uint8_t* build_pdu(uint8_t dest_addr, uint8_t scr_addr, uint8_t ttl, uint16_t sdu_length, uint8_t sdu_type, const uint8_t* payload){
+    //build buffer with both header and payload
+
+    //kontroller lengde på payload for å gjøre pdu delelig med 4?
+
+    uint16_t aligned_length = sdu_length;
+    if (sdu_length % 4 != 0) {
+        aligned_length += 4 - (sdu_length % 4);
+    }
+
+    uint8_t* pdu = malloc(4 + aligned_length); // 4 bytes header + SDU
+
+    //header
+    mip_header header;
+    set_dest_addr(header, dest_addr);
+    set_sdu_length(header, sdu_length);
+    set_sdu_type(header, sdu_type);
+    set_ttl(header, ttl);
+    set_src_addr(header, scr_addr);
+
+    //kopierer header over i pdu
+    //pdu peker til buffer, header legges inn, 4 er antall bytes som kopieres
+    memcpy(pdu, header, 4);
+
+    memcpy(pdu + 4, payload, sdu_length);
+
+    if (aligned_length > sdu_length){
+        memset(pdu + 4 + sdu_length, 0, aligned_length  - sdu_length);
+    }
+
+    return pdu;
+
 }

@@ -4,11 +4,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <arpa/inet.h>
 
-#include "mipd.h"
+
+#ifdef __linux__
+#include <netinet/if_ether.h>
+#include <net/if.h>
+#include <linux/if_packet.h>
+#endif
 
 
-// simulering av oppdatering for testing
+#include "mipd.h" // header fil som igjen pekes på av mipd_funcs.c for å unngå dobbel main
 
 //----------------------MAIN--------------------------
 
@@ -97,12 +103,48 @@ int main(int argc, char *argv[]) {
 			arp_lookup(dst, mac);
 		}
 
-		// Skriv ut hva daemonen ville ha sendt på MIP-laget
-		// Printer både MIP-adresse og MAC-adresse i hex-format@
+        //---- RAW SOCKET--
+        // Linux RAW Ethernet socket
+        //AF PACKET -adress family, til å motta ethernet rammer, under ip nivået
+        //SOCK RAW - type socket, raw socket gir pakker slik de faktisk er
+        // htons - gir "network byte order" ETH_P_ALL gir alle rammetyper
+        #ifdef __linux__
+        int rawsocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+        if (rawsocket < 0){
+            perror("socket");
+            exit(1);
+        }
 
-		//int rawfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-		//sendto(rawfd, packet_data, packet_len, 0, (struct sockaddr*)&eth_addr, sizeof(eth_addr));
+        struct sockaddr_ll device;
 
+        //nullstiller
+        memset(&device, 0, sizeof(device));
+        device.sll_ifindex = if_nametoindex("eth0"); //interface
+        device.sll_family = AF_PACKET; // ethernet
+        device.sll_halen = ETH_ALEN; //6 lengde på mac adresse
+
+        //kopierer mac adressen til destinasjonen - hentet fra tidligere
+        memcpy(device.sll_addr, mac, 6);
+
+        //send datagram //DUMMY DATA ENDRE TIL ANNERLEDES LENGDE SENERE
+        uint8_t payload[8] = {0,1,2,3,4,5,6,7};
+
+        uint16_t sdu_length = sizeof(payload);
+
+        uint8_t* pdu = build_pdu(42, 17, 4, sdu_length, 9, payload);
+
+        uint16_t pdu_length = 4 + sdu_length;
+
+        //send
+        sendto(rawsocket, pdu, pdu_length, 0, (struct sockaddr*)&device, sizeof(device));
+
+        free(pdu);
+
+
+        #elif __APPLE__
+        printf("[TX-simulert] Ville sendt PDU til MIP %d\n", dst);
+
+        #endif  
 
 		printf("[TX] Ville sendt MIP-PDU til MIP %d (MAC %02X:%02X:%02X:%02X:%02X:%02X)\n",
 			dst, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);

@@ -23,4 +23,7 @@ uint8_t get_ttl(const mip_header header);
 uint16_t get_sdu_length(const mip_header header);
 uint8_t get_sdu_type(const mip_header header);
 
+// pdu funksjoner
+uint8_t* build_pdu(uint8_t dest_addr, uint8_t scr_addr, uint8_t ttl, uint16_t sdu_length, uint8_t sdu_type, const uint8_t* payload);
+
 #endif
