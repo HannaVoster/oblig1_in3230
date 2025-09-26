@@ -6,16 +6,8 @@
 
 
 //----------------------ARP CASHE--------------------------
-#define MAX_ARP 256
 
-// MIP ARP CASHE
-typedef struct {
-	int mip_addr;
-	unsigned char mac[6];
-	int valid;
-} arp_entry;
 
-arp_entry arp_cash[MAX_ARP];
 
 
 //method for updating arp cashe
@@ -149,13 +141,128 @@ uint8_t* build_pdu(uint8_t dest_addr, uint8_t scr_addr, uint8_t ttl, uint16_t sd
     //kopierer header over i pdu
     //pdu peker til buffer, header legges inn, 4 er antall bytes som kopieres
     memcpy(pdu, header, 4);
-
     memcpy(pdu + 4, payload, sdu_length);
-
-    if (aligned_length > sdu_length){
-        memset(pdu + 4 + sdu_length, 0, aligned_length  - sdu_length);
-    }
+    
+    if (aligned_length > sdu_length) {
+        memset(pdu + 4 + sdu_length, 0, aligned_length - sdu_length);
+    }   
 
     return pdu;
-
 }
+//endret til å ha en generisk sende metode
+int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac){
+    #ifdef __linux__
+    if (rawsocket < 0){
+        perror("socket");
+        exit(1);
+    }
+
+    struct sockaddr_ll device;
+
+    memset(&device, 0, sizeof(device)); //nullstiller
+    device.sll_ifindex = if_nametoindex("eth0"); //interface
+    device.sll_family = AF_PACKET; // ethernet
+    device.sll_halen = ETH_ALEN; //6 lengde på mac adresse
+    memcpy(device.sll_addr, dest_mac, 6);
+
+    int send = sendto(rawsocket, pdu, pdu_length, 0, (struct sockaddr*)&device, sizeof(device));
+    if(send < 0){
+        perror("send_pdu");
+    }
+
+    return send;
+
+    #elif __APPLE__
+    printf("[SEND_PDU] SEND ON MAC");
+    return 1;
+    #endif
+}
+
+//Broadcast
+int send_broadcast(int dst, int rawsocket){
+    #ifdef __linux__
+    //raw socket broadcast kode
+    req mip_arp_msg;
+    mip_arp_msg.type = SDU_TYPE_ARP_REQ;
+    mip_arp_msg.mip_addr = dst;
+
+    //setter mac feltet i req til  være tom
+    memset(mip_arp_msg.mac, 0,6);
+
+    // type cast: (uint8_t*)&req
+    uint8_t* pdu = build_pdu(
+        dst,
+        my_mip_address,
+        2, 
+        sizeof(mip_arp_msg), 
+        SDU_TYPE_ARP_REQ,  
+        (uint8_t*)&mip_arp_msg);
+
+    unsigned char broadcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}; // broadcast mac adresse
+
+    send_pdu(rawsocket, pdu, 4 + sizeof(mip_arp_msg), broadcast_mac)
+  
+    free(pdu);
+
+    #elif __APPLE__
+    printf("[ARP] Simulert broadcast for MIP");
+    
+    #endif
+
+    return 0;
+}
+
+int wait_for_broadcast_response(){}
+
+//Sende pakke
+
+int send_packet(int clientfd, unsigned char *mac_address, int dst){
+     //---- RAW SOCKET--
+        // Linux RAW Ethernet socket
+        //AF PACKET -adress family, til å motta ethernet rammer, under ip nivået
+        //SOCK RAW - type socket, raw socket gir pakker slik de faktisk er
+        // htons - gir "network byte order" ETH_P_ALL gir alle rammetyper
+        #ifdef __linux__
+        int rawsocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+        if (rawsocket < 0){
+            perror("socket");
+            exit(1);
+        }
+
+        struct sockaddr_ll device;
+
+        //nullstiller
+        memset(&device, 0, sizeof(device));
+        device.sll_ifindex = if_nametoindex("eth0"); //interface
+        device.sll_family = AF_PACKET; // ethernet
+        device.sll_halen = ETH_ALEN; //6 lengde på mac adresse
+
+        //kopierer mac adressen til destinasjonen - hentet fra tidligere
+        memcpy(device.sll_addr, mac_address, 6);
+
+        //send datagram //DUMMY DATA ENDRE TIL ANNERLEDES LENGDE SENERE
+        uint8_t payload[8] = {0,1,2,3,4,5,6,7};
+
+        uint16_t sdu_length = sizeof(payload);
+
+        uint8_t* pdu = build_pdu(dst, my_mip_address, 4, sdu_length, 9, payload);
+
+        uint16_t pdu_length = 4 + sdu_length;
+
+        //send
+        sendto(rawsocket, pdu, pdu_length, 0, (struct sockaddr*)&device, sizeof(device));
+
+        free(pdu);
+
+        #elif __APPLE__
+        printf("[TX-simulert] Ville sendt PDU til MIP %d\n", dst);
+
+        #endif  
+
+		printf("[TX] Ville sendt MIP-PDU til MIP %d (MAC %02X:%02X:%02X:%02X:%02X:%02X)\n",
+			dst, mac_address[0], mac_address[1], mac_address[2], mac_address[3], mac_address[4], mac_address[5]);
+
+		// Send et enkelt svar tilbake til klienten for å vise at flyten fungerer
+		const char *reply = "PONG (simulert)\n";
+		write(clientfd, reply, strlen(reply));
+	}
