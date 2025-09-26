@@ -1,16 +1,33 @@
-#hvilken kompulator
-CC = gcc
+# Kompileringsvalg
+CC      = gcc
+CFLAGS  = -Wall -Wextra -g -Iinclude
 
-#flags 
-CFLAGS= -Wall -Wextra -g
+# Mapper
+SRC_DIR = src
+BIN_DIR = bin
 
-# Standard: bygg programmet "mip_test"
-all: mip_test
+# Programmer
+TARGETS = $(BIN_DIR)/mipd $(BIN_DIR)/ping_client $(BIN_DIR)/ping_server
 
-# Hvordan lage "mip_test" fra main.c
-mip_test: src/main.c
-	$(CC) $(CFLAGS) -o mip_test src/main.c
+# Standardregel
+all: $(TARGETS)
 
-# Rydd opp (fjern den kompilerte fila)
+# Lag bin/ hvis den ikke finnes
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
+# Bygg mipd
+$(BIN_DIR)/mipd: $(SRC_DIR)/mipd.c $(SRC_DIR)/mipd_funcs.c $(SRC_DIR)/arp.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# Bygg ping_client
+$(BIN_DIR)/ping_client: $(SRC_DIR)/ping_client.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# Bygg ping_server
+$(BIN_DIR)/ping_server: $(SRC_DIR)/ping_server.c | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# Rydd opp
 clean:
-	rm -f mip_test
+	rm -rf $(BIN_DIR)
