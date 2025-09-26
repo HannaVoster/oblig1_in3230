@@ -209,6 +209,12 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     device.sll_halen    = ETH_ALEN;
     memcpy(device.sll_addr, dest_mac, ETH_ALEN);
 
+    // Minste Ethernet-frame (uten FCS) er 60 bytes
+    if (frame_len < 60) {
+        memset(frame + frame_len, 0, 60 - frame_len);  // pad med nuller
+        frame_len = 60;
+    }
+
     int sent = sendto(rawsocket, frame, frame_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
 
