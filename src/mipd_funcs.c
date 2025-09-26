@@ -103,6 +103,8 @@ uint8_t* build_pdu(
     // Total PDU-lengde i bytes (inkl. header)
     if (out_length) {
         *out_length = sizeof(mip_header_t) + aligned_length_bytes;
+        printf("[DEBUG] pdu_length=%zu\n", pdu_length);
+
     }
 
     return pdu;
@@ -114,6 +116,10 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         perror("socket");
         exit(1);
     }
+
+    printf("[DEBUG] dest_mac = %02X:%02X:%02X:%02X:%02X:%02X\n",
+       dest_mac[0], dest_mac[1], dest_mac[2],
+       dest_mac[3], dest_mac[4], dest_mac[5]);
 
     struct sockaddr_ll device;
     
