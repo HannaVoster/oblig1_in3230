@@ -133,7 +133,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     }
     
     device.sll_family   = AF_PACKET; 
-    device.sll_protocol = htons(ETH_P_MIP); 
+    device.sll_protocol = htons(ETH_P_ALL); 
     device.sll_ifindex  = ifidx;
     device.sll_halen    = ETH_ALEN; // 6 bytes (MAC-lengde)
     memcpy(device.sll_addr, dest_mac, 6);
