@@ -110,68 +110,117 @@ uint8_t* build_pdu(
 }
 
 
-
-int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac){
-    if (rawsocket < 0){
-        perror("socket");
+// Bygger en Ethernet + MIP-ramme
+// - dst_mac: MAC til mottaker (fra ARP eller FF:FF:FF:FF:FF:FF)
+// - src_mac: MAC til vårt interface (fra ioctl(SIOCGIFHWADDR))
+// - payload: peker til MIP-header + SDU (bygget av build_pdu())
+// - payload_len: lengde av MIP-header + SDU
+// - out_len: returnerer total lengde på Ethernet-ramma
+uint8_t* build_frame(unsigned char *dst_mac,
+                     unsigned char *src_mac,
+                     uint8_t *payload, size_t payload_len,
+                     size_t *out_len) {
+    // Ethernet header er 14 bytes
+    size_t frame_len = sizeof(struct ether_header) + payload_len;
+    uint8_t *frame = malloc(frame_len);
+    if (!frame) {
+        perror("malloc frame");
         exit(1);
     }
 
-    struct sockaddr_ll device;
-    unsigned ifidx = if_nametoindex(iface_name);
-    printf("[DEBUG] iface=%s ifindex=%d\n", iface_name, ifidx);
+    // Pek til headeren i bufferen
+    struct ether_header *eh = (struct ether_header *)frame;
 
+    // Kopier MAC-adressene
+    memcpy(eh->ether_dhost, dst_mac, ETH_ALEN);
+    memcpy(eh->ether_shost, src_mac, ETH_ALEN);
+
+    // Sett protokollfeltet til vår egen MIP-protokoll
+    eh->ether_type = htons(ETH_P_MIP);
+
+    // Kopier inn payload rett etter Ethernet-headeren
+    memcpy(frame + sizeof(struct ether_header), payload, payload_len);
+
+    // Returner total lengde
+    *out_len = frame_len;
+    return frame;
+}
+
+
+// Henter MAC-adressen til vårt interface
+int get_iface_mac(const char *ifname, unsigned char *mac) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return -1;
+
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+
+    if (ioctl(fd, SIOCGIFHWADDR, &ifr) == -1) {
+        close(fd);
+        return -1;
+    }
+
+    memcpy(mac, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+    close(fd);
+    return 0;
+}
+
+int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac) {
+    if (rawsocket < 0) {
+        perror("rawsocket");
+        exit(1);
+    }
+
+    unsigned ifidx = if_nametoindex(iface_name);
     if (!ifidx) {
         perror("if_nametoindex");
         return -1;
     }
 
-    memset(&device, 0, sizeof(device));
-    device.sll_family   = AF_PACKET; 
-    device.sll_protocol = htons(ETH_P_MIP); 
-    device.sll_ifindex  = ifidx;
-    device.sll_halen    = ETH_ALEN;
+    unsigned char src_mac[ETH_ALEN];
+    if (get_iface_mac(iface_name, src_mac) < 0) {
+        perror("get_iface_mac");
+        return -1;
+    }
 
-    // Ethernet frame buffer = dst MAC + src MAC + Ethertype + PDU
-    size_t frame_len = 14 + pdu_length;
+    // Bygg Ethernet-ramme
+    size_t frame_len = sizeof(struct ethhdr) + pdu_length;
     uint8_t *frame = malloc(frame_len);
     if (!frame) {
         perror("malloc");
         return -1;
     }
 
-    // Sett destination MAC
-    memcpy(frame, dest_mac, 6);
+    struct ethhdr *eh = (struct ethhdr *)frame;
+    memcpy(eh->h_dest, dest_mac, ETH_ALEN);
+    memcpy(eh->h_source, src_mac, ETH_ALEN);
+    eh->h_proto = htons(ETH_P_MIP);
 
-    // Sett source MAC (henter fra vårt interface)
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, iface_name, IFNAMSIZ - 1);
-    if (ioctl(rawsocket, SIOCGIFHWADDR, &ifr) == -1) {
-        perror("ioctl get hwaddr");
-        free(frame);
-        return -1;
-    }
-    memcpy(frame + 6, ifr.ifr_hwaddr.sa_data, 6);
+    memcpy(frame + sizeof(struct ethhdr), pdu, pdu_length);
 
-    // Sett ethertype (to bytes)
-    frame[12] = (ETH_P_MIP >> 8) & 0xFF;
-    frame[13] = ETH_P_MIP & 0xFF;
+    // Sett opp sockaddr_ll
+    struct sockaddr_ll device;
+    memset(&device, 0, sizeof(device));
+    device.sll_family   = AF_PACKET;
+    device.sll_protocol = htons(ETH_P_MIP);
+    device.sll_ifindex  = ifidx;
+    device.sll_halen    = ETH_ALEN;
+    memcpy(device.sll_addr, dest_mac, ETH_ALEN);
 
-    // Kopier MIP-PDU inn etter Ethernet-header
-    memcpy(frame + 14, pdu, pdu_length);
-
-    // Send hele Ethernet-frame
-    int send = sendto(rawsocket, frame, frame_len, 0,
+    int sent = sendto(rawsocket, frame, frame_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
-    if(send < 0){
-        perror("send_pdu");
-    }
 
     free(frame);
-    return send;
-}
 
+    if (sent < 0) {
+        perror("sendto");
+    } else {
+        printf("[DEBUG] sendto ok, bytes=%d\n", sent);
+    }
+
+    return sent;
+}
 
 
 //Broadcast

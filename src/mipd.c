@@ -132,14 +132,25 @@ void handle_raw_packet(int raw_sock) {
                           .msg_iov = &iov, .msg_iovlen = 1 };
 
     int len = recvmsg(raw_sock, &msg, 0);
-    if (len < 14) return; // må minst være Ethernet
+    if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
 
-    uint8_t *eth_hdr = buffer;
-    uint8_t *mip_hdr_start = buffer + 14;
+    // Tolker Ethernet-header
+    struct ethhdr *eh = (struct ethhdr *)buffer;
 
-    uint8_t *src_mac = eth_hdr + 6;
-    uint16_t ethertype = (eth_hdr[12] << 8) | eth_hdr[13];
-    if (ntohs(ethertype) != ETH_P_MIP) return;
+    // Filtrer på vårt eget Ethertype
+    if (ntohs(eh->h_proto) != ETH_P_MIP) return;
+
+    // Debug: MAC-adresser
+    if (debug_mode) {
+        printf("[DEBUG] recv: src=");
+        for (int i = 0; i < ETH_ALEN; i++) printf("%02X:", eh->h_source[i]);
+        printf(" dst=");
+        for (int i = 0; i < ETH_ALEN; i++) printf("%02X:", eh->h_dest[i]);
+        printf(" proto=0x%04X\n", ntohs(eh->h_proto));
+    }
+
+    // Pek på MIP-headeren rett etter Ethernet
+    uint8_t *mip_hdr_start = buffer + sizeof(struct ethhdr);
 
     mip_header_t hdr;
     memcpy(&hdr, mip_hdr_start, sizeof(mip_header_t));
@@ -153,18 +164,16 @@ void handle_raw_packet(int raw_sock) {
     if (dest_mip != my_mip_address && dest_mip != 0xFF) return;
 
     switch (sdu_type) {
-        case SDU_TYPE_PING:
-        printf("[RAW] PING mottatt fra MIP %d\n", src_mip);
-        // svar med PONG
-        {
+        case SDU_TYPE_PING: {
+            printf("[RAW] PING mottatt fra MIP %d\n", src_mip);
             size_t pdu_len;
             uint8_t* pdu = build_pdu(src_mip, my_mip_address, 4,
-                                    sdu_len, SDU_TYPE_PONG,
-                                    payload, &pdu_len);
-            send_pdu(raw_sock, pdu, pdu_len, (unsigned char*)src_mac);
+                                     sdu_len, SDU_TYPE_PONG,
+                                     payload, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, eh->h_source); // bruk src MAC fra Ethernet
             free(pdu);
+            break;
         }
-        break;
 
         case SDU_TYPE_PONG:
             printf("[RAW] PONG mottatt fra MIP %d: %.*s\n", src_mip, sdu_len, payload);
@@ -178,26 +187,22 @@ void handle_raw_packet(int raw_sock) {
         case SDU_TYPE_ARP: {
             mip_arp_msg *arp = (mip_arp_msg*)payload;
 
-        if (arp->type == 0x00) { // Request
-            if (arp->mip_addr == my_mip_address) {
+            if (arp->type == 0x00 && arp->mip_addr == my_mip_address) {
                 printf("[RAW] ARP-REQ for meg (%d)\n", my_mip_address);
-
                 mip_arp_msg resp = { .type = 0x01, .mip_addr = my_mip_address, .reserved = 0 };
                 size_t pdu_len;
                 uint8_t* pdu = build_pdu(src_mip, my_mip_address, 1,
-                                        sizeof(resp), SDU_TYPE_ARP,
-                                        (uint8_t*)&resp, &pdu_len);
-
-                send_pdu(raw_sock, pdu, pdu_len, src_mac);
+                                         sizeof(resp), SDU_TYPE_ARP,
+                                         (uint8_t*)&resp, &pdu_len);
+                send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
                 free(pdu);
+            } 
+            else if (arp->type == 0x01) {
+                printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
+                arp_update(arp->mip_addr, eh->h_source);
+                send_pending_messages(raw_sock, arp->mip_addr, eh->h_source);
             }
-        }
-        else if (arp->type == 0x01) { // Response
-            printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
-            arp_update(arp->mip_addr, src_mac);
-            send_pending_messages(raw_sock, arp->mip_addr, src_mac);
-        }
-        break;
+            break;
         }
 
         default:
@@ -205,6 +210,7 @@ void handle_raw_packet(int raw_sock) {
             break;
     }
 }
+
 
 // Denne funksjonen finner et nettverksinterface (f.eks. "eth0")
 // som vi kan bruke for AF_PACKET rå-sockets.
