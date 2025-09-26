@@ -138,10 +138,15 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     device.sll_halen    = ETH_ALEN; // 6 bytes (MAC-lengde)
     memcpy(device.sll_addr, dest_mac, 6);
 
+
+    memset(device.sll_addr + ETH_ALEN, 0, sizeof(device.sll_addr) - ETH_ALEN);
+
     int send = sendto(rawsocket, pdu, pdu_length, 0,
                       (struct sockaddr*)&device, sizeof(device));
-    if(send < 0){
+    if (send < 0) {
         perror("send_pdu");
+    } else {
+        printf("[DEBUG] sendto ok, bytes=%d\n", send);
     }
 
     return send;
