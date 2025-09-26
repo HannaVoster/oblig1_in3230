@@ -47,7 +47,9 @@ int main(int argc, char *argv[]) {
 
     // Lag svar: "PONG:<received>"
     char reply[BUF_SIZE];
-    snprintf(reply, sizeof(reply), "PONG:%s", buf);
+    snprintf(reply, sizeof(reply), "PONG:%.*s",
+         (int)(sizeof(reply) - 6), buf);
+    //warning her
 
     if (write(sock, reply, strlen(reply)) < 0) {
         perror("write");
