@@ -68,4 +68,10 @@ int send_broadcast(int dest, int rawsocket);
 void queue_message(uint8_t dest_mip, uint8_t* pdu, size_t length);
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac);
 
+// hentefunksjoner
+uint8_t get_src(const mip_header_t *h);
+uint8_t get_dest(const mip_header_t *h);
+uint8_t get_type(const mip_header_t *h);
+uint16_t get_length(const mip_header_t *h);
+
 #endif

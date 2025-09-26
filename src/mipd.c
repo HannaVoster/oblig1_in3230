@@ -12,13 +12,15 @@
 #include <net/if.h>             // if_nametoindex(), struct ifreq
 #include <arpa/inet.h>
 #include <netinet/if_ether.h>   // struct ethhdr (klassisk Ethernet-header)
-#include <linux/if_packet.h>    // ekstra Linux-definisjoner for raw sockets
 
 
 #include "mipd.h"
 
 #define MAX_EVENTS 10
 #define UNIX_PATH "/tmp/mip_socket"
+
+int debug_mode = 0; // global flagg for debug
+int last_unix_client_fd = -1; 
 
 int create_unix_socket(const char *path) {
     int sock;
@@ -199,9 +201,6 @@ void handle_raw_packet(int raw_sock) {
     }
 }
 
-
-int debug_mode = 0; // global flagg for debug
-int last_unix_client_fd = -1; 
 
 int main(int argc, char *argv[]) {
     // Håndterer -h og -d

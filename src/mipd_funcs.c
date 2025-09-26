@@ -2,7 +2,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <net/if.h>
 #include "mipd.h"
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
+
 
 pending_msg pending_queue[MAX_PENDING] = {0};
 
