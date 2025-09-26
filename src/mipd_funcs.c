@@ -118,7 +118,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     struct sockaddr_ll device;
     
     unsigned ifidx = if_nametoindex(iface_name);
-    printf("[DEBUG] iface=%s ifindex=%d\n", iface_name, ifindex);
+    printf("[DEBUG] iface=%s ifindex=%d\n", iface_name, ifidx);
 
     if (!ifidx) {
         perror("if_nametoindex");
