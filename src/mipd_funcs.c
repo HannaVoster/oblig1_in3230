@@ -118,7 +118,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     struct sockaddr_ll device;
 
     memset(&device, 0, sizeof(device)); //nullstiller
-    device.sll_ifindex = if_nametoindex("eth0"); //interface
+    device.sll_ifindex = if_nametoindex(iface_name); // ikke "eth0" lenger
     device.sll_family = AF_PACKET; // ethernet
     device.sll_halen = ETH_ALEN; //6 lengde på mac adresse
     memcpy(device.sll_addr, dest_mac, 6);

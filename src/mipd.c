@@ -98,10 +98,8 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
         unsigned char mac[6];
         if (arp_lookup(dest_addr, mac)) {
             send_pdu(raw_sock, pdu, pdu_len, mac);
-            free(pdu);
         } else {
             queue_message(dest_addr, pdu, pdu_len);
-            free(pdu);
 
             mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
             size_t arp_len;
