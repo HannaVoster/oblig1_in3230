@@ -215,6 +215,13 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         frame_len = 60;
     }
 
+    printf("[DEBUG] Dump av Ethernet frame (%zu bytes):\n", frame_len);
+    for (size_t i = 0; i < frame_len; i++) {
+        printf("%02X ", frame[i]);
+        if ((i+1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+
     int sent = sendto(rawsocket, frame, frame_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
 
