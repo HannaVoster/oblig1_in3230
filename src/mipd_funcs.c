@@ -7,7 +7,7 @@
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <arpa/inet.h> 
-
+#include <sys/ioctl.h>
 
 pending_msg pending_queue[MAX_PENDING] = {0};
 
