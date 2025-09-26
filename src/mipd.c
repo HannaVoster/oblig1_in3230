@@ -22,6 +22,7 @@
 int debug_mode = 0; // global flagg for debug
 int last_unix_client_fd = -1; 
 int my_mip_address = -1;
+char iface_name[IFNAMSIZ] = {0};
 
 
 int create_unix_socket(const char *path) {
@@ -203,6 +204,51 @@ void handle_raw_packet(int raw_sock) {
     }
 }
 
+// Denne funksjonen finner et nettverksinterface (f.eks. "eth0")
+// som vi kan bruke for AF_PACKET rå-sockets.
+// Den hopper over "lo" (loopback), siden vi ikke vil sende MIP-pakker dit.
+void find_iface(void) {
+    struct ifaddrs *ifaddr, *ifa;
+
+    // Henter en lenket liste over alle nettverksinterfaces på maskinen.
+    // ifaddr peker til starten av lista.
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs"); // Skriver feilmelding hvis det feiler
+        exit(1);
+    }
+
+    // Vi går gjennom alle entries i lista
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) continue; // Hopp over ugyldige entries
+
+        // Vi er kun interessert i interfaces av type AF_PACKET,
+        // altså lavnivå nettverksinterfaces (Ethernet, etc.)
+        // Ikke f.eks. IPv4 (AF_INET) eller IPv6 (AF_INET6).
+        if (ifa->ifa_addr->sa_family == AF_PACKET &&
+            strcmp(ifa->ifa_name, "lo") != 0) { // Hopper over "lo" (loopback)
+            
+            // Kopierer navnet (eks: "eth0", "ens33", etc.) inn i global variabel
+            strncpy(iface_name, ifa->ifa_name, IFNAMSIZ);
+            iface_name[IFNAMSIZ - 1] = '\0'; // Sørg for at string alltid nulltermineres
+            break; // Vi tar det første gyldige vi finner
+        }
+    }
+
+    // Ferdig med lista – frigjør minnet
+    freeifaddrs(ifaddr);
+
+    // Hvis vi ikke fant noe interface, feiler vi
+    if (iface_name[0] == '\0') {
+        fprintf(stderr, "Fant ikke noe gyldig interface!\n");
+        exit(1);
+    }
+
+    // Debug: skriv ut hvilket interface vi valgte
+    if (debug_mode) {
+        printf("[DEBUG] Bruker interface: %s\n", iface_name);
+    }
+}
+
 
 int main(int argc, char *argv[]) {
     // Håndterer -h og -d
@@ -232,6 +278,10 @@ int main(int argc, char *argv[]) {
     char *socket_path = argv[optind];
     int my_mip_address;
     my_mip_address = atoi(argv[optind+1]);
+
+    find_iface();
+
+    
 
     if (debug_mode) {
         printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",

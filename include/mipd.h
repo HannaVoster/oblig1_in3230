@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <net/if.h>  //for IFNAMIZ til interface
 
 // SDU typer i henhold til RFC Appendix A
 #define SDU_TYPE_ARP   0x01
@@ -13,6 +14,7 @@
 
 #define ETH_P_MIP 0xBB88
 
+extern char iface_name[IFNAMSIZ];
 
 typedef struct {
     int valid;
