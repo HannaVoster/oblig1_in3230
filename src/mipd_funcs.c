@@ -125,19 +125,22 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         return -1;
     }
 
-    memset(&device, 0, sizeof(device)); //nullstiller
-    device.sll_ifindex = ifidx; // ikke "eth0" lenger
-    device.sll_family = AF_PACKET; // ethernet
-    device.sll_halen = ETH_ALEN; //6 lengde på mac adresse
+    memset(&device, 0, sizeof(device)); // nullstiller
+    device.sll_family   = AF_PACKET; 
+    device.sll_protocol = htons(ETH_P_MIP); 
+    device.sll_ifindex  = ifidx;
+    device.sll_halen    = ETH_ALEN; // 6 bytes (MAC-lengde)
     memcpy(device.sll_addr, dest_mac, 6);
 
-    int send = sendto(rawsocket, pdu, pdu_length, 0, (struct sockaddr*)&device, sizeof(device));
+    int send = sendto(rawsocket, pdu, pdu_length, 0,
+                      (struct sockaddr*)&device, sizeof(device));
     if(send < 0){
         perror("send_pdu");
     }
 
     return send;
 }
+
 
 //Broadcast
 int send_broadcast(int dst, int rawsocket){
