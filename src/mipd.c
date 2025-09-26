@@ -134,6 +134,13 @@ void handle_raw_packet(int raw_sock) {
     int len = recvmsg(raw_sock, &msg, 0);
     if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
 
+    printf("[DEBUG] recvmsg got %d bytes\n", len);
+    for (int i = 0; i < len; i++) {
+        printf("%02X ", buffer[i]);
+        if ((i+1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+
     // Tolker Ethernet-header
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
