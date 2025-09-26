@@ -25,6 +25,7 @@ typedef struct {
 
 // global kø
 extern pending_msg pending_queue[MAX_PENDING];
+extern int last_unix_client_fd;
 
 // ARP message (SDU payload)
 typedef struct __attribute__((packed)) {

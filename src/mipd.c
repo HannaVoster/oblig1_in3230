@@ -12,7 +12,7 @@
 #include <net/if.h>             // if_nametoindex(), struct ifreq
 #include <arpa/inet.h>
 #include <netinet/if_ether.h>   // struct ethhdr (klassisk Ethernet-header)
-
+#include <ifaddrs.h>
 
 #include "mipd.h"
 
@@ -112,7 +112,11 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             free(arp_pdu);
         }
         free(pdu);
+        if (last_unix_client_fd > 0) {
+            close(last_unix_client_fd);
+        }
         last_unix_client_fd = client;
+        return;
     }
     close(client);
 }
