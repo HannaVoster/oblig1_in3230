@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 #define BUF_SIZE 256
 
