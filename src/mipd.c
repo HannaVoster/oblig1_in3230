@@ -7,24 +7,18 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <netpacket/packet.h>
-#include <net/ethernet.h>
-#include <net/if.h>
+#include <netpacket/packet.h>   // AF_PACKET, sockaddr_ll
+#include <net/ethernet.h>       // ETH_P_*
+#include <net/if.h>             // if_nametoindex(), struct ifreq
 #include <arpa/inet.h>
+#include <netinet/if_ether.h>   // struct ethhdr (klassisk Ethernet-header)
+#include <linux/if_packet.h>    // ekstra Linux-definisjoner for raw sockets
 
-
-
-#ifdef __linux__
-#include <netinet/if_ether.h>
-#include <net/if.h>
-#include <linux/if_packet.h>
-#endif
 
 #include "mipd.h"
 
 #define MAX_EVENTS 10
 #define UNIX_PATH "/tmp/mip_socket"
-
 
 int create_unix_socket(const char *path) {
     int sock;
@@ -68,8 +62,8 @@ int create_raw_socket() {
 
     //AF_PACKET forteller at adressen tilhører ethernet rammer, på et lavt nivå
     //SOCK_RAW socket type, tar imot hele ethernet rammer med både header og payload
-    //htons(ETH_P_ALL) tar imot alle typer ethernet
-    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    //htons(ETH_P_MIP) 
+    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
@@ -79,202 +73,171 @@ int create_raw_socket() {
 
 //håndterer en forbindelse på UNIX socket
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
-
-    //client - fildeskriptor som representerer forbindelsen
     int client = accept(unix_sock, NULL, NULL);
-    if (client < 0) {
-        perror("accept");
-        return;
-    }
+    if (client < 0) return;
 
-    //buffer til å holde det som skal leses fra klinetforbindelsen
     char buffer[256];
-
-    //leser fra klienten, legger inn i buffer
     int n = read(client, buffer, sizeof(buffer)-1);
 
-    //passer på at det er plass til en nullterminering
-    //bygger pdu som sendes gjennom raw_socket
     if (n > 0) {
         buffer[n] = '\0';
-        printf("[UNIX] Received from client: %s\n", buffer);
-        
-        //hent ut dest mip adresse og payload
         uint8_t dest_addr = buffer[0];
         uint8_t* payload = (uint8_t*)&buffer[1];
-        uint16_t payload_length = n - 1; // første byte er addresse
+        uint16_t payload_length = n - 1;
 
         size_t pdu_len;
-            uint8_t* pdu = build_pdu(
-                dest_addr,
-                my_mip_address,
-                4,
-                payload_length,
-                SDU_TYPE_PING,
-                payload,
-                &pdu_len
-            );
+        uint8_t* pdu = build_pdu(dest_addr, my_mip_address, 4,
+                                 payload_length, SDU_TYPE_PING,
+                                 payload, &pdu_len);
 
-        //sjekk ARP cashe med arp_lookup
         unsigned char mac[6];
-        if (arp_lookup(dest_addr, mac)){
-            //hvis HIT -> PDU til MAC via raw socket
-            //fant mac - send pdu
+        if (arp_lookup(dest_addr, mac)) {
             send_pdu(raw_sock, pdu, pdu_len, mac);
             free(pdu);
-        }
-        else{
-            //hvis MISS -> send ARP request, broadcast for å finne MAC
+        } else {
             queue_message(dest_addr, pdu, pdu_len);
             free(pdu);
 
-            printf("[ARP] MIP %d ikke funnet, må sende ARP request\n", dest_addr);
-            send_broadcast(dest_addr, raw_sock);
+            mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
+            size_t arp_len;
+            uint8_t* arp_pdu = build_pdu(0xFF, my_mip_address, 1,
+                                         sizeof(req), SDU_TYPE_ARP,
+                                         (uint8_t*)&req, &arp_len);
 
+            unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+            send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+            free(arp_pdu);
         }
-
+        free(pdu);
+        last_unix_client_fd = client;
     }
-    //ferdig med forbindelsen så lukker den for å frigjøre ressurser
     close(client);
 }
 
+
+
 //håndterer en forbindelse på RAW socket
 void handle_raw_packet(int raw_sock) {
-    //lager buffer til å holde det som leses
-    // uint8_t pga rå bytes og ikke tekst
     uint8_t buffer[2000];
+    struct sockaddr_ll src_addr;
+    struct iovec iov = { buffer, sizeof(buffer) };
+    struct msghdr msg = { .msg_name = &src_addr, .msg_namelen = sizeof(src_addr),
+                          .msg_iov = &iov, .msg_iovlen = 1 };
 
-    //henter ethernet ramme, legger over i buffer, med max antall bytes og eventuelle flagg(her 0)
-    int len = recv(raw_sock, buffer, sizeof(buffer), 0);
+    int len = recvmsg(raw_sock, &msg, 0);
+    if (len < 14) return; // må minst være Ethernet
 
-    //len representerer lengden, antall bytes som mottas. hvis < 0 -> feil skjedd og returner
-    if (len < 0) {
-        perror("recv raw");
-        return;
-    }
-    printf("[rawsocket] Got packet of length %d\n", len);
+    uint8_t *eth_hdr = buffer;
+    uint8_t *mip_hdr_start = buffer + 14;
 
-    //headeren er 4 bytes, så pakken må være minst det for å kunne tolkes
-    if (len < 4){
-        printf("raw socket, pakken er for kort");
-        return;
-    }
+    uint8_t *src_mac = eth_hdr + 6;
+    uint16_t ethertype = (eth_hdr[12] << 8) | eth_hdr[13];
+    if (ntohs(ethertype) != ETH_P_MIP) return;
 
-    //parser mip header med hjelpemetoder
-    mip_header header;
-    mepcpy(&header, buffer, 4);
-    uint8_t src_addr = get_src_addr(header);
-    uint8_t dest_addr = get_dest_addr(header);
-    uint8_t ttl = get_ttl(header);
-    uint8_t sdu_type = get_sdu_type(header);
-    uint16_t sdu_length = get_sdu_lengt(header);
+    mip_header_t hdr;
+    memcpy(&hdr, mip_hdr_start, sizeof(mip_header_t));
 
-    if (dest_addr != my_mip_address){
-        printf("[rawsocket], ikke pakken min");
-        return;
-    }
+    uint8_t src_mip   = get_src(&hdr);
+    uint8_t dest_mip  = get_dest(&hdr);
+    uint8_t sdu_type  = get_type(&hdr);
+    uint16_t sdu_len  = get_length(&hdr) * 4;
+    uint8_t *payload  = mip_hdr_start + sizeof(mip_header_t);
 
-    //henter payload
-    uint8_t* payload = buffer + 4;
+    if (dest_mip != my_mip_address && dest_mip != 0xFF) return;
 
-    //lager en switch som håndterer de ulike casene av sdu typer
-    switch(sdu_type){
-
-        case SDU_TYPE_PING: {
-            //hvis PING - PONG tilbake til avsender
-            printf("[RAW] PING mottatt fra MIP %d\n", src_addr);
-
-            // bygg pfu klar for PONG
+    switch (sdu_type) {
+        case SDU_TYPE_PING:
+        printf("[RAW] PING mottatt fra MIP %d\n", src_mip);
+        // svar med PONG
+        {
             size_t pdu_len;
-            uint8_t *pdu = build_pdu(src_addr, my_mip_address, 4, sdu_length, SDU_TYPE_PONG, payload, &pdu_len);
-
-            //må ha mac for å kunne sende, sjekker ARP
-            unsigned char mac[6]; // plass til mac adressen
-            if (arp_lookup(src_addr, mac)) {
-                send_pdu(raw_sock, pdu, pdu_len, mac);
-                free(pdu);
-            }
-            else{
-                printf("[RAW] MAC for %d ikke i cache, sender ARP request\n", src_addr);
-
-                queue_message(src_addr, pdu, pdu_len);
-                free(pdu);
-                //mac ikke funnet, sender broadcast for å kunne oppdatere arp tabellen/finne mac
-                send_broadcast(dest_addr, raw_sock);
-            }
-            
-            break;
-
-
-        }
-        case SDU_TYPE_PONG: {
-            // logg eller send videre til UNIX klient
-            printf("[RAW] PONG mottatt fra MIP %d: %.*s\n", src_addr, sdu_length, payload);
-            //HVA NÅ? sende melding til unix klient???
-            break;
-
-        }
-        case SDU_TYPE_ARP_REQ: {
-            // bygg og send ARP respons
-            //caster payloaded til å passe til mip_arp_msg
-            mip_arp_msg *req = (mip_arp_msg*)payload;
-
-            //sjekker om forespørselen er for denne maskinen før vi går videre
-            if(req-> mip_addr == my_mip_address){
-                printf("[RAW] ARP request for me (%d) mottatt\n", my_mip_address);
-
-                mip_arp_msg resp;
-                resp.mip_addr = my_mip_address;
-                resp.type = SDU_TYPE_ARP_RESP;
-                memset(req.mac, 0, 6); //jeg spør, de trenger ikke vite min (per nå)
-
-                size_t pdu_len;
-                uint8_t *pdu = build_pdu(src_addr, my_mip_address, 4, sizeof(resp), SDU_TYPE_ARP_RESP, (uint8_t*)&resp, &pdu_len );
-
-                unsigned char mac[6];
-                if(arp_lookup(src_addr, mac)){
-                    send_pdu(raw_sock, pdu, pdu_len, mac);
-                }
-                else{
-                    unsigned char broadcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-                    send_pdu(raw_sock, pdu, pdu_len, broadcast_mac);
-                }
-            }
+            uint8_t* pdu = build_pdu(src_mip, my_mip_address, 4,
+                                    sdu_len, SDU_TYPE_PONG,
+                                    payload, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, (unsigned char*)src_mac);
             free(pdu);
+        }
+        break;
+
+        case SDU_TYPE_PONG:
+            printf("[RAW] PONG mottatt fra MIP %d: %.*s\n", src_mip, sdu_len, payload);
+            if (last_unix_client_fd > 0) {
+                write(last_unix_client_fd, payload, sdu_len);
+                close(last_unix_client_fd);
+                last_unix_client_fd = -1;
+            }
             break;
 
+        case SDU_TYPE_ARP: {
+            mip_arp_msg *arp = (mip_arp_msg*)payload;
+
+        if (arp->type == 0x00) { // Request
+            if (arp->mip_addr == my_mip_address) {
+                printf("[RAW] ARP-REQ for meg (%d)\n", my_mip_address);
+
+                mip_arp_msg resp = { .type = 0x01, .mip_addr = my_mip_address, .reserved = 0 };
+                size_t pdu_len;
+                uint8_t* pdu = build_pdu(src_mip, my_mip_address, 1,
+                                        sizeof(resp), SDU_TYPE_ARP,
+                                        (uint8_t*)&resp, &pdu_len);
+
+                send_pdu(raw_sock, pdu, pdu_len, src_mac);
+                free(pdu);
+            }
         }
-        case SDU_TYPE_ARP_RESP: {
-            // oppdater ARP- cashe
-            mip_arp_msg *resp = (mip_arp_msg*)payload;
+        else if (arp->type == 0x01) { // Response
+            printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
+            arp_update(arp->mip_addr, src_mac);
+            send_pending_messages(raw_sock, arp->mip_addr, src_mac);
+        }
+        break;
+        }
 
-            printf("[RAW] ARP response for MIP %d mottatt\n", resp->mip_addr);
-
-            arp_update(resp->mip_addr, resp->mac);
-
-            //meldinger som eventuelt venter i kø til denne mac adressen kan nå sendes
-            send_pending_messages(raw_sock, resp->mip_addr, resp->mac);
-
+        default:
+            printf("[RAW] Ukjent SDU-type: %d\n", sdu_type);
             break;
-
-        }
-        default: {
-            printf("ukjent SDU type");
-            break;
-        }
     }
 }
 
 
+int debug_mode = 0; // global flagg for debug
+int last_unix_client_fd = -1; 
+
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <socket_upper> <MIP_address>\n", argv[0]);
-        return 1;
+    // Håndterer -h og -d
+    int opt;
+    while ((opt = getopt(argc, argv, "hd")) != -1) {
+        switch(opt) {
+            case 'h':
+                printf("Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
+                printf("Options:\n");
+                printf("  -h      print help and exit\n");
+                printf("  -d      enable debug mode\n");
+                return 0;
+            case 'd':
+                debug_mode = 1;
+                break;
+            default:
+                fprintf(stderr, "Unknown option\n");
+                return 1;
+        }
     }
 
-    char *socket_path = argv[1];
+    if (optind + 2 > argc) {
+        fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+  
+    char *socket_path = argv[optind];
     int my_mip_address;
-    my_mip_address = atoi(argv[2]);
+    my_mip_address = atoi(argv[optind+1]);
+
+    if (debug_mode) {
+        printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",
+               socket_path, my_mip_address);
+        printf("[DEBUG] Initial ARP cache:\n");
+        print_arp_cache();
+    }
 
     int unix_sock = create_unix_socket(socket_path);
     int raw_sock = create_raw_socket();

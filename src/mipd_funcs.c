@@ -4,154 +4,108 @@
 #include <stdlib.h>
 #include "mipd.h"
 
-
-//----------------------ARP CASHE--------------------------
-
-
-
-
-//method for updating arp cashe
-void arp_update(int mip_addr, unsigned char *mac){
-	for(int i = 0; i < MAX_ARP; i++){
-		if(!arp_cash[i].valid){
-			arp_cash[i].valid = 1;
-			arp_cash[i].mip_addr = mip_addr;
-
-			if (mac){
-				memcpy(arp_cash[i].mac, mac, 6);
-			}
-
-			else {
-                unsigned char dummy[6] = {0x02,0x00,0x00,0x00,0x00,0x01};
-                memcpy(arp_cash[i].mac, dummy, 6);
-            }
-
-			printf("[ARP] UPDATE: la inn MIP %d med MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
-                   mip_addr,
-                   arp_cash[i].mac[0], arp_cash[i].mac[1], arp_cash[i].mac[2],
-                   arp_cash[i].mac[3], arp_cash[i].mac[4], arp_cash[i].mac[5]);
-            return;
-		}
-	}
-
-	printf("[ARP] CACHE FULL: kunne ikke lagre MIP %d\n", mip_addr);
-};
-
-
-// Sjekk om MIP finnes i cache. Fyll mac_out hvis ikke NULL.
-int arp_lookup(int mip_addr, unsigned char *mac_out) {
-    for (int i = 0; i < MAX_ARP; i++) {
-        if (arp_cash[i].valid && arp_cash[i].mip_addr == mip_addr) {
-
-            if (mac_out) {
-				memcpy(mac_out, arp_cash[i].mac, 6);
-			}
-
-            printf("[ARP] HIT: MIP %d finnes i cache\n", mip_addr);
-            return 1;
-        }
-    }
-    printf("[ARP] MISS: MIP %d ikke i cache → (ville sendt broadcast nå)\n", mip_addr);
-    return 0;
-}
+pending_msg pending_queue[MAX_PENDING] = {0};
 
 //----------------------HEADER--------------------------
 //GET/SET
 
-typedef uint8_t mip_header[4]; //fast størrelse på 4 bytes, bruker set/get metoder under
+// SET
+void set_dest(mip_header_t *h, uint8_t dest) { h->dest = dest; }
+void set_src(mip_header_t *h, uint8_t src)   { h->src  = src; }
 
-//SET
-
-void set_dest_addr(mip_header header, uint8_t dest_addr){
-    header[0] = dest_addr;
-}
-void set_src_addr(mip_header header, uint8_t scr_addr){
-    header[1] = scr_addr;
-}
-void set_ttl(mip_header header, uint8_t ttl){
-    header[2] = (header[2] & 0x0F) | (ttl & 0x0F) << 4;
-    //Beholde de nederste 4 bitene.
-    //Nullstille de øverste 4 bitene
-    //Legge inn TTL der
-}
-void set_sdu_length(mip_header header, uint16_t sdu_length){
-    header[2] = (header[2] & 0xF0) | ((sdu_length >> 8) & 0x0F); // øverste bits
-    header[3] = sdu_length & 0xFF; // nederste bits
-}
-void set_sdu_type(mip_header header, uint8_t sdu_type){
-    header[3] = (header[3] & 0xF0) | (sdu_type & 0x0F);
+void set_ttl(mip_header_t *h, uint8_t ttl) {
+    h->ttl_len = (h->ttl_len & 0x0F) | ((ttl & 0x0F) << 4);
 }
 
-//GET
-
-uint8_t get_dest_addr(const mip_header header) {
-	return header[0]; // header i byte 0(1)
+void set_length(mip_header_t *h, uint16_t len_words) {
+    // len_words = antall 32-bits ord (ikke bytes!)
+    // øverste 4 bits går i ttl_len (lavere halvdel)
+    h->ttl_len = (h->ttl_len & 0xF0) | ((len_words >> 5) & 0x0F);
+    // de 5 neste bit + type havner i len_type
+    h->len_type = (h->len_type & 0x07) | ((len_words & 0x1F) << 3);
 }
 
-uint8_t get_src_addr(const mip_header header) {
-	return header[1];
+void set_type(mip_header_t *h, uint8_t type) {
+    h->len_type = (h->len_type & 0xF8) | (type & 0x07);
 }
 
-uint8_t get_ttl(const mip_header header) {
-	return (header[2] >> 4) & 0x0F;
+// GET
+uint8_t get_dest(const mip_header_t *h) { return h->dest; }
+uint8_t get_src (const mip_header_t *h) { return h->src; }
 
-	//flytter de fire første bitene til de fire laveste
-	//nullstiller så de fire første så bare ttl returneres 
+uint8_t get_ttl(const mip_header_t *h) {
+    return (h->ttl_len >> 4) & 0x0F;
 }
 
-//lenger siden sdu length er 9 bits
-uint16_t get_sdu_length(const mip_header header) {
-	return (header[2] & 0x0F) << 8 | header[3];
-    // ta de fire nederste bit fra header[2]
-    //flytt dem til høye bitposisjon
-    //legg til hele innholdet i header[3]
+uint16_t get_length(const mip_header_t *h) {
+    uint16_t high = h->ttl_len & 0x0F;
+    uint16_t low  = (h->len_type >> 3) & 0x1F;
+    return (high << 5) | low;
 }
 
-uint8_t get_sdu_type(const mip_header header) {
-    return (header[3] & 0x0F);
-	//de fire øverste bitene nullstilt, og de fire nederste beholdes.
+uint8_t get_type(const mip_header_t *h) {
+    return h->len_type & 0x07;
 }
-
 
 //------------------PDU------------------
 
-
 // pdu = header + payload
 
-uint8_t* build_pdu(uint8_t dest_addr, uint8_t scr_addr, uint8_t ttl, uint16_t sdu_length, uint8_t sdu_type, const uint8_t* payload){
+uint8_t* build_pdu(
+    uint8_t dest_addr, 
+    uint8_t src_addr, 
+    uint8_t ttl, 
+    uint16_t sdu_length_bytes,
+    uint8_t sdu_type,
+    const uint8_t* payload,
+    size_t* out_length
+    ){ 
     //build buffer with both header and payload
 
     //kontroller lengde på payload for å gjøre pdu delelig med 4?
 
-    uint16_t aligned_length = sdu_length;
-    if (sdu_length % 4 != 0) {
-        aligned_length += 4 - (sdu_length % 4);
+    uint16_t aligned_length_bytes = (sdu_length_bytes + 3) & ~0x03;
+
+    // RFC: SDU length skal lagres i words (32-bit ord)
+    uint16_t length_in_words = aligned_length_bytes / 4;
+
+    // Alloker plass: header (4 byte) + payload (padded)
+    uint8_t* pdu = malloc(sizeof(mip_header_t) + aligned_length_bytes);
+    if (!pdu) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
     }
 
-    uint8_t* pdu = malloc(4 + aligned_length); // 4 bytes header + SDU
+    // Bygg header
+    mip_header_t hdr = {0};
+    set_dest(&hdr, dest_addr);
+    set_src(&hdr, src_addr);
+    set_ttl(&hdr, ttl);
+    set_length(&hdr, length_in_words);
+    set_type(&hdr, sdu_type);
 
-    //header
-    mip_header header;
-    set_dest_addr(header, dest_addr);
-    set_sdu_length(header, sdu_length);
-    set_sdu_type(header, sdu_type);
-    set_ttl(header, ttl);
-    set_src_addr(header, scr_addr);
+    // Kopier header inn i PDU
+    memcpy(pdu, &hdr, sizeof(mip_header_t));
 
-    //kopierer header over i pdu
-    //pdu peker til buffer, header legges inn, 4 er antall bytes som kopieres
-    memcpy(pdu, header, 4);
-    memcpy(pdu + 4, payload, sdu_length);
-    
-    if (aligned_length > sdu_length) {
-        memset(pdu + 4 + sdu_length, 0, aligned_length - sdu_length);
-    }   
+    // Kopier payload
+    memcpy(pdu + sizeof(mip_header_t), payload, sdu_length_bytes);
+
+    // Nullfyll padding hvis nødvendig
+    if (aligned_length_bytes > sdu_length_bytes) {
+        memset(pdu + sizeof(mip_header_t) + sdu_length_bytes, 0,
+               aligned_length_bytes - sdu_length_bytes);
+    }
+
+    // Total PDU-lengde i bytes (inkl. header)
+    if (out_length) {
+        *out_length = sizeof(mip_header_t) + aligned_length_bytes;
+    }
 
     return pdu;
 }
+
 //endret til å ha en generisk sende metode
 int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac){
-    #ifdef __linux__
     if (rawsocket < 0){
         perror("socket");
         exit(1);
@@ -171,98 +125,64 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     }
 
     return send;
-
-    #elif __APPLE__
-    printf("[SEND_PDU] SEND ON MAC");
-    return 1;
-    #endif
 }
 
 //Broadcast
 int send_broadcast(int dst, int rawsocket){
-    #ifdef __linux__
     //raw socket broadcast kode
-    req mip_arp_msg;
-    mip_arp_msg.type = SDU_TYPE_ARP_REQ;
-    mip_arp_msg.mip_addr = dst;
+    mip_arp_msg req;
+    req.type = 0x00; // ARP Request
+    req.mip_addr = dst;
+    req.reserved = 0;
 
-    //setter mac feltet i req til  være tom
-    memset(mip_arp_msg.mac, 0,6);
-
-    // type cast: (uint8_t*)&req
+    size_t pdu_len;
     uint8_t* pdu = build_pdu(
         dst,
         my_mip_address,
-        2, 
-        sizeof(mip_arp_msg), 
-        SDU_TYPE_ARP_REQ,  
-        (uint8_t*)&mip_arp_msg);
+        1, //TTL
+        sizeof(req), 
+        SDU_TYPE_ARP,  
+        (uint8_t*)&req,
+        &pdu_len)
+        ;
 
     unsigned char broadcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}; // broadcast mac adresse
 
-    send_pdu(rawsocket, pdu, 4 + sizeof(mip_arp_msg), broadcast_mac)
+    send_pdu(rawsocket, pdu, pdu_len, broadcast_mac);
   
     free(pdu);
-
-    #elif __APPLE__
-    printf("[ARP] Simulert broadcast for MIP");
-    
-    #endif
-
     return 0;
 }
 
-int wait_for_broadcast_response(){}
 
-//Sende pakke
-
-int send_packet(int clientfd, unsigned char *mac_address, int dst){
-     //---- RAW SOCKET--
-        // Linux RAW Ethernet socket
-        //AF PACKET -adress family, til å motta ethernet rammer, under ip nivået
-        //SOCK RAW - type socket, raw socket gir pakker slik de faktisk er
-        // htons - gir "network byte order" ETH_P_ALL gir alle rammetyper
-        #ifdef __linux__
-        int rawsocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-        if (rawsocket < 0){
-            perror("socket");
-            exit(1);
+void queue_message(uint8_t dest_mip, uint8_t* pdu, size_t length) {
+    for (int i = 0; i < MAX_PENDING; i++) {
+        if (!pending_queue[i].valid) {
+            pending_queue[i].valid = 1;
+            pending_queue[i].dest_mip = dest_mip;
+            pending_queue[i].payload = malloc(length);
+            memcpy(pending_queue[i].payload, pdu, length);
+            pending_queue[i].length = length;
+            printf("[QUEUE] Meldingen for MIP %d lagt i kø\n", dest_mip);
+            return;
         }
+    }
+    printf("[QUEUE] Kø full, kunne ikke legge til melding for MIP %d\n", dest_mip);
+}
 
-        struct sockaddr_ll device;
+void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac) {
+    for (int i = 0; i < MAX_PENDING; i++) {
+        if (pending_queue[i].valid && pending_queue[i].dest_mip == mip_addr) {
+            send_pdu(raw_sock, pending_queue[i].payload, pending_queue[i].length, mac);
+            free(pending_queue[i].payload);
+            pending_queue[i].payload = NULL;
+            pending_queue[i].valid = 0;
+            printf("[QUEUE] Sendt kø-melding til MIP %d\n", mip_addr);
+        }
+    }
+}
 
-        //nullstiller
-        memset(&device, 0, sizeof(device));
-        device.sll_ifindex = if_nametoindex("eth0"); //interface
-        device.sll_family = AF_PACKET; // ethernet
-        device.sll_halen = ETH_ALEN; //6 lengde på mac adresse
 
-        //kopierer mac adressen til destinasjonen - hentet fra tidligere
-        memcpy(device.sll_addr, mac_address, 6);
 
-        //send datagram //DUMMY DATA ENDRE TIL ANNERLEDES LENGDE SENERE
-        uint8_t payload[8] = {0,1,2,3,4,5,6,7};
 
-        uint16_t sdu_length = sizeof(payload);
 
-        uint8_t* pdu = build_pdu(dst, my_mip_address, 4, sdu_length, 9, payload);
-
-        uint16_t pdu_length = 4 + sdu_length;
-
-        //send
-        sendto(rawsocket, pdu, pdu_length, 0, (struct sockaddr*)&device, sizeof(device));
-
-        free(pdu);
-
-        #elif __APPLE__
-        printf("[TX-simulert] Ville sendt PDU til MIP %d\n", dst);
-
-        #endif  
-
-		printf("[TX] Ville sendt MIP-PDU til MIP %d (MAC %02X:%02X:%02X:%02X:%02X:%02X)\n",
-			dst, mac_address[0], mac_address[1], mac_address[2], mac_address[3], mac_address[4], mac_address[5]);
-
-		// Send et enkelt svar tilbake til klienten for å vise at flyten fungerer
-		const char *reply = "PONG (simulert)\n";
-		write(clientfd, reply, strlen(reply));
-	}
