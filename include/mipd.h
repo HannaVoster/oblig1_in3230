@@ -12,7 +12,7 @@
 
 #define MAX_PENDING 20
 
-#define ETH_P_MIP 0xBB88
+#define ETH_P_MIP 0x88B5
 
 extern char iface_name[IFNAMSIZ];
 

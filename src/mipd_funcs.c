@@ -122,6 +122,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     printf("[DEBUG] pdu_length=%zu\n", pdu_length);
 
     struct sockaddr_ll device;
+    memset(&device, 0, sizeof(device)); // nullstiller
     
     unsigned ifidx = if_nametoindex(iface_name);
     printf("[DEBUG] iface=%s ifindex=%d\n", iface_name, ifidx);
@@ -130,8 +131,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         perror("if_nametoindex");
         return -1;
     }
-
-    memset(&device, 0, sizeof(device)); // nullstiller
+    
     device.sll_family   = AF_PACKET; 
     device.sll_protocol = htons(ETH_P_MIP); 
     device.sll_ifindex  = ifidx;
