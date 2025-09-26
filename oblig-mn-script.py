@@ -137,5 +137,5 @@ CLI.do_EOF = do_EOF
 
 # Topologies
 topos = {
-    'oblig': (lambda: ObligTopo()),
+    'oblig': (lambda: Oblig()),
 }
