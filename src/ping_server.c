@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define BUF_SIZE 256
+#define BUF_SIZE 512 //økt etter warning
 
 int main(int argc, char *argv[]) {
     if (argc < 2 || strcmp(argv[1], "-h") == 0) {

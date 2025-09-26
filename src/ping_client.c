@@ -10,7 +10,7 @@
 #include <sys/time.h>
 #include <stdint.h>
 
-#define BUF_SIZE 256
+#define BUF_SIZE 512
 
 int main(int argc, char *argv[]) {
     if (argc < 4 || strcmp(argv[1], "-h") == 0) {
