@@ -73,7 +73,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
 int send_broadcast(int dest, int rawsocket);
 
 void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t length);
-void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac);
+void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, int my_mip_address);
 
 // hentefunksjoner
 uint8_t get_src(const mip_header_t *h);

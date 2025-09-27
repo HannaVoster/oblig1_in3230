@@ -209,7 +209,7 @@ void handle_raw_packet(int raw_sock) {
             else if (arp->type == 0x01) {
                 printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
                 arp_update(arp->mip_addr, eh->h_source);
-                send_pending_messages(raw_sock, arp->mip_addr, eh->h_source);
+                send_pending_messages(raw_sock, arp->mip_addr, eh->h_source, my_mip_address);
             }
             break;
         }
@@ -293,7 +293,6 @@ int main(int argc, char *argv[]) {
     }
   
     char *socket_path = argv[optind];
-    int my_mip_address;
     my_mip_address = atoi(argv[optind+1]);
 
     find_iface();

@@ -282,7 +282,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t len
 }
 
 
-void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac) {
+void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, my_mip_address) {
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid && pending_queue[i].dest_mip == mip_addr) {
             size_t pdu_len;
