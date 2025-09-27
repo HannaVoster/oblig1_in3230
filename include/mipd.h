@@ -80,6 +80,7 @@ uint8_t get_src(const mip_header_t *h);
 uint8_t get_dest(const mip_header_t *h);
 uint8_t get_type(const mip_header_t *h);
 uint16_t get_length(const mip_header_t *h);
+uint8_t get_ttl(const mip_header_t *h);
 
 void set_dest(mip_header_t *h, uint8_t dest);
 void set_src(mip_header_t *h, uint8_t src);
