@@ -10,7 +10,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-pending_msg pending_queue[MAX_PENDING] = {0};
+pending_entry pending_queue[MAX_PENDING] = {0};
+
 
 //----------------------HEADER--------------------------
 //GET/SET

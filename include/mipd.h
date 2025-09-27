@@ -16,12 +16,6 @@
 
 extern char iface_name[IFNAMSIZ];
 
-typedef struct {
-    int valid;
-    uint8_t dest_mip;
-    uint8_t* payload;
-    size_t length;
-} pending_msg;
 
 typedef struct {
     int valid;
@@ -34,7 +28,7 @@ typedef struct {
 pending_entry pending_queue[MAX_PENDING];
 
 // global kø
-extern pending_msg pending_queue[MAX_PENDING];
+extern pending_entry pending_queue[MAX_PENDING];
 extern int last_unix_client_fd;
 
 // ARP message (SDU payload)
@@ -78,7 +72,8 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
 
 // Broadcast / kø
 int send_broadcast(int dest, int rawsocket);
-void queue_message(uint8_t dest_mip, uint8_t* pdu, size_t length);
+
+void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t length);
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac);
 
 // hentefunksjoner
