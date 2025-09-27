@@ -63,18 +63,27 @@ int create_unix_socket(const char *path) {
 }
 
 int create_raw_socket() {
-    //lager en raw socket
-
-    //AF_PACKET forteller at adressen tilhører ethernet rammer, på et lavt nivå
-    //SOCK_RAW socket type, tar imot hele ethernet rammer med både header og payload
-    //htons(ETH_P_MIP) 
     int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
     }
+
+    // Bind socketen til valgt interface (iface_name settes i find_iface())
+    struct sockaddr_ll sll = {0};
+    sll.sll_family   = AF_PACKET;
+    sll.sll_protocol = htons(ETH_P_MIP);
+    sll.sll_ifindex  = if_nametoindex(iface_name);
+
+    if (bind(sock, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
+        perror("bind raw socket");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
     return sock;
 }
+
 
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     int client = accept(unix_sock, NULL, NULL);
