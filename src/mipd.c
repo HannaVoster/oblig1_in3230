@@ -84,35 +84,61 @@ int create_raw_socket() {
     return sock;
 }
 
-// Håndterer en forbindelse på UNIX socket
-void handle_unix_request(int client) {
-    uint8_t buffer[2000];
+
+void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
+    int client = accept(unix_sock, NULL, NULL);
+    if (client < 0) return;
+
+    char buffer[256];
     int n = read(client, buffer, sizeof(buffer));
-    if (n <= 0) {
-        close(client);
+
+    if (n > 0) {
+        uint8_t dest_addr = buffer[0];
+        uint8_t* payload = (uint8_t*)&buffer[1];
+        size_t payload_length = n - 1;   // korrekt lengde
+
+        // Debug
+        printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n",
+               n, dest_addr, payload_length);
+        printf("[DEBUG] payload bytes: ");
+        for (size_t i = 0; i < payload_length && i < 8; i++) {
+            printf("%02X ", payload[i]);
+        }
+        printf("\n");
+
+        unsigned char mac[6];
+        if (arp_lookup(dest_addr, mac)) {
+            // MAC finnes → bygg og send PING nå
+            size_t pdu_len;
+            uint8_t* pdu = build_pdu(dest_addr, my_mip_address, 4,
+                                     payload_length, SDU_TYPE_PING,
+                                     payload, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, mac);
+            free(pdu);
+        } else {
+            // MAC finnes ikke → legg på vent
+            queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
+
+            // Send ARP request
+            mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
+            size_t arp_len;
+            uint8_t* arp_pdu = build_pdu(0xFF, my_mip_address, 1,
+                                         sizeof(req), SDU_TYPE_ARP,
+                                         (uint8_t*)&req, &arp_len);
+            unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+            send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+            free(arp_pdu);
+        }
+
+        // Håndter UNIX client FD
+        if (last_unix_client_fd > 0) {
+            close(last_unix_client_fd);
+        }
+        last_unix_client_fd = client;
         return;
     }
 
-    // Første byte = dest MIP-adresse, resten = payload
-    uint8_t dest_addr = buffer[0];
-    uint8_t *payload  = &buffer[1];
-    size_t payload_length = n - 1;
-
-    printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n",
-           n, dest_addr, payload_length);
-
-    // Dump de første bytes i payload
-    printf("[DEBUG] payload first bytes: ");
-    for (size_t i = 0; i < payload_length && i < 16; i++) {
-        printf("%02X ", payload[i]);
-    }
-    printf("\n");
-
-    // Legg meldingen i kø
-    queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
-
-    // Husk siste klient, slik at vi kan sende PONG tilbake senere
-    last_unix_client_fd = client;
+    close(client);
 }
 
 
