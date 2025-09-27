@@ -81,4 +81,10 @@ uint8_t get_dest(const mip_header_t *h);
 uint8_t get_type(const mip_header_t *h);
 uint16_t get_length(const mip_header_t *h);
 
+void set_dest(mip_header_t *h, uint8_t dest);
+void set_src(mip_header_t *h, uint8_t src);
+void set_ttl(mip_header_t *h, uint8_t ttl);
+void set_length(mip_header_t *h, uint16_t len_words);
+void set_type(mip_header_t *h, uint8_t type);
+
 #endif
