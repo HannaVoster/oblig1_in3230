@@ -20,15 +20,17 @@ void set_dest(mip_header_t *h, uint8_t dest) { h->dest = dest; }
 void set_src(mip_header_t *h, uint8_t src)   { h->src  = src; }
 
 void set_ttl(mip_header_t *h, uint8_t ttl) {
-    h->ttl_len = (h->ttl_len & 0x0F) | ((ttl & 0x0F) << 4);
+    h->ttl_len = (ttl << 4) | (h->ttl_len & 0x0F);
 }
 
 void set_length(mip_header_t *h, uint16_t len_words) {
-    // len_words = antall 32-bits ord (ikke bytes!)
-    // øverste 4 bits går i ttl_len (lavere halvdel)
-    h->ttl_len = (h->ttl_len & 0xF0) | ((len_words >> 5) & 0x0F);
-    // de 5 neste bit + type havner i len_type
-    h->len_type = (h->len_type & 0x07) | ((len_words & 0x1F) << 3);
+    // split opp length = 9 bits i high(4) + low(5)
+    uint8_t high = (len_words >> 5) & 0x0F;  // øverste 4
+    uint8_t low  = len_words & 0x1F;         // nederste 5
+    // sett low inn i len_type[7:3], behold type i [2:0]
+    h->len_type = (low << 3) | (h->len_type & 0x07);
+    // sett high inn i ttl_len[3:0], behold TTL i [7:4]
+    h->ttl_len  = (h->ttl_len & 0xF0) | high;
 }
 
 void set_type(mip_header_t *h, uint8_t type) {
