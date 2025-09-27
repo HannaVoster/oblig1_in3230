@@ -12,7 +12,6 @@
 
 pending_entry pending_queue[MAX_PENDING] = {0};
 
-
 //----------------------HEADER--------------------------
 //GET/SET
 

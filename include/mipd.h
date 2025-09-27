@@ -25,7 +25,6 @@ typedef struct {
     size_t length;
 } pending_entry;
 
-pending_entry pending_queue[MAX_PENDING];
 
 // global kø
 extern pending_entry pending_queue[MAX_PENDING];
