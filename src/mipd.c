@@ -76,7 +76,6 @@ int create_raw_socket() {
     return sock;
 }
 
-//håndterer en forbindelse på UNIX socket
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     int client = accept(unix_sock, NULL, NULL);
     if (client < 0) return;
@@ -90,36 +89,41 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
         uint8_t* payload = (uint8_t*)&buffer[1];
         uint16_t payload_length = n - 1;
 
-        size_t pdu_len;
-        uint8_t* pdu = build_pdu(dest_addr, my_mip_address, 4,
-                                 payload_length, SDU_TYPE_PING,
-                                 payload, &pdu_len);
-
         unsigned char mac[6];
         if (arp_lookup(dest_addr, mac)) {
+            // MAC finnes → bygg og send PING nå
+            size_t pdu_len;
+            uint8_t* pdu = build_pdu(dest_addr, my_mip_address, 4,
+                                    payload_length, SDU_TYPE_PING,
+                                    payload, &pdu_len);
             send_pdu(raw_sock, pdu, pdu_len, mac);
+            free(pdu);
         } else {
-            queue_message(dest_addr, pdu, pdu_len);
+            // MAC finnes ikke → legg på vent
+            queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
 
+            // Send ARP request
             mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
             size_t arp_len;
             uint8_t* arp_pdu = build_pdu(0xFF, my_mip_address, 1,
-                                         sizeof(req), SDU_TYPE_ARP,
-                                         (uint8_t*)&req, &arp_len);
-
+                                        sizeof(req), SDU_TYPE_ARP,
+                                        (uint8_t*)&req, &arp_len);
             unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
             send_pdu(raw_sock, arp_pdu, arp_len, bmac);
             free(arp_pdu);
         }
-        free(pdu);
+
+        // Håndter UNIX client FD
         if (last_unix_client_fd > 0) {
             close(last_unix_client_fd);
         }
         last_unix_client_fd = client;
         return;
     }
+
     close(client);
 }
+
 
 //håndterer en forbindelse på RAW socket
 void handle_raw_packet(int raw_sock) {

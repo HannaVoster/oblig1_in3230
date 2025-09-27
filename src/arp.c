@@ -1,6 +1,17 @@
 #include <stdio.h>
 #include <string.h>
 #include "mipd.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <net/if.h>
+#include "mipd.h"
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
+#include <arpa/inet.h> 
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 arp_entry arp_cache[MAX_ARP] = {0};
 
@@ -53,5 +64,26 @@ void print_arp_cache(void) {
                    arp_cache[i].mac[3], arp_cache[i].mac[4], arp_cache[i].mac[5]);
         }
     }
+}
+
+
+int send_arp_request(int rawsock, int dest_mip) {
+    mip_arp_msg req = { .type = 0x00, .mip_addr = (uint8_t)dest_mip, .reserved = 0 };
+
+    size_t pdu_len = 0;
+    uint8_t *pdu = build_pdu(
+        /*dest_mip*/ 0xFF,                // broadcast på MIP-nivå
+        /*src_mip*/  my_mip_address,
+        /*ttl*/      1,
+        /*sdu_len*/  sizeof(req),
+        /*sdu_type*/ SDU_TYPE_ARP,
+        /*payload*/  (uint8_t*)&req,
+        &pdu_len
+    );
+
+    unsigned char bcast[ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    int sent = send_pdu(rawsock, pdu, pdu_len, bcast);
+    free(pdu);
+    return sent;
 }
 

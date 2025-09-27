@@ -265,13 +265,14 @@ int send_broadcast(int dst, int rawsocket){
 }
 
 
-void queue_message(uint8_t dest_mip, uint8_t* pdu, size_t length) {
+void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t length) {
     for (int i = 0; i < MAX_PENDING; i++) {
         if (!pending_queue[i].valid) {
             pending_queue[i].valid = 1;
             pending_queue[i].dest_mip = dest_mip;
+            pending_queue[i].sdu_type = sdu_type;
             pending_queue[i].payload = malloc(length);
-            memcpy(pending_queue[i].payload, pdu, length);
+            memcpy(pending_queue[i].payload, data, length);
             pending_queue[i].length = length;
             printf("[QUEUE] Meldingen for MIP %d lagt i kø\n", dest_mip);
             return;
@@ -280,17 +281,33 @@ void queue_message(uint8_t dest_mip, uint8_t* pdu, size_t length) {
     printf("[QUEUE] Kø full, kunne ikke legge til melding for MIP %d\n", dest_mip);
 }
 
+
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac) {
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid && pending_queue[i].dest_mip == mip_addr) {
-            send_pdu(raw_sock, pending_queue[i].payload, pending_queue[i].length, mac);
+            size_t pdu_len;
+            uint8_t *pdu = build_pdu(
+                pending_queue[i].dest_mip,
+                my_mip_address,
+                4, // ttl
+                pending_queue[i].length,
+                pending_queue[i].sdu_type,
+                pending_queue[i].payload,
+                &pdu_len
+            );
+
+            send_pdu(raw_sock, pdu, pdu_len, mac);
+
+            free(pdu);
             free(pending_queue[i].payload);
             pending_queue[i].payload = NULL;
             pending_queue[i].valid = 0;
+
             printf("[QUEUE] Sendt kø-melding til MIP %d\n", mip_addr);
         }
     }
 }
+
 
 
 

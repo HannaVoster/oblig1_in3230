@@ -23,6 +23,16 @@ typedef struct {
     size_t length;
 } pending_msg;
 
+typedef struct {
+    int valid;
+    uint8_t dest_mip;
+    uint8_t sdu_type;
+    uint8_t *payload;
+    size_t length;
+} pending_entry;
+
+pending_entry pending_queue[MAX_PENDING];
+
 // global kø
 extern pending_msg pending_queue[MAX_PENDING];
 extern int last_unix_client_fd;
