@@ -167,6 +167,11 @@ void handle_raw_packet(int raw_sock) {
         printf(" proto=0x%04X\n", ntohs(eh->h_proto));
     }
 
+    if (len < sizeof(struct ethhdr) + sizeof(mip_header_t)) {
+        printf("[ERROR] Frame for kort: len=%d\n", len);
+        return;
+    }
+
     // Pek på MIP-headeren rett etter Ethernet
     uint8_t *mip_hdr_start = buffer + sizeof(struct ethhdr);
 
