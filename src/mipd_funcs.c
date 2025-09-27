@@ -77,6 +77,10 @@ uint8_t* build_pdu(
     // RFC: SDU length skal lagres i words (32-bit ord)
     uint16_t length_in_words = aligned_length_bytes / 4;
 
+    printf("[DEBUG] build_pdu: sdu_length=%u aligned=%u words=%u total=%zu\n",
+       sdu_length_bytes, aligned_length_bytes, length_in_words,
+       sizeof(mip_header_t)+aligned_length_bytes);
+
     // Alloker plass: header (4 byte) + payload (padded)
     uint8_t* pdu = malloc(sizeof(mip_header_t) + aligned_length_bytes);
     if (!pdu) {
@@ -117,9 +121,6 @@ uint8_t* build_pdu(
     if (out_length) {
         *out_length = sizeof(mip_header_t) + aligned_length_bytes;
     }
-
-    
-
 
     return pdu;
 }
