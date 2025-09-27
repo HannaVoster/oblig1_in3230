@@ -378,6 +378,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    mip_header_t h = {0};
+
+    set_dest(&h, 0xFF);
+    set_src(&h, 0x0A);
+    set_ttl(&h, 1);
+    set_length(&h, 1);
+    set_type(&h, 1);
+
+    printf("ttl_len=0x%02X len_type=0x%02X\n", h.ttl_len, h.len_type);
+    printf("dest=%d src=%d ttl=%d len=%d type=%d\n",
+        get_dest(&h), get_src(&h), get_ttl(&h),
+        get_length(&h), get_type(&h));
+
     //ferdig - lukker socketene
     close(unix_sock);
     close(raw_sock);
