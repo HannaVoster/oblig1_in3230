@@ -279,19 +279,26 @@ int send_broadcast(int dst, int rawsocket){
     return 0;
 }
 
-
-void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t length) {
+// Legg melding i pending-kø
+void queue_message(uint8_t dest_mip, uint8_t sdu_type,
+                   uint8_t *data, size_t length_bytes) {
     for (int i = 0; i < MAX_PENDING; i++) {
         if (!pending_queue[i].valid) {
-            printf("[DEBUG] queue_message: dest=%d type=%d len=%zu\n",
-             dest_mip, sdu_type, length);
+            printf("[DEBUG] queue_message: dest=%d type=%d len=%zu bytes\n",
+                   dest_mip, sdu_type, length_bytes);
 
-            pending_queue[i].valid = 1;
+            pending_queue[i].valid    = 1;
             pending_queue[i].dest_mip = dest_mip;
             pending_queue[i].sdu_type = sdu_type;
-            pending_queue[i].payload = malloc(length);
-            memcpy(pending_queue[i].payload, data, length);
-            pending_queue[i].length = length;
+            pending_queue[i].length   = length_bytes;  // alltid bytes
+
+            pending_queue[i].payload = malloc(length_bytes);
+            if (!pending_queue[i].payload) {
+                perror("[ERROR] malloc queue_message");
+                exit(EXIT_FAILURE);
+            }
+            memcpy(pending_queue[i].payload, data, length_bytes);
+
             printf("[QUEUE] Meldingen for MIP %d lagt i kø\n", dest_mip);
             return;
         }
@@ -300,37 +307,32 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t len
 }
 
 
-void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, int my_mip_address) {
-    
+// Send alle meldinger til gitt dest MIP (brukes når ARP-respons er mottatt)
+void send_pending_messages(int raw_sock, uint8_t mip_addr,
+                           unsigned char *mac, int my_mip_address) {
 
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid && pending_queue[i].dest_mip == mip_addr) {
+            printf("[DEBUG] send_pending_messages: dest=%d type=%d len=%zu bytes valid=%d\n",
+                   pending_queue[i].dest_mip,
+                   pending_queue[i].sdu_type,
+                   pending_queue[i].length,
+                   pending_queue[i].valid);
 
-        printf("[DEBUG] send_pending_messages: dest=%d type=%d len=%zu valid=%d\n",
-            pending_queue[i].dest_mip,
-            pending_queue[i].sdu_type,
-            pending_queue[i].length,
-            pending_queue[i].valid);
+            if (pending_queue[i].length == 0 || pending_queue[i].payload == NULL) {
+                printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n",
+                       pending_queue[i].dest_mip);
+                pending_queue[i].valid = 0;
+                continue;
+            }
 
-        if (pending_queue[i].length == 0 || pending_queue[i].payload == NULL) {
-            printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n",
-                pending_queue[i].dest_mip);
-            pending_queue[i].valid = 0;
-            continue;
-        }
-
-        printf("[DEBUG] payload dump:");
-        for (size_t j = 0; j < pending_queue[i].length; j++) {
-            printf(" %02X", pending_queue[i].payload[j]);
-        }
-        printf("\n");
-
+            // Bygg PDU på nytt fra payload (build_pdu håndterer padding/words)
             size_t pdu_len;
             uint8_t *pdu = build_pdu(
                 pending_queue[i].dest_mip,
                 my_mip_address,
-                4, // ttl
-                pending_queue[i].length,
+                4,  // TTL
+                pending_queue[i].length,      // NB: alltid bytes!
                 pending_queue[i].sdu_type,
                 pending_queue[i].payload,
                 &pdu_len
@@ -347,6 +349,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, i
         }
     }
 }
+
 
 
 
