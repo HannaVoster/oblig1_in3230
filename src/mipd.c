@@ -68,7 +68,7 @@ int create_raw_socket() {
     //AF_PACKET forteller at adressen tilhører ethernet rammer, på et lavt nivå
     //SOCK_RAW socket type, tar imot hele ethernet rammer med både header og payload
     //htons(ETH_P_MIP) 
-    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
