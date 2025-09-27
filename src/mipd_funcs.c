@@ -90,6 +90,9 @@ uint8_t* build_pdu(
     set_length(&hdr, length_in_words);
     set_type(&hdr, sdu_type);
 
+    printf("ttl_len=0x%02X len_type=0x%02X\n", hdr.ttl_len, hdr.len_type);
+
+
     printf("[DEBUG] Header: dest=%u src=%u ttl=%u len_words=%u type=%u\n",
        get_dest(&hdr), get_src(&hdr), get_ttl(&hdr),
        get_length(&hdr), get_type(&hdr));
@@ -98,6 +101,7 @@ uint8_t* build_pdu(
     // Kopier header inn i PDU
     memcpy(pdu, &hdr, sizeof(mip_header_t));
 
+    printf("sizeof(mip_header_t)=%zu\n", sizeof(mip_header_t));
     // Kopier payload
     memcpy(pdu + sizeof(mip_header_t), payload, sdu_length_bytes);
 
