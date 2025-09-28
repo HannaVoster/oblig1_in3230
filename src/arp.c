@@ -73,13 +73,13 @@ int send_arp_request(int rawsock, int dest_mip) {
     mip_arp_msg req = { .type = 0x00, .mip_addr = (uint8_t)dest_mip, .reserved = 0 };
 
     size_t pdu_len = 0;
-    uint8_t *pdu = build_pdu(
-        /*dest_mip*/ 0xFF,                // broadcast på MIP-nivå
-        /*src_mip*/  my_mip_address,
+    uint8_t *pdu = mip_build_pdu(
+        /*dest*/     0xFF,
+        /*src*/      my_mip_address,
         /*ttl*/      1,
-        /*sdu_len*/  sizeof(req),
         /*sdu_type*/ SDU_TYPE_ARP,
-        /*payload*/  (uint8_t*)&req,
+        /*sdu*/      (uint8_t*)&req,
+        /*sdu_len*/  sizeof(req),
         &pdu_len
     );
 
