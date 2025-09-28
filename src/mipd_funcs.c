@@ -68,25 +68,26 @@ uint8_t* build_pdu(
     const uint8_t* payload,
     size_t* out_length
     ){ 
+
+    printf("[DEBUG] build_pdu CALLED: dest=%d src=%d ttl=%d type=%d sdu_length_bytes=%zu\n",
+           dest_addr, src_addr, ttl, sdu_type, sdu_length_bytes);
     //build buffer with both header and payload
 
-    //kontroller lengde på payload for å gjøre pdu delelig med 4?
-
-    uint16_t aligned_length_bytes = (sdu_length_bytes + 3) & ~0x03;
-
+    //kontroller lengde på payload for å gjøre pdu delelig med 4
     // RFC: SDU length skal lagres i words (32-bit ord)
+    uint16_t aligned_length_bytes = (sdu_length_bytes + 3) & ~0x03;
     uint16_t length_in_words = aligned_length_bytes / 4;
 
-    printf("[DEBUG] build_pdu: sdu_length=%u aligned=%u words=%u total=%zu\n",
-       sdu_length_bytes, aligned_length_bytes, length_in_words,
-       sizeof(mip_header_t)+aligned_length_bytes);
-
     // Alloker plass: header (4 byte) + payload (padded)
-    uint8_t* pdu = malloc(sizeof(mip_header_t) + aligned_length_bytes);
+    size_t total_len = sizeof(mip_header_t) + aligned_length_bytes;
+    uint8_t* pdu = malloc(total_len);
     if (!pdu) {
-        perror("malloc");
-        exit(EXIT_FAILURE);
+        perror("malloc build pdu");
+        exit(1);
     }
+
+    printf("[DEBUG] build_pdu: aligned=%u words=%u total=%zu\n",
+           aligned_length_bytes, length_in_words, total_len);
 
     // Bygg header
     mip_header_t hdr = {0};
@@ -97,7 +98,6 @@ uint8_t* build_pdu(
     set_type(&hdr, sdu_type);
 
     printf("ttl_len=0x%02X len_type=0x%02X\n", hdr.ttl_len, hdr.len_type);
-
 
     printf("[DEBUG] Header: dest=%u src=%u ttl=%u len_words=%u type=%u\n",
        get_dest(&hdr), get_src(&hdr), get_ttl(&hdr),
@@ -116,7 +116,6 @@ uint8_t* build_pdu(
         memset(pdu + sizeof(mip_header_t) + sdu_length_bytes, 0,
                aligned_length_bytes - sdu_length_bytes);
     }
-
     // Total PDU-lengde i bytes (inkl. header)
     if (out_length) {
         *out_length = sizeof(mip_header_t) + aligned_length_bytes;
