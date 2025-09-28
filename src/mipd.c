@@ -71,7 +71,7 @@ int create_raw_socket() {
 
     // Bind socketen til valgt interface (iface_name settes i find_iface())
     struct sockaddr_ll sll = {0};
-    sll.sll_family   = AF_PACKET;
+    sll.sll_family = AF_PACKET;
     sll.sll_protocol = htons(ETH_P_MIP);
     sll.sll_ifindex  = if_nametoindex(iface_name);
 
@@ -107,6 +107,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
         printf("\n");
 
         unsigned char mac[6];
+        printf("[DEBUG] Checking ARP for dest=%u\n", dest_addr);
         if (arp_lookup(dest_addr, mac)) {
             // MAC finnes → bygg og send PING nå
             size_t pdu_len;

@@ -45,8 +45,15 @@ void arp_update(int mip_addr, const unsigned char *mac) {
 
 
 int arp_lookup(int mip_addr, unsigned char *mac_out) {
+    if(debug_mode){
+        printf("[DEBUG] arp_lookup CALLED for mip=%u\n", mip_addr);
+    }
+    
     for (int i = 0; i < MAX_ARP; i++) {
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
+            if(debug_mode){
+                printf("[DEBUG] arp_lookup FOUND for mip=%u\n", mip_addr);
+            }
             memcpy(mac_out, arp_cache[i].mac, 6);
             return 1;
         }
