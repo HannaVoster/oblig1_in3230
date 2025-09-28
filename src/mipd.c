@@ -12,8 +12,6 @@
 #include <arpa/inet.h>      
 #include <netinet/if_ether.h> 
 #include <ifaddrs.h>       
-#include <linux/if_packet.h>
-
 
 #include "mipd.h"
 #include "pdu.h"
