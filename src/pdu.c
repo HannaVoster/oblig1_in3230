@@ -267,6 +267,13 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
 
     size_t send_len = alloc_len;
 
+    if(debug_mode){
+        printf("[DEBUG] TX via ifindex=%d iface=%s dest_mac=%02X:%02X:%02X:%02X:%02X:%02X\n",
+       device.sll_ifindex, iface_name,
+       dest_mac[0], dest_mac[1], dest_mac[2],
+       dest_mac[3], dest_mac[4], dest_mac[5]);
+    }
+
     int sent = sendto(rawsocket, frame, send_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
 
