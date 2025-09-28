@@ -6,7 +6,7 @@
 
 #define MAX_ARP 256
 
-#define SDU_TYPE_ARP 0x10
+#define SDU_TYPE_ARP 0x01
 
 #define ARP_REQUEST    0x00
 #define ARP_RESPONSE   0x01
