@@ -128,7 +128,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             for (size_t i = 0; i < payload_length && i < 8; i++) {
                 printf("%02X ", payload[i]);
             }
-            printf("\n");
+            printf("\n\n");
             printf("[DEBUG] Checking ARP for dest=%u\n\n", dest_addr);
         }
         
@@ -483,7 +483,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
             }
 
             if (debug_mode) {
-                printf("[DEBUG] queue_message saved: len=%zu at slot=%d\n\n",
+                printf("[DEBUG] queue_message saved: len=%zu at slot=%d",
                        pending_queue[i].length, i);
                 if (length_bytes > 0)
                     printf(", payload[0]=0x%02X", pending_queue[i].payload[0]);

@@ -168,12 +168,12 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     }
     
     if(debug_mode){
-        printf("[DEBUG] Dump av Ethernet frame (%zu bytes):\n\n", frame_len);
+        printf("[DEBUG] Dump av Ethernet frame (%zu bytes):\n", frame_len);
         for (size_t i = 0; i < frame_len; i++) {
             printf("%02X ", frame[i]);
             if ((i+1) % 16 == 0) printf("\n");
         }
-        printf("\n");
+        printf("\n\n");
         printf("[DEBUG] TX via ifindex=%d iface=%s dest_mac=%02X:%02X:%02X:%02X:%02X:%02X\n\n",
         device.sll_ifindex, iface_name,
         dest_mac[0], dest_mac[1], dest_mac[2],
