@@ -69,3 +69,22 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
     if (out_len) *out_len = total;
     return buf;
 }
+
+ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
+                  uint8_t *dest, uint8_t *src, uint8_t *ttl,
+                  uint8_t *sdu_type, const uint8_t **sdu_out)
+{
+    if (rcv_len < 4) return -1;
+    uint32_t h_net;
+    memcpy(&h_net, rcv, 4);
+
+    uint16_t len_words = 0;
+    mip_unpack_header(h_net, dest, src, ttl, &len_words, sdu_type);
+
+    size_t sdu_bytes = (size_t)len_words * 4;
+    if (rcv_len < 4 + sdu_bytes) return -1;
+
+    if (sdu_out) *sdu_out = rcv + 4;
+    return (ssize_t)sdu_bytes;
+}
+
