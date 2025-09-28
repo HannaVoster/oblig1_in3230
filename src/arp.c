@@ -10,12 +10,14 @@
 
 arp_entry arp_cache[MAX_ARP] = {0};
 
+// Oppdaterer ARP-cachen med en MIP-adresse og tilhørende MAC-adresse
 void arp_update(int mip_addr, const unsigned char *mac) {
     if (!mac) return;
 
-    // Oppdater hvis finnes
+    // Gå gjennom hele ARP-cachen for å se om entry finnes fra før
     for (int i = 0; i < MAX_ARP; i++) {
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
+            // fant en eksisterende entry, oppdater MAC-adressen
             memcpy(arp_cache[i].mac, mac, 6);
             printf("[ARP] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n",
                    mip_addr,
@@ -23,7 +25,7 @@ void arp_update(int mip_addr, const unsigned char *mac) {
             return;
         }
     }
-    // Sett inn ny
+    // Sett inn ny mapping
     for (int i = 0; i < MAX_ARP; i++) {
         if (!arp_cache[i].valid) {
             arp_cache[i].valid = 1;
@@ -38,13 +40,15 @@ void arp_update(int mip_addr, const unsigned char *mac) {
     printf("[ARP] Cache full, kunne ikke lagre MIP %d\n", mip_addr);
 }
 
-
+// Søker i ARP-cachen etter en gitt MIP-adresse
+// unsigned char *mac_out peker til bufferet hvor mac addressen eventuellt lagres
 int arp_lookup(int mip_addr, unsigned char *mac_out) {
     if(debug_mode){
         printf("[DEBUG] arp_lookup CALLED for mip=%u\n", mip_addr);
     }
     
     for (int i = 0; i < MAX_ARP; i++) {
+        // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
             if(debug_mode){
                 printf("[DEBUG] arp_lookup FOUND for mip=%u\n", mip_addr);
@@ -53,11 +57,12 @@ int arp_lookup(int mip_addr, unsigned char *mac_out) {
             return 1;
         }
     }
-    return 0;
+    return 0; //ikke funnet
 }
-
+//funksjon til debugging, for å sjekke at ARP cashe oppdateeres riktig
+//brukes av main
 void print_arp_cache(void) {
-    printf("=== ARP CACHE ===\n");
+    printf("-- ARP CACHE --\n");
     for (int i = 0; i < MAX_ARP; i++) {
         if (arp_cache[i].valid) {
             printf("  MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -67,25 +72,3 @@ void print_arp_cache(void) {
         }
     }
 }
-
-
-int send_arp_request(int rawsock, int dest_mip) {
-    mip_arp_msg req = { .type = 0x00, .mip_addr = (uint8_t)dest_mip, .reserved = 0 };
-
-    size_t pdu_len = 0;
-    uint8_t *pdu = mip_build_pdu(
-    /*dest*/     0xFF,
-    /*src*/      my_mip_address,
-    /*ttl*/      1,
-    /*sdu_type*/ SDU_TYPE_ARP,
-    /*sdu*/      (uint8_t*)&req,
-    /*sdu_len*/  sizeof(req),
-    &pdu_len
-    );
-
-    unsigned char bcast[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-    int sent = send_pdu(rawsock, pdu, pdu_len, bcast);
-    free(pdu);
-    return sent;
-}
-

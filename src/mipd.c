@@ -381,47 +381,18 @@ void find_iface(void) {
     }
 }
 
+/*
+Denne funksjonen tar inn navnet på et nettverksinterface, 
+oppretter en socket for å spørre kjernen om informasjon, 
+og bruker ioctl med flagget SIOCGIFHWADDR for å hente MAC-adressen. 
 
+Resultatet kopieres til bufferet mac. Den returnerer 0 hvis alt gikk bra, ellers -1
 
-// Bygger en Ethernet + MIP-ramme
-// - dst_mac: MAC til mottaker (fra ARP eller FF:FF:FF:FF:FF:FF)
-// - src_mac: MAC til vårt interface (fra ioctl(SIOCGIFHWADDR))
-// - payload: peker til MIP-header + SDU (bygget av build_pdu())
-// - payload_len: lengde av MIP-header + SDU
-// - out_len: returnerer total lengde på Ethernet-ramma
-uint8_t* build_frame(unsigned char *dst_mac,
-                     unsigned char *src_mac,
-                     uint8_t *payload, size_t payload_len,
-                     size_t *out_len) {
-    // Ethernet header er 14 bytes
-    size_t frame_len = sizeof(struct ether_header) + payload_len;
-    uint8_t *frame = malloc(frame_len);
-    if (!frame) {
-        perror("malloc frame");
-        exit(1);
-    }
-
-    // Pek til headeren i bufferen
-    struct ether_header *eh = (struct ether_header *)frame;
-
-    // Kopier MAC-adressene
-    memcpy(eh->ether_dhost, dst_mac, ETH_ALEN);
-    memcpy(eh->ether_shost, src_mac, ETH_ALEN);
-
-    // Sett protokollfeltet til vår egen MIP-protokoll
-    eh->ether_type = htons(ETH_P_MIP);
-
-    // Kopier inn payload rett etter Ethernet-headeren
-    memcpy(frame + sizeof(struct ether_header), payload, payload_len);
-
-    // Returner total lengde
-    *out_len = frame_len;
-    return frame;
-}
-
-
-// Henter MAC-adressen til vårt interface
+brukes av send_pdu i pdu.c
+*/
 int get_iface_mac(const char *ifname, unsigned char *mac) {
+
+    // Åpner en socket for å kunne utføre ioctl-kall på interfacet
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) return -1;
 
@@ -429,6 +400,7 @@ int get_iface_mac(const char *ifname, unsigned char *mac) {
     memset(&ifr, 0, sizeof(ifr));
     strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
 
+    // Henter hardware-adressen (MAC) via ioctl
     if (ioctl(fd, SIOCGIFHWADDR, &ifr) == -1) {
         close(fd);
         return -1;
@@ -440,8 +412,13 @@ int get_iface_mac(const char *ifname, unsigned char *mac) {
 }
 
 
+/*
+Legg melding i pending-kø dersom mottakers addresse er ukjent
+ - venter på å sende PING uten arp resp
+meldingene lagres til ARP response kommer og kan sendes via send_pending_message
 
-// Legg melding i pending-kø
+pending_queue er en global kø med pending_entries og feltene settes av parameterene funskjonen tar
+*/
 void queue_message(uint8_t dest_mip, uint8_t sdu_type,
                    uint8_t *data, size_t length_bytes) {
 
@@ -452,7 +429,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
                        dest_mip, sdu_type, length_bytes);
             }
 
-            // Nullstill
+            // Nullstill og sett metadata
             pending_queue[i].payload = NULL;
             pending_queue[i].length  = length_bytes;
             pending_queue[i].dest_mip = dest_mip;
@@ -466,6 +443,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
                     perror("[ERROR] malloc queue_message");
                     exit(EXIT_FAILURE);
                 }
+                //kopierer payload
                 memcpy(pending_queue[i].payload, data, length_bytes);
             }
 
@@ -485,13 +463,23 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
 }
 
 
+/*
+Sender meldinger som ligger i pending-køen for en gitt MIP-adresse
+Alle meldinger i køen som er adressert til den MIP-adressen pakkes på nytt som en MIP PDU og sendes
+fjerner deretter køelementet fra den globale køen
 
+
+tar inn raw socket for å sende i send_pdu of adresse for å vite hvem som skal få
+og hvem som sender
+*/
 void send_pending_messages(int raw_sock, uint8_t mip_addr,
                            unsigned char *mac, int my_mip_address) {
 
     for (int i = 0; i < MAX_PENDING; i++) {
+        // Se etter meldinger i køen for denne destinasjons-MIPen
         if (pending_queue[i].valid && pending_queue[i].dest_mip == mip_addr) {
-
+            
+            // Sjekk at køelementet er gyldig (payload finnes og lengden > 0)
             if (pending_queue[i].length == 0 || pending_queue[i].payload == NULL) {
                 printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n",
                        pending_queue[i].dest_mip);
@@ -524,7 +512,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
 
             free(pdu);
 
-            // Invalider køelementet FØR vi frigjør payload
+            // Invalider køelementet FØR payloaden frigis
             pending_queue[i].valid = 0;
             free(pending_queue[i].payload);
             pending_queue[i].payload = NULL;
