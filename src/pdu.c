@@ -4,6 +4,7 @@
 #include <stdint.h>   // for uint8_t, uint32_t
 #include <arpa/inet.h> // for htonl, ntohl
 #include "pdu.h"
+#include "mipd.h"
 
 
 uint32_t mip_pack_header(uint8_t dest,
@@ -67,6 +68,13 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
     }
 
     if (out_len) *out_len = total;
+
+    if(debug_mode){
+        printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
+           "sdu_len=%u aligned=%u words=%u total=%zu\n",
+           dest, src, ttl, sdu_type,
+           sdu_len_bytes, aligned, len_words, total);
+    }
     return buf;
 }
 
