@@ -22,9 +22,6 @@
 #define UNIX_PATH "/tmp/mip_socket"
 
 
-char iface_name[IFNAMSIZ] = {0};
-
-
 int create_unix_socket(const char *path) {
     int sock;
     struct sockaddr_un addr;
