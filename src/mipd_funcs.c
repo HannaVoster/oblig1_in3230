@@ -66,6 +66,8 @@ uint8_t* build_pdu(uint8_t dest_addr,
                    const uint8_t* payload,
                    size_t* out_length) 
 {
+    printf("[DEBUG] build_pdu CALLED: sdu_length_bytes=%u\n", sdu_length_bytes);
+
     // Align til 32-bit (RFC: payload må være delelig på 4)
     uint16_t aligned_length_bytes = (sdu_length_bytes + 3) & ~0x03;
     uint16_t length_in_words = aligned_length_bytes / 4;
@@ -286,6 +288,10 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
             pending_queue[i].length   = length_bytes;  // alltid bytes
 
             pending_queue[i].payload = malloc(length_bytes);
+
+            printf("[DEBUG] queue_message saved: len=%zu at slot=%d, payload[0]=0x%02X\n",
+                pending_queue[i].length, i, pending_queue[i].payload[0]);
+
             if (!pending_queue[i].payload) {
                 perror("[ERROR] malloc queue_message");
                 exit(EXIT_FAILURE);
@@ -318,6 +324,12 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
                 pending_queue[i].valid = 0;
                 continue;
             }
+
+            printf("[DEBUG] send_pending_messages using slot=%d len=%zu type=%d dest=%d\n",
+            i,
+            pending_queue[i].length,
+            pending_queue[i].sdu_type,
+            pending_queue[i].dest_mip);
 
             // Bygg PDU på nytt fra payload (build_pdu håndterer padding/words)
             size_t pdu_len;
