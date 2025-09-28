@@ -18,18 +18,30 @@ typedef struct __attribute__((packed)) {
     uint8_t len_type;  // nedre 4 bit = SDU-type, øvre 4 bit kan være high bits av length
 } mip_header_t;
 
-uint32_t mip_pack_header(uint8_t dest,
-                         uint8_t src,
-                         uint8_t ttl,
-                         uint16_t len_words,
-                         uint8_t sdu_type);
+uint32_t mip_pack_header(uint8_t *dest,
+                         uint8_t *src,
+                         uint8_t *ttl,
+                         uint16_t *len_words,
+                         uint8_t *sdu_type);
 
-void mip_unpack_header(uint32_t h_net,
-                       uint8_t *dest,
-                       uint8_t *src,
-                       uint8_t *ttl,
-                       uint16_t *len_words,
-                       uint8_t *sdu_type);
+void mip_build_header_bytes(uint8_t *hdr,
+                            uint8_t dest,
+                            uint8_t src,
+                            uint8_t ttl,
+                            uint16_t len_words,
+                            uint8_t sdu_type);
+                            
+void mip_unpack_header(const uint8_t *hdr,
+                       uint8_t *dest, uint8_t *src, uint8_t *ttl,
+                       uint16_t *len_words, uint8_t *sdu_type);
+
+
+// void mip_unpack_header(const uint8_t *hdr,
+//                        uint8_t *dest,
+//                        uint8_t *src,
+//                        uint8_t *ttl,
+//                        uint16_t *len_words,
+//                        uint8_t *sdu_type);
 
 uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                        uint8_t sdu_type,
