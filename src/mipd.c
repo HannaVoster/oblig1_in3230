@@ -195,7 +195,8 @@ pending_queue – tømmes når ventende meldinger sendes etter en ARP-RESP (send
 Bruker debug_mode for logging
 */
 void handle_raw_packet(int raw_sock, int my_mip_address) {
-     
+    printf("[DEBUG] handle_raw_packet CALLED\n");
+
     uint8_t buffer[2000]; // Buffer for å lagre innkommende råpakke
     struct sockaddr_ll src_addr; // Struktur for å lagre avsenderadresse
 
@@ -213,7 +214,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
     //sjekekr at protokollen er mip
-    if (ntohs(eh->h_proto) != ETH_P_MIP){
+    if (eh->h_proto != htons(ETH_P_MIP)){
         printf("JEG ER FEIL PROTOKOLL");
         return; 
     }
