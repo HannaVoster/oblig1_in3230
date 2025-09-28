@@ -70,7 +70,7 @@ funksjonen binder socketen til det valgte nettverksinterface,
 og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt.
 */
 int create_raw_socket() {
-    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
+    int sock = socket(AF_PACKET, SOCK_RAW, ETH_P_MIP);
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
@@ -81,6 +81,11 @@ int create_raw_socket() {
     sll.sll_family = AF_PACKET;
     sll.sll_protocol = htons(ETH_P_MIP);
     sll.sll_ifindex  = if_nametoindex(iface_name);
+
+    if(debug_mode){
+        printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n",
+           iface_name, sll.sll_ifindex, ETH_P_MIP);
+    }
 
     if (bind(sock, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
         perror("bind raw socket");
@@ -357,6 +362,11 @@ void find_iface(void) {
     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr == NULL) continue; // Hopp over ugyldige entries
 
+        if (debug_mode) {
+            printf("[DEBUG] Fant interface: %s (family=%d)\n",
+                   ifa->ifa_name,
+                   ifa->ifa_addr->sa_family);
+        }
         // Kun interessert i interfaces av type AF_PACKET, lavnivå nettverksinterfaces (Ethernet)
         // Ikke f.eks. IPv4 eller IPv6 
         if (ifa->ifa_addr->sa_family == AF_PACKET &&
@@ -366,6 +376,10 @@ void find_iface(void) {
             strncpy(iface_name, ifa->ifa_name, IFNAMSIZ);
 
             iface_name[IFNAMSIZ - 1] = '\0'; // Sørger for at string alltid nulltermineres
+
+            if (debug_mode) {
+                printf("[DEBUG] Valgte interface: %s\n", iface_name);
+            }
 
             break; //  tar det første gyldige 
         }
