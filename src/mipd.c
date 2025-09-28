@@ -232,6 +232,9 @@ void handle_raw_packet(int raw_sock) {
     // Kun prosesser pakker til oss eller broadcast
     if (dest_mip != my_mip_address && dest_mip != 0xFF) return;
 
+    printf("[DEBUG] handle_raw_packet: src_mip=%u dest_mip=%u type=%u len=%u\n",
+       src_mip, dest_mip, sdu_type, sdu_len);
+
     switch (sdu_type) {
         case SDU_TYPE_PING: {
             printf("[RAW] PING mottatt fra MIP %u\n", src_mip);
@@ -271,6 +274,9 @@ void handle_raw_packet(int raw_sock) {
             }
 
             mip_arp_msg *arp = (mip_arp_msg*)payload;
+
+            printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%u)\n",
+            arp->type, arp->mip_addr, sdu_len);
 
             if (arp->type == 0x00 /*REQ*/ && arp->mip_addr == my_mip_address) {
                 printf("[RAW] ARP-REQ for meg (%d)\n", my_mip_address);
