@@ -74,16 +74,16 @@ int send_arp_request(int rawsock, int dest_mip) {
 
     size_t pdu_len = 0;
     uint8_t *pdu = mip_build_pdu(
-        /*dest*/     0xFF,
-        /*src*/      my_mip_address,
-        /*ttl*/      1,
-        /*sdu_type*/ SDU_TYPE_ARP,
-        /*sdu*/      (uint8_t*)&req,
-        /*sdu_len*/  sizeof(req),
-        &pdu_len
+    /*dest*/     0xFF,
+    /*src*/      my_mip_address,
+    /*ttl*/      1,
+    /*sdu_type*/ SDU_TYPE_ARP,
+    /*sdu*/      (uint8_t*)&req,
+    /*sdu_len*/  sizeof(req),
+    &pdu_len
     );
 
-    unsigned char bcast[ETH_ALEN] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    unsigned char bcast[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     int sent = send_pdu(rawsock, pdu, pdu_len, bcast);
     free(pdu);
     return sent;
