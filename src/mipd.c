@@ -394,7 +394,7 @@ void find_iface(void) {
             iface_name[IFNAMSIZ - 1] = '\0'; // Sørger for at string alltid nulltermineres
 
             if (debug_mode) {
-                printf("[DEBUG] Valgte interface: %s\n", iface_name);
+                printf("[DEBUG] Valgte interface: %s\n\n", iface_name);
             }
 
             break; //  tar det første gyldige 
@@ -406,13 +406,13 @@ void find_iface(void) {
 
     // Hvis ikke fant noe interface, feiler 
     if (iface_name[0] == '\0') {
-        fprintf(stderr, "Fant ikke noe gyldig interface!\n");
+        fprintf(stderr, "Fant ikke noe gyldig interface!\n\n");
         exit(1);
     }
 
     // Debug: skriv ut hvilket interface vi valgte
     if (debug_mode) {
-        printf("[DEBUG] Bruker interface: %s\n", iface_name);
+        printf("[DEBUG] Bruker interface: %s\n\n", iface_name);
     }
 }
 
@@ -460,7 +460,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
     for (int i = 0; i < MAX_PENDING; i++) {
         if (!pending_queue[i].valid) {
             if (debug_mode) {
-                printf("[DEBUG] queue_message: dest=%d type=%d len=%zu bytes\n",
+                printf("[DEBUG] queue_message: dest=%d type=%d len=%zu bytes\n\n",
                        dest_mip, sdu_type, length_bytes);
             }
 
@@ -483,18 +483,18 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
             }
 
             if (debug_mode) {
-                printf("[DEBUG] queue_message saved: len=%zu at slot=%d",
+                printf("[DEBUG] queue_message saved: len=%zu at slot=%d\n\n",
                        pending_queue[i].length, i);
                 if (length_bytes > 0)
                     printf(", payload[0]=0x%02X", pending_queue[i].payload[0]);
-                printf("\n");
+                printf("\n\n");
             }
 
-            printf("[QUEUE] Meldingen for MIP %d lagt i kø\n", dest_mip);
+            printf("[QUEUE] Meldingen for MIP %d lagt i kø\n\n", dest_mip);
             return;
         }
     }
-    printf("[QUEUE] Kø full, kunne ikke legge til melding for MIP %d\n", dest_mip);
+    printf("[QUEUE] Kø full, kunne ikke legge til melding for MIP %d\n\n", dest_mip);
 }
 
 
@@ -516,7 +516,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             
             // Sjekk at køelementet er gyldig (payload finnes og lengden > 0)
             if (pending_queue[i].length == 0 || pending_queue[i].payload == NULL) {
-                printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n",
+                printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n\n",
                        pending_queue[i].dest_mip);
                 pending_queue[i].valid = 0;
                 continue;
@@ -524,7 +524,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
 
             if (debug_mode) {
                 printf("[DEBUG] send_pending_messages using slot=%d "
-                       "len=%zu type=%d dest=%d\n",
+                       "len=%zu type=%d dest=%d\n\n",
                        i,
                        pending_queue[i].length,
                        pending_queue[i].sdu_type,
@@ -552,7 +552,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             free(pending_queue[i].payload);
             pending_queue[i].payload = NULL;
 
-            printf("[QUEUE] Sendt kø-melding til MIP %d\n", mip_addr);
+            printf("[QUEUE] Sendt kø-melding til MIP %d\n\n", mip_addr);
         }
     }
 }

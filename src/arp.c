@@ -19,7 +19,7 @@ void arp_update(int mip_addr, const unsigned char *mac) {
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
             // fant en eksisterende entry, oppdater MAC-adressen
             memcpy(arp_cache[i].mac, mac, 6);
-            printf("[ARP] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n",
+            printf("[ARP] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n\n",
                    mip_addr,
                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             return;
@@ -31,7 +31,7 @@ void arp_update(int mip_addr, const unsigned char *mac) {
             arp_cache[i].valid = 1;
             arp_cache[i].mip_addr = mip_addr;
             memcpy(arp_cache[i].mac, mac, 6);
-            printf("[ARP] Lagt til MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n",
+            printf("[ARP] Lagt til MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n\n",
                    mip_addr,
                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             return;
@@ -44,14 +44,14 @@ void arp_update(int mip_addr, const unsigned char *mac) {
 // unsigned char *mac_out peker til bufferet hvor mac addressen eventuellt lagres
 int arp_lookup(int mip_addr, unsigned char *mac_out) {
     if(debug_mode){
-        printf("[DEBUG] arp_lookup CALLED for mip=%u\n", mip_addr);
+        printf("[DEBUG] arp_lookup CALLED for mip=%u\n\n", mip_addr);
     }
     
     for (int i = 0; i < MAX_ARP; i++) {
         // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
             if(debug_mode){
-                printf("[DEBUG] arp_lookup FOUND for mip=%u\n", mip_addr);
+                printf("[DEBUG] arp_lookup FOUND for mip=%u\n\n", mip_addr);
             }
             memcpy(mac_out, arp_cache[i].mac, 6);
             return 1;
@@ -65,7 +65,7 @@ void print_arp_cache(void) {
     printf("-- ARP CACHE --\n");
     for (int i = 0; i < MAX_ARP; i++) {
         if (arp_cache[i].valid) {
-            printf("  MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n",
+            printf("  MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n\n",
                    arp_cache[i].mip_addr,
                    arp_cache[i].mac[0], arp_cache[i].mac[1], arp_cache[i].mac[2],
                    arp_cache[i].mac[3], arp_cache[i].mac[4], arp_cache[i].mac[5]);

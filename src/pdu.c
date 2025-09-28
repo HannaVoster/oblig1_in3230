@@ -1,46 +1,16 @@
-#include <stdio.h>       // perror, printf
-#include <stdlib.h>      // malloc, exit
-#include <string.h>      // memcpy, memset
-#include <stdint.h>      // uint8_t, uint32_t
-#include <arpa/inet.h>   // htonl, ntohl, htons
-#include <net/if.h>      // if_nametoindex
-#include <netpacket/packet.h> // sockaddr_ll
-#include <net/ethernet.h>     // ethhdr, ETH_ALEN, ETH_P_*
-#include <sys/ioctl.h>   // ioctl (brukes i get_iface_mac)
-#include <unistd.h>      // close, read, write
+#include <stdio.h>       
+#include <stdlib.h>      
+#include <string.h>      
+#include <stdint.h>     
+#include <arpa/inet.h>   
+#include <net/if.h>      
+#include <netpacket/packet.h> 
+#include <net/ethernet.h>    
+#include <sys/ioctl.h>   
+#include <unistd.h>      
 
 #include "mipd.h"
 #include "pdu.h"
-
-// uint32_t mip_pack_header(uint8_t dest,
-//                          uint8_t src,
-//                          uint8_t ttl,
-//                          uint16_t len_words,
-//                          uint8_t sdu_type)
-// {
-//     uint32_t h = 0;
-//     h |= ((uint32_t)dest      & 0xFF) << 24; //& 0xFF bare 8 bit flyttes til å være 8 øverste
-//     h |= ((uint32_t)src       & 0xFF) << 16; //flyttes til 16-23
-//     h |= ((uint32_t)ttl       & 0x0F) << 12; //& 0x0F så bare de 4 nederste brukes, bit 12-15
-//     h |= ((uint32_t)len_words & 0x1FF) << 3; //0x1FF maks 9 bit, på plass 3-11
-//     h |= ((uint32_t)sdu_type  & 0x07); //& 0x07 maks 3 bit på 0-2
-//     return h;
-// }
-
-// void mip_unpack_header(uint32_t h_net,
-//                        uint8_t *dest,
-//                        uint8_t *src,
-//                        uint8_t *ttl,
-//                        uint16_t *len_words,
-//                        uint8_t *sdu_type)
-// {
-//     uint32_t h = ntohl(h_net);
-//     if (dest)      *dest      = (h >> 24) & 0xFF;
-//     if (src)       *src       = (h >> 16) & 0xFF;
-//     if (ttl)       *ttl       = (h >> 12) & 0x0F;
-//     if (len_words) *len_words = (h >> 3)  & 0x1FF;
-//     if (sdu_type)  *sdu_type  =  h        & 0x07;
-// }
 
 void mip_build_header_bytes(uint8_t *hdr,
                             uint8_t dest,
@@ -88,13 +58,13 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
         exit(EXIT_FAILURE);
     }
 
-    // ---- Pakk header (manuelt) ----
+    // pakk header (manuelt)
     buf[0] = dest;
     buf[1] = src;
     buf[2] = ((ttl & 0x0F) << 4) | ((len_words >> 5) & 0x0F);
     buf[3] = ((len_words & 0x1F) << 3) | (sdu_type & 0x07);
 
-    // ---- Kopier SDU + pad ----
+    // Kopier SDU + pad
     if (sdu_len_bytes && sdu) {
         memcpy(buf + 4, sdu, sdu_len_bytes);
     }
@@ -106,7 +76,7 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
 
     if (debug_mode) {
         printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
-               "sdu_len=%u aligned=%u words=%u total=%zu\n",
+               "sdu_len=%u aligned=%u words=%u total=%zu\n\n",
                dest, src, ttl, sdu_type,
                sdu_len_bytes, aligned, len_words, total);
     }
@@ -114,94 +84,33 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
 }
 
 
-
-// uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
-//                        uint8_t sdu_type,
-//                        const uint8_t *sdu, uint16_t sdu_len_bytes,
-//                        size_t *out_len)
-// {
-//     // SDU må være 32-bit justert
-//     uint16_t aligned = (sdu_len_bytes + 3) & ~0x03;
-//     uint16_t len_words = aligned / 4;
-
-//     // alloker (4 byte header + SDU pad)
-//     size_t total = 4 + aligned;
-//     uint8_t *buf = (uint8_t *)malloc(total);
-//     if (!buf) {
-//         perror("malloc mip_build_pdu");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     // pakk header -> nettverksbyteorden
-//     uint32_t h_host = mip_pack_header(dest, src, ttl, len_words, sdu_type);
-//     uint32_t h_net  = htonl(h_host);
-//     memcpy(buf, &h_net, 4);
-
-//     // kopier SDU + pad med nuller
-//     if (sdu_len_bytes && sdu) {
-//         memcpy(buf + 4, sdu, sdu_len_bytes);
-//     }
-//     if (aligned > sdu_len_bytes) {
-//         memset(buf + 4 + sdu_len_bytes, 0, aligned - sdu_len_bytes);
-//     }
-
-//     if (out_len) *out_len = total;
-
-//     if(debug_mode){
-//         printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
-//            "sdu_len=%u aligned=%u words=%u total=%zu\n",
-//            dest, src, ttl, sdu_type,
-//            sdu_len_bytes, aligned, len_words, total);
-//     }
-//     return buf;
-// }
-
-// ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
-//                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
-//                   uint8_t *sdu_type, const uint8_t **sdu_out)
-// {
-//     if (rcv_len < 4) return -1;
-//     uint32_t h_net;
-//     memcpy(&h_net, rcv, 4);
-
-//     uint16_t len_words = 0;
-//     mip_unpack_header(h_net, dest, src, ttl, &len_words, sdu_type);
-
-//     size_t sdu_bytes = (size_t)len_words * 4;
-//     if (rcv_len < 4 + sdu_bytes) return -1;
-
-//     if (sdu_out) *sdu_out = rcv + 4;
-//     return (ssize_t)sdu_bytes;
-// }
-
 ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
                   uint8_t *sdu_type, const uint8_t **sdu_out)
 {
     if (rcv_len < 4) return -1;
 
-    // ---- Unpack header ----
+    // pakker ut header
     *dest = rcv[0];
     *src  = rcv[1];
     *ttl  = (rcv[2] >> 4) & 0x0F;
     uint16_t len_words = ((rcv[2] & 0x0F) << 5) | ((rcv[3] >> 3) & 0x1F);
     *sdu_type = rcv[3] & 0x07;
 
-    // ---- Beregn SDU-lengde ----
+    // beregner sdu lengde
     size_t sdu_bytes = (size_t)len_words * 4;
     if (rcv_len < 4 + sdu_bytes) return -1;
 
     if (sdu_out) *sdu_out = rcv + 4;
 
     if (debug_mode) {
-        printf("[DEBUG] mip_parse raw header bytes: %02X %02X %02X %02X\n",
+        printf("[DEBUG] mip_parse raw header bytes: %02X %02X %02X %02X\n\n",
             rcv[0], rcv[1], rcv[2], rcv[3]);
-        printf("[DEBUG] mip_parse decoded: dest=%u src=%u ttl=%u len_words=%u sdu_type=%u\n",
+        printf("[DEBUG] mip_parse decoded: dest=%u src=%u ttl=%u len_words=%u sdu_type=%u\n\n",
             *dest, *src, *ttl, len_words, *sdu_type);
     }
     return (ssize_t)sdu_bytes;
 }
-
 
 
 
@@ -257,22 +166,21 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         memset(frame + frame_len, 0, 60 - frame_len);  // pad med nuller
         frame_len = 60;
     }
-
-    printf("[DEBUG] Dump av Ethernet frame (%zu bytes):\n", frame_len);
-    for (size_t i = 0; i < frame_len; i++) {
-        printf("%02X ", frame[i]);
-        if ((i+1) % 16 == 0) printf("\n");
+    
+    if(debug_mode){
+        printf("[DEBUG] Dump av Ethernet frame (%zu bytes):\n\n", frame_len);
+        for (size_t i = 0; i < frame_len; i++) {
+            printf("%02X ", frame[i]);
+            if ((i+1) % 16 == 0) printf("\n");
+        }
+   
+        printf("[DEBUG] TX via ifindex=%d iface=%s dest_mac=%02X:%02X:%02X:%02X:%02X:%02X\n\n",
+        device.sll_ifindex, iface_name,
+        dest_mac[0], dest_mac[1], dest_mac[2],
+        dest_mac[3], dest_mac[4], dest_mac[5]);
     }
-    printf("\n");
 
     size_t send_len = alloc_len;
-
-    if(debug_mode){
-        printf("[DEBUG] TX via ifindex=%d iface=%s dest_mac=%02X:%02X:%02X:%02X:%02X:%02X\n",
-       device.sll_ifindex, iface_name,
-       dest_mac[0], dest_mac[1], dest_mac[2],
-       dest_mac[3], dest_mac[4], dest_mac[5]);
-    }
 
     int sent = sendto(rawsocket, frame, send_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
@@ -282,9 +190,8 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     if (sent < 0) {
         perror("sendto");
     } else {
-        printf("[DEBUG] sendto ok, bytes=%d\n", sent);
+        if(debug_mode){printf("[DEBUG] sendto ok, bytes=%d\n", sent);}
     }
-
     return sent;
 }
 
