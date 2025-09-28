@@ -1,21 +1,22 @@
-// daemonen som kjører i bakgrunnen og håndterer trafikk på vegne av applikasjonene
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netpacket/packet.h>   // AF_PACKET, sockaddr_ll
-#include <net/ethernet.h>       // ETH_P_*
-#include <net/if.h>             // if_nametoindex(), struct ifreq
-#include <arpa/inet.h>
-#include <netinet/if_ether.h>   // struct ethhdr (klassisk Ethernet-header)
-#include <ifaddrs.h>
+#include <stdio.h>          // printf, perror, fprintf
+#include <stdlib.h>         // malloc, free, exit
+#include <string.h>         // memset, memcpy, strncpy, strcmp
+#include <unistd.h>         // read, write, close, unlink
+#include <sys/epoll.h>      // epoll_event, epoll_* (hvis brukt)
+#include <sys/socket.h>     // socket, bind, listen, accept, recvmsg
+#include <sys/un.h>         // sockaddr_un
+#include <sys/ioctl.h>      // ioctl
+#include <netpacket/packet.h> // sockaddr_ll, AF_PACKET
+#include <net/ethernet.h>   // ETH_P_*, ETH_ALEN
+#include <net/if.h>         // if_nametoindex, ifreq, IFNAMSIZ
+#include <arpa/inet.h>      // htons, ntohs
+#include <netinet/if_ether.h> // struct ether_header
+#include <ifaddrs.h>        // getifaddrs, freeifaddrs
 
 #include "mipd.h"
 #include "pdu.h"
+#include "arp.h"
+
 
 #define MAX_EVENTS 10
 #define UNIX_PATH "/tmp/mip_socket"
@@ -254,178 +255,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     }
 }
 
-//Ok
-
-// håndterer en forbindelse på RAW socket
-// void handle_raw_packet(int raw_sock) {
-//     uint8_t buffer[2000];
-//     struct sockaddr_ll src_addr;
-//     struct iovec iov = { .iov_base = buffer, .iov_len = sizeof(buffer) };
-//     struct msghdr msg = {
-//         .msg_name    = &src_addr,
-//         .msg_namelen = sizeof(src_addr),
-//         .msg_iov     = &iov,
-//         .msg_iovlen  = 1
-//     };
-
-//     // Bruk ssize_t (match recvmsg-signatur)
-//     ssize_t len = recvmsg(raw_sock, &msg, 0);
-//     if (len < 0) {
-//         perror("recvmsg");
-//         return;
-//     }
-
-//     if (len < (ssize_t)sizeof(struct ethhdr)) {
-//         // For lite til å inneholde Ethernet-header
-//         return;
-//     }
-
-//     if (debug_mode) {
-//         printf("[DEBUG] recvmsg got %zd bytes\n", len);
-//         for (ssize_t i = 0; i < len; i++) {
-//             printf("%02X ", buffer[i]);
-//             if ((i + 1) % 16 == 0) printf("\n");
-//         }
-//         printf("\n");
-//     }
-
-//     // Tolker Ethernet-header
-//     struct ethhdr *eh = (struct ethhdr *)buffer;
-
-//     // Filtrer på vårt Ethertype (MIP)
-//     if (ntohs(eh->h_proto) != ETH_P_MIP) return;
-
-//     if (debug_mode) {
-//         printf("[DEBUG] recv: src=");
-//         for (int i = 0; i < ETH_ALEN; i++) printf("%02X:", eh->h_source[i]);
-//         printf(" dst=");
-//         for (int i = 0; i < ETH_ALEN; i++) printf("%02X:", eh->h_dest[i]);
-//         printf(" proto=0x%04X\n", ntohs(eh->h_proto));
-//     }
-
-//     // Sjekk at vi har plass til MIP-header etter Ethernet
-//     if (len < (ssize_t)(sizeof(struct ethhdr) + sizeof(mip_header_t))) {
-//         printf("[ERROR] Frame for kort: len=%zd\n", len);
-//         return;
-//     }
-
-//     // Pek på MIP-headeren rett etter Ethernet
-//     uint8_t *mip_hdr_start = buffer + sizeof(struct ethhdr);
-
-//     mip_header_t hdr;
-//     memcpy(&hdr, mip_hdr_start, sizeof(mip_header_t));
-
-//     uint8_t  src_mip  = get_src(&hdr);
-//     uint8_t  dest_mip = get_dest(&hdr);
-//     uint8_t  ttl      = get_ttl(&hdr);
-//     uint8_t  sdu_type = get_type(&hdr);
-//     uint16_t sdu_len  = get_length(&hdr) * 4; // length feltet er i 32-bit ord
-
-//     // Sjekk at hele SDU faktisk er mottatt
-//     ssize_t need = (ssize_t)(sizeof(struct ethhdr) + sizeof(mip_header_t) + sdu_len);
-//     if (len < need) {
-//         printf("[ERROR] Frame len=%zd for kort for SDU=%u (need=%zd)\n", len, sdu_len, need);
-//         return;
-//     }
-
-//     uint8_t *payload = mip_hdr_start + sizeof(mip_header_t);
-
-//     if (debug_mode) {
-//         printf("[DEBUG] Parsed MIP header: src=%u dest=%u ttl=%u len=%u type=%u\n",
-//                src_mip, dest_mip, ttl, sdu_len, sdu_type);
-
-//         printf("[DEBUG] Payload dump (%u bytes):\n", sdu_len);
-//         for (uint16_t i = 0; i < sdu_len; i++) {
-//             printf("%02X ", payload[i]);
-//             if ((i + 1) % 16 == 0) printf("\n");
-//         }
-//         printf("\n");
-//     }
-
-//     // Kun prosesser pakker til oss eller broadcast
-//     if (dest_mip != my_mip_address && dest_mip != 0xFF) return;
-
-//     printf("[DEBUG] handle_raw_packet: src_mip=%u dest_mip=%u type=%u len=%u\n",
-//        src_mip, dest_mip, sdu_type, sdu_len);
-
-//     switch (sdu_type) {
-//         case SDU_TYPE_PING: {
-//             printf("[RAW] PING mottatt fra MIP %u\n", src_mip);
-//             // Bygg PONG med samme payload tilbake
-//             size_t pdu_len = 0;
-//             uint8_t *pdu = build_pdu(
-//                 /*dest*/ src_mip,
-//                 /*src */ my_mip_address,
-//                 /*ttl */ 4,
-//                 /*len */ sdu_len,
-//                 /*type*/ SDU_TYPE_PONG,
-//                 /*data*/ payload,
-//                 &pdu_len
-//             );
-//             // Svar til avsenders MAC fra Ethernet-header
-//             send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
-//             free(pdu);
-//             break;
-//         }
-
-//         case SDU_TYPE_PONG: {
-//             printf("[RAW] PONG mottatt fra MIP %u: %.*s\n", src_mip, sdu_len, (char*)payload);
-//             if (last_unix_client_fd > 0) {
-//                 // send SDU tilbake til klient på UNIX-socket
-//                 (void)write(last_unix_client_fd, payload, sdu_len);
-//                 close(last_unix_client_fd);
-//                 last_unix_client_fd = -1;
-//             }
-//             break;
-//         }
-
-//         case SDU_TYPE_ARP: {
-//             // MIP-ARP payload forventes å være minst 4 bytes (type + addr + padding)
-//             if (sdu_len < 4) {
-//                 printf("[ERROR] ARP SDU for kort (%u bytes)\n", sdu_len);
-//                 return;
-//             }
-
-//             mip_arp_msg *arp = (mip_arp_msg*)payload;
-
-//             printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%u)\n",
-//             arp->type, arp->mip_addr, sdu_len);
-
-//             if (arp->type == 0x00 /*REQ*/ && arp->mip_addr == my_mip_address) {
-//                 printf("[RAW] ARP-REQ for meg (%d)\n", my_mip_address);
-
-//                 // Send ARP-RESP tilbake unicast
-//                 mip_arp_msg resp = { .type = 0x01, .mip_addr = (uint8_t)my_mip_address, .reserved = 0 };
-//                 size_t pdu_len = 0;
-//                 uint8_t *pdu = build_pdu(
-//                     /*dest*/ src_mip,
-//                     /*src */ my_mip_address,
-//                     /*ttl */ 1,
-//                     /*len */ (uint16_t)sizeof(resp),
-//                     /*type*/ SDU_TYPE_ARP,
-//                     /*data*/ (uint8_t*)&resp,
-//                     &pdu_len
-//                 );
-//                 send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
-//                 free(pdu);
-//             }
-//             else if (arp->type == 0x01 /*RESP*/) {
-//                 printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
-//                 // Lær MAC fra Ethernet-kilde
-//                 arp_update(arp->mip_addr, eh->h_source);
-//                 // Send alle køede meldinger til denne MIP-adressen
-//                 send_pending_messages(raw_sock, arp->mip_addr, eh->h_source, my_mip_address);
-//             }
-//             break;
-//         }
-
-//         default:
-//             printf("[RAW] Ukjent SDU-type: %u\n", sdu_type);
-//             break;
-//     }
-// }
-
-
 
 // Denne funksjonen finner et nettverksinterface (f.eks. "eth0")
 // som vi kan bruke for AF_PACKET rå-sockets.
@@ -472,126 +301,147 @@ void find_iface(void) {
     }
 }
 
+pending_entry pending_queue[MAX_PENDING] = {0};
 
-int main(int argc, char *argv[]) {
-    // Håndterer -h og -d
-    int opt;
-    while ((opt = getopt(argc, argv, "hd")) != -1) {
-        switch(opt) {
-            case 'h':
-                printf("Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
-                printf("Options:\n");
-                printf("  -h      print help and exit\n");
-                printf("  -d      enable debug mode\n");
-                return 0;
-            case 'd':
-                debug_mode = 1;
-                break;
-            default:
-                fprintf(stderr, "Unknown option\n");
-                return 1;
-        }
+// Bygger en Ethernet + MIP-ramme
+// - dst_mac: MAC til mottaker (fra ARP eller FF:FF:FF:FF:FF:FF)
+// - src_mac: MAC til vårt interface (fra ioctl(SIOCGIFHWADDR))
+// - payload: peker til MIP-header + SDU (bygget av build_pdu())
+// - payload_len: lengde av MIP-header + SDU
+// - out_len: returnerer total lengde på Ethernet-ramma
+uint8_t* build_frame(unsigned char *dst_mac,
+                     unsigned char *src_mac,
+                     uint8_t *payload, size_t payload_len,
+                     size_t *out_len) {
+    // Ethernet header er 14 bytes
+    size_t frame_len = sizeof(struct ether_header) + payload_len;
+    uint8_t *frame = malloc(frame_len);
+    if (!frame) {
+        perror("malloc frame");
+        exit(1);
     }
 
-    if (optind + 2 > argc) {
-        fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-  
-    char *socket_path = argv[optind];
-    my_mip_address = atoi(argv[optind+1]);
+    // Pek til headeren i bufferen
+    struct ether_header *eh = (struct ether_header *)frame;
 
-    find_iface();
+    // Kopier MAC-adressene
+    memcpy(eh->ether_dhost, dst_mac, ETH_ALEN);
+    memcpy(eh->ether_shost, src_mac, ETH_ALEN);
 
-    
+    // Sett protokollfeltet til vår egen MIP-protokoll
+    eh->ether_type = htons(ETH_P_MIP);
 
-    if (debug_mode) {
-        printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",
-               socket_path, my_mip_address);
-        printf("[DEBUG] Initial ARP cache:\n");
-        print_arp_cache();
-    }
+    // Kopier inn payload rett etter Ethernet-headeren
+    memcpy(frame + sizeof(struct ether_header), payload, payload_len);
 
-    int unix_sock = create_unix_socket(socket_path);
-    int raw_sock = create_raw_socket();
-    
-    //ev brukes til å registrere en enkelt socket
-    //events er et array av hendelser som epoll_wait() returnerer og forteller hvilke
-    //sockets som har tilgjengelig data
-    struct epoll_event ev, events[MAX_EVENTS];
+    // Returner total lengde
+    *out_len = frame_len;
+    return frame;
+}
 
-    // oppretter en epoll instans
-    // epoll instans er en beholder som kan overvåle flere fildeskroptorer samtidig
-    //sockets eller filer
-    int epollfd = epoll_create1(0);
 
-    if (epollfd == -1) {
-        perror("epoll_create1");
-        exit(EXIT_FAILURE);
+// Henter MAC-adressen til vårt interface
+int get_iface_mac(const char *ifname, unsigned char *mac) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return -1;
+
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+
+    if (ioctl(fd, SIOCGIFHWADDR, &ifr) == -1) {
+        close(fd);
+        return -1;
     }
 
-    // Registrer UNIX-socket
-    ev.events = EPOLLIN; // ønsker å overvåke innkommende data
-    ev.data.fd = unix_sock; //fil deskriptor til epoll for å vite hvilken socket det er snakk om
-
-    //legger til instansen i epollfd (instansen fra tidligere)
-    // EPOLL_CTL_ADD forteller instansen at socketen skal overvåkes
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, unix_sock, &ev) == -1) {
-        perror("epoll_ctl: unix_sock");
-        exit(EXIT_FAILURE);
-    }
-
-    // Registrer RAW-socket
-    ev.events = EPOLLIN; // ønsker å overvåke innkommende data
-    ev.data.fd = raw_sock; //fil deskriptor til epoll for å vite hvilken socket det er snakk om
-    
-    //samme som med unix socket
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, raw_sock, &ev) == -1) {
-        perror("epoll_ctl: raw_sock");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Daemon running. Listening on UNIX + RAW sockets...\n");
-
-    //overvåking av sockets i en evig løkke
-    while (1) {
-        // epoll.wait() venter på at en av de registrerte socketene får innkommende data
-        //nfds holder verdien i int for hvor mange sockets som har hendelser
-        int nfds = epoll_wait(epollfd, events, MAX_EVENTS, -1);
-    
-        if (nfds == -1) {
-            perror("epoll_wait");
-            exit(EXIT_FAILURE);
-        }
-
-        //går igjennom eventuelle events i events array og sjekker om det er en unix/raw socket
-        //kaller de respektive metodene for å håndtere informasjonen som mottas i forbindelsene
-        for (int n = 0; n < nfds; n++) {
-            if (events[n].data.fd == unix_sock) {
-                handle_unix_request(unix_sock, raw_sock, my_mip_address);
-            } else if (events[n].data.fd == raw_sock) {
-                handle_raw_packet(raw_sock, my_mip_address);
-            }
-        }
-    }
-
-    mip_header_t h = {0};
-
-    set_dest(&h, 0xFF);
-    set_src(&h, 0x0A);
-    set_ttl(&h, 1);
-    set_length(&h, 1);
-    set_type(&h, 1);
-
-    printf("ttl_len=0x%02X len_type=0x%02X\n", h.ttl_len, h.len_type);
-    printf("dest=%d src=%d ttl=%d len=%d type=%d\n",
-        get_dest(&h), get_src(&h), get_ttl(&h),
-        get_length(&h), get_type(&h));
-
-    //ferdig - lukker socketene
-    close(unix_sock);
-    close(raw_sock);
+    memcpy(mac, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+    close(fd);
     return 0;
 }
+
+
+
+// Legg melding i pending-kø
+void queue_message(uint8_t dest_mip, uint8_t sdu_type,
+                   uint8_t *data, size_t length_bytes) {
+    for (int i = 0; i < MAX_PENDING; i++) {
+        if (!pending_queue[i].valid) {
+            printf("[DEBUG] queue_message: dest=%d type=%d len=%zu bytes\n",
+                   dest_mip, sdu_type, length_bytes);
+
+            pending_queue[i].valid    = 1;
+            pending_queue[i].dest_mip = dest_mip;
+            pending_queue[i].sdu_type = sdu_type;
+            pending_queue[i].length   = length_bytes;  // alltid bytes
+
+            pending_queue[i].payload = malloc(length_bytes);
+
+            printf("[DEBUG] queue_message saved: len=%zu at slot=%d, payload[0]=0x%02X\n",
+                pending_queue[i].length, i, pending_queue[i].payload[0]);
+
+            if (!pending_queue[i].payload) {
+                perror("[ERROR] malloc queue_message");
+                exit(EXIT_FAILURE);
+            }
+            memcpy(pending_queue[i].payload, data, length_bytes);
+
+            printf("[QUEUE] Meldingen for MIP %d lagt i kø\n", dest_mip);
+            return;
+        }
+    }
+    printf("[QUEUE] Kø full, kunne ikke legge til melding for MIP %d\n", dest_mip);
+}
+
+
+void send_pending_messages(int raw_sock, uint8_t mip_addr,
+                           unsigned char *mac, int my_mip_address) {
+
+    for (int i = 0; i < MAX_PENDING; i++) {
+        if (pending_queue[i].valid && pending_queue[i].dest_mip == mip_addr) {
+            printf("[DEBUG] send_pending_messages: dest=%d type=%d len=%zu bytes valid=%d\n",
+                   pending_queue[i].dest_mip,
+                   pending_queue[i].sdu_type,
+                   pending_queue[i].length,
+                   pending_queue[i].valid);
+
+            if (pending_queue[i].length == 0 || pending_queue[i].payload == NULL) {
+                printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n",
+                       pending_queue[i].dest_mip);
+                pending_queue[i].valid = 0;
+                continue;
+            }
+
+            printf("[DEBUG] send_pending_messages using slot=%d len=%zu type=%d dest=%d\n",
+                   i,
+                   pending_queue[i].length,
+                   pending_queue[i].sdu_type,
+                   pending_queue[i].dest_mip);
+
+            // Bygg PDU på nytt fra payload
+            size_t pdu_len;
+            uint8_t *pdu = mip_build_pdu(
+                pending_queue[i].dest_mip,    // dest
+                my_mip_address,               // src
+                4,                            // TTL
+                pending_queue[i].sdu_type,    // SDU type
+                pending_queue[i].payload,     // SDU data
+                pending_queue[i].length,      // SDU lengde i bytes
+                &pdu_len
+            );
+
+            send_pdu(raw_sock, pdu, pdu_len, mac);
+
+            free(pdu);
+            free(pending_queue[i].payload);
+            pending_queue[i].payload = NULL;
+            pending_queue[i].valid = 0;
+
+            printf("[QUEUE] Sendt kø-melding til MIP %d\n", mip_addr);
+        }
+    }
+}
+
+
+
 
 

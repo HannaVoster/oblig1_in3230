@@ -1,17 +1,12 @@
-#include <stdio.h>
-#include <string.h>
+#include <stdio.h>        // printf
+#include <string.h>       // memcpy
+#include <stdlib.h>       // free
+#include <stdint.h>       // uint8_t
+#include <net/ethernet.h> // ETH_ALEN
+
 #include "mipd.h"
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <net/if.h>
-#include "mipd.h"
-#include <netpacket/packet.h>
-#include <net/ethernet.h>
-#include <arpa/inet.h> 
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include "pdu.h"
+#include "arp.h"
 
 arp_entry arp_cache[MAX_ARP] = {0};
 

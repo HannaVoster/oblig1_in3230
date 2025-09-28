@@ -17,7 +17,7 @@ $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 # Bygg mipd
-$(BIN_DIR)/mipd: $(SRC_DIR)/mipd.c $(SRC_DIR)/mipd_funcs.c $(SRC_DIR)/arp.c $(SRC_DIR)/pdu.c | $(BIN_DIR)
+$(BIN_DIR)/mipd: $(SRC_DIR)/main.c $(SRC_DIR)/mipd.c $(SRC_DIR)/pdu.c $(SRC_DIR)/arp.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 # Bygg ping_client

@@ -1,11 +1,16 @@
-#include <stdio.h>    // for perror
-#include <stdlib.h>   // for malloc, exit
-#include <string.h>   // for memcpy, memset
-#include <stdint.h>   // for uint8_t, uint32_t
-#include <arpa/inet.h> // for htonl, ntohl
-#include "pdu.h"
-#include "mipd.h"
+#include <stdio.h>       // perror, printf
+#include <stdlib.h>      // malloc, exit
+#include <string.h>      // memcpy, memset
+#include <stdint.h>      // uint8_t, uint32_t
+#include <arpa/inet.h>   // htonl, ntohl, htons
+#include <net/if.h>      // if_nametoindex
+#include <netpacket/packet.h> // sockaddr_ll
+#include <net/ethernet.h>     // ethhdr, ETH_ALEN, ETH_P_*
+#include <sys/ioctl.h>   // ioctl (brukes i get_iface_mac)
+#include <unistd.h>      // close, read, write
 
+#include "mipd.h"
+#include "pdu.h"
 
 uint32_t mip_pack_header(uint8_t dest,
                          uint8_t src,
@@ -96,3 +101,110 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
     return (ssize_t)sdu_bytes;
 }
 
+int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac) {
+    if (rawsocket < 0) {
+        perror("rawsocket");
+        exit(1);
+    }
+
+    unsigned ifidx = if_nametoindex(iface_name);
+    if (!ifidx) {
+        perror("if_nametoindex");
+        return -1;
+    }
+
+    unsigned char src_mac[ETH_ALEN];
+    if (get_iface_mac(iface_name, src_mac) < 0) {
+        perror("get_iface_mac");
+        return -1;
+    }
+
+    // Bygg Ethernet-ramme
+    size_t frame_len = sizeof(struct ethhdr) + pdu_length;
+    uint8_t *frame = malloc(frame_len);
+    if (!frame) {
+        perror("malloc");
+        return -1;
+    }
+
+    struct ethhdr *eh = (struct ethhdr *)frame;
+    memcpy(eh->h_dest, dest_mac, ETH_ALEN);
+    memcpy(eh->h_source, src_mac, ETH_ALEN);
+    eh->h_proto = htons(ETH_P_MIP);
+
+    memcpy(frame + sizeof(struct ethhdr), pdu, pdu_length);
+
+    // Sett opp sockaddr_ll
+    struct sockaddr_ll device;
+    memset(&device, 0, sizeof(device));
+    device.sll_family   = AF_PACKET;
+    device.sll_protocol = htons(ETH_P_MIP);
+    device.sll_ifindex  = ifidx;
+    device.sll_halen    = ETH_ALEN;
+    memcpy(device.sll_addr, dest_mac, ETH_ALEN);
+
+    // Minste Ethernet-frame (uten FCS) er 60 bytes
+    if (frame_len < 60) {
+        memset(frame + frame_len, 0, 60 - frame_len);  // pad med nuller
+        frame_len = 60;
+    }
+
+    printf("[DEBUG] Dump av Ethernet frame (%zu bytes):\n", frame_len);
+    for (size_t i = 0; i < frame_len; i++) {
+        printf("%02X ", frame[i]);
+        if ((i+1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+
+    int sent = sendto(rawsocket, frame, frame_len, 0,
+                      (struct sockaddr*)&device, sizeof(device));
+
+    free(frame);
+
+    if (sent < 0) {
+        perror("sendto");
+    } else {
+        printf("[DEBUG] sendto ok, bytes=%d\n", sent);
+    }
+
+    return sent;
+}
+
+void set_dest(mip_header_t *h, uint8_t dest) { h->dest = dest; }
+void set_src(mip_header_t *h, uint8_t src)   { h->src  = src; }
+
+void set_ttl(mip_header_t *h, uint8_t ttl) {
+    h->ttl_len = (ttl << 4) | (h->ttl_len & 0x0F);
+}
+
+void set_length(mip_header_t *h, uint16_t len_words) {
+    // split opp length = 9 bits i high(4) + low(5)
+    uint8_t high = (len_words >> 5) & 0x0F;  // øverste 4
+    uint8_t low  = len_words & 0x1F;         // nederste 5
+    // sett low inn i len_type[7:3], behold type i [2:0]
+    h->len_type = (low << 3) | (h->len_type & 0x07);
+    // sett high inn i ttl_len[3:0], behold TTL i [7:4]
+    h->ttl_len  = (h->ttl_len & 0xF0) | high;
+}
+
+void set_type(mip_header_t *h, uint8_t type) {
+    h->len_type = (h->len_type & 0xF8) | (type & 0x07);
+}
+
+// GET
+uint8_t get_dest(const mip_header_t *h) { return h->dest; }
+uint8_t get_src (const mip_header_t *h) { return h->src; }
+
+uint8_t get_ttl(const mip_header_t *h) {
+    return (h->ttl_len >> 4) & 0x0F;
+}
+
+uint16_t get_length(const mip_header_t *h) {
+    uint16_t high = h->ttl_len & 0x0F;
+    uint16_t low  = (h->len_type >> 3) & 0x1F;
+    return (high << 5) | low;
+}
+
+uint8_t get_type(const mip_header_t *h) {
+    return h->len_type & 0x07;
+}
