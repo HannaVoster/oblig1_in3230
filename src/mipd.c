@@ -234,8 +234,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     if (debug_mode) {
         printf("[DEBUG] RX frame ethertype=0x%04X\n", proto);
         // Dump Ethernet-header (14 bytes)
-        printf("[DEBUG] RX frame (%zd bytes) ethertype=0x%04X\n",
-            n, ntohs(eh->h_proto));
         printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
             "src=%02X:%02X:%02X:%02X:%02X:%02X\n",
             eh->h_dest[0], eh->h_dest[1], eh->h_dest[2],
