@@ -8,6 +8,9 @@
 
 #define SDU_TYPE_ARP 0x10
 
+#define ARP_REQUEST    0x00
+#define ARP_RESPONSE   0x01
+
 // ARP message (SDU payload)
 typedef struct __attribute__((packed)) {
     uint8_t type;       // 0x00 = request, 0x01 = response

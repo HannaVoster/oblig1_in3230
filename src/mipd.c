@@ -149,7 +149,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
 
             // Send ARP request
-            mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
+            mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
             size_t arp_len;
             uint8_t* arp_pdu = mip_build_pdu(
                 0xFF,                  // broadcast dest
@@ -296,7 +296,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                    arp->type, arp->mip_addr, sdu_len);
             }
 
-            if (arp->type == 0x00 && arp->mip_addr == my_mip_address) {
+            if (arp->type == ARP_REQUEST && arp->mip_addr == my_mip_address) {
                 // Dette er en ARP request (0x00), og den spør etter nodens MIP-adresse
                 // Da bygges en ARP response (0x01) med egen MIP-adresse
 
@@ -314,7 +314,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
                 free(pdu);
             }
-            else if (arp->type == 0x01) {
+            else if (arp->type == ARP_RESPONSE) {
                 // Dette er en ARP response (0x01)
                 //oppdatterer arp med mac adresse og mip
                 printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
