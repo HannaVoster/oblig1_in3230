@@ -90,7 +90,20 @@ int create_raw_socket() {
 
     return sock;
 }
+/*
+Håndterer forespørsler som kommer fra klient programmer (ping_client).
+tar inn unic_sock som er fildeskriptor for socketen
+raw_sock som er fildeskriptor for raw socket som brukes til å for sende 
+pakker på nettverket (send_pdu)
+og my_mip_address som er adressen til noden
 
+Leser melding fra klienten, første byte er dest_addr og resten payload
+dest_addr sjekkes opp mot arp cashe, og pakken håndteres ulikt avhengig av om mac er lagret
+
+miss - bygg pakke, legg i kø og send broadcast arp req for å finne mottaker
+
+hit - har riktig mac, kan sende PING
+*/
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     int client = accept(unix_sock, NULL, NULL);
     if (client < 0) return;
@@ -136,7 +149,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
 
             // Send ARP request
-            mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
+            mip_arp_msg req = { .type = 0, .mip_addr = dest_addr, .reserved = 0 };
             size_t arp_len;
             uint8_t* arp_pdu = mip_build_pdu(
                 0xFF,                  // broadcast dest
@@ -163,27 +176,54 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
 
     close(client);
 }
+/*
+mottar råpakker fra nettverkskortet via raw_sock. 
+Den sjekker at det faktisk er en MIP-pakke, pakker opp headeren, og håndterer innholdet avhengig av SDU-typen
 
+PING svarer med en PONG tilbake.
+PONG skriver svaret tilbake til den siste UNIX-klienten.
+ARP-REQUEST svarer med en ARP-RESPONSE hvis forespørselen gjelder egen MIP-adresse.
+ARP-RESPONSE oppdaterer ARP-cachen og sender eventuelle ventende meldinger til den adressen
+
+raw_sock: rå-socketen vi lytter på.
+my_mip_address: egen MIP-adresse
+                brukes til å avgjøre om en pakke er til seg selv og til å fylle ut svar
+
+last_unix_client_fd – kan lukkes eller skrives til når en PONG mottas
+arp_cache – oppdateres når ARP-RESP mottas (gjennom arp_update)
+pending_queue – tømmes når ventende meldinger sendes etter en ARP-RESP (send_pending_message)
+Bruker debug_mode for logging
+*/
 void handle_raw_packet(int raw_sock, int my_mip_address) {
-    uint8_t buffer[2000];
-    struct sockaddr_ll src_addr;
+     
+    uint8_t buffer[2000]; // Buffer for å lagre innkommende råpakke
+    struct sockaddr_ll src_addr; // Struktur for å lagre avsenderadresse
+
+    // iovec beskriver hvor data skal plasseres når vi mottar meldingen
     struct iovec iov = { buffer, sizeof(buffer) };
+
+    // msghdr brukes av recvmsg() for å motta både data og metadata
     struct msghdr msg = { .msg_name = &src_addr, .msg_namelen = sizeof(src_addr),
                           .msg_iov = &iov, .msg_iovlen = 1 };
 
     int len = recvmsg(raw_sock, &msg, 0);
     if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
 
+    // Tolker starten av bufferet som en Ethernet-header
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
+    //sjekekr at protokollen er mip
     if (ntohs(eh->h_proto) != ETH_P_MIP)
         return; // feil protokoll
 
+    //mip pakken starter etter ethernet header
     const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
     size_t mip_len = len - sizeof(struct ethhdr);
 
     uint8_t dest, src, ttl, sdu_type;
     const uint8_t *sdu;
+
+    // Pakk ut og tolk MIP-headeren
     ssize_t sdu_len = mip_parse(mip_start, mip_len,
                                 &dest, &src, &ttl,
                                 &sdu_type, &sdu);
@@ -197,28 +237,41 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return;
     }
 
+    //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
         case SDU_TYPE_PING: {
             printf("[RAW] PING mottatt fra MIP %u\n", src);
+
+            // Oppretter en PONG som svar, med samme payload som kom i PING
             size_t pdu_len = 0;
             uint8_t *pdu = mip_build_pdu(
-                /*dest*/ src,
+                /*dest*/ src, //svar skal tilbake til avsenderr
                 /*src */ my_mip_address,
                 /*ttl */ 4,
                 /*type*/ SDU_TYPE_PONG,
                 sdu, (uint16_t)sdu_len,
                 &pdu_len
             );
+
+            arp_update(src, eh->h_source); //lagrer avsender i ARP til senere
+
+            //eh->h_source er feltet i Ethernet-headeren som inneholder MAC-adressen til avsenderen
             send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
             free(pdu);
             break;
         }
 
         case SDU_TYPE_PONG: {
+            // Mottatt et PONG-svar fra en node vi tidligere sendte en PING til
             printf("[RAW] PONG mottatt fra MIP %u: %.*s\n",
                    src, (int)sdu_len, (char*)sdu);
+
+            // Skriver svaret (payloaden) tilbake til UNIX-klienten som startet forespørselen
             if (last_unix_client_fd > 0) {
                 (void)write(last_unix_client_fd, sdu, sdu_len);
+
+                //lukker klientens socket og 'last_unix_client_fd' settes til -1
+                //så klart til senere
                 close(last_unix_client_fd);
                 last_unix_client_fd = -1;
             }
@@ -226,32 +279,49 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         case SDU_TYPE_ARP: {
+            // arp meldinger, enten request eller response
+
+            //payload må være stor nok til å inneholde en mip_arp_msg
             if (sdu_len < (ssize_t)sizeof(mip_arp_msg)) {
                 printf("[ERROR] ARP SDU for kort (%zd bytes)\n", sdu_len);
                 return;
             }
 
+            //mip_arp_message definert i arp.h (type: reqest eller response, addresse og ev padding)
+            //payloaden tolkes slik
             const mip_arp_msg *arp = (const mip_arp_msg*)sdu;
-            printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%zd)\n",
-                   arp->type, arp->mip_addr, sdu_len);
 
-            if (arp->type == 0x00 && arp->mip_addr == my_mip_address) {
-                // REQ til meg
-                mip_arp_msg resp = { .type = 0x01, .mip_addr = (uint8_t)my_mip_address, .reserved = 0 };
+            if(debug_mode){
+                printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%zd)\n",
+                   arp->type, arp->mip_addr, sdu_len);
+            }
+
+            if (arp->type == 0 && arp->mip_addr == my_mip_address) {
+                // Dette er en ARP request (0), og den spør etter nodens MIP-adresse
+                // Da bygges en ARP response (1) med egen MIP-adresse
+
+                mip_arp_msg resp = { .type = 1, .mip_addr = my_mip_address, .reserved = 0 };
                 size_t pdu_len = 0;
                 uint8_t *pdu = mip_build_pdu(
-                    src, my_mip_address, 1,
+                    src, 
+                    my_mip_address,
+                    1,
                     SDU_TYPE_ARP,
-                    (uint8_t*)&resp, sizeof(resp),
+                    (uint8_t*)&resp, 
+                    sizeof(resp),
                     &pdu_len
                 );
                 send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
                 free(pdu);
             }
-            else if (arp->type == 0x01) {
-                // RESP
+            else if (arp->type == 1) {
+                // Dette er en ARP response (1)
+                //oppdatterer arp med mac adresse og mip
                 printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
                 arp_update(arp->mip_addr, eh->h_source);
+
+                //har fått response, så kan sjekke om det er noen pakker som venter på å bli sent
+                //og som venter på denne aaddressen
                 send_pending_messages(raw_sock, arp->mip_addr, eh->h_source, my_mip_address);
             }
             break;

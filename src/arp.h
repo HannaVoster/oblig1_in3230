@@ -8,10 +8,17 @@
 #define SDU_TYPE_ARP   0x01
 
 // ARP message (SDU payload)
+// typedef struct __attribute__((packed)) {
+//     uint8_t type;       // 0x00 = request, 0x01 = response
+//     uint8_t mip_addr;   // hvem vi spør om / hvem som svarer
+//     uint16_t reserved;  // padding = 0
+// } mip_arp_msg;
+
+// MIP-ARP message (nøyaktig 32 bits totalt)
 typedef struct __attribute__((packed)) {
-    uint8_t type;       // 0x00 = request, 0x01 = response
-    uint8_t mip_addr;   // hvem vi spør om / hvem som svarer
-    uint16_t reserved;  // padding = 0
+    unsigned int type     : 1;   // 1 bit (0 = request, 1 = response)
+    unsigned int mip_addr : 8;   // 8 bits (MIP address vi spør om/svarer for)
+    unsigned int reserved : 23;  // 23 bits (alltid 0)
 } mip_arp_msg;
 
 // ARP entry
