@@ -69,7 +69,7 @@ uint8_t* build_pdu(
     size_t* out_length
     ){ 
 
-    printf("[DEBUG] build_pdu CALLED: dest=%d src=%d ttl=%d type=%d sdu_length_bytes=%zu\n",
+    printf("[DEBUG] build_pdu CALLED: dest=%d src=%d ttl=%d type=%d sdu_length_bytes=%u\n",
            dest_addr, src_addr, ttl, sdu_type, sdu_length_bytes);
     //build buffer with both header and payload
 
