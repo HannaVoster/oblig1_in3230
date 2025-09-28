@@ -6,7 +6,7 @@
 
 #define MAX_ARP 256
 
-#define SDU_TYPE_ARP   0x10
+#define SDU_TYPE_ARP 0x10
 
 // ARP message (SDU payload)
 typedef struct __attribute__((packed)) {
