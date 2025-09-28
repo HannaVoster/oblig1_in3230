@@ -233,13 +233,24 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     if (debug_mode) {
         printf("[DEBUG] RX frame ethertype=0x%04X\n", proto);
+        // Dump Ethernet-header (14 bytes)
+        printf("[DEBUG] RX frame (%zd bytes) ethertype=0x%04X\n",
+            n, ntohs(eh->h_proto));
+        printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
+            "src=%02X:%02X:%02X:%02X:%02X:%02X\n",
+            eh->h_dest[0], eh->h_dest[1], eh->h_dest[2],
+            eh->h_dest[3], eh->h_dest[4], eh->h_dest[5],
+            eh->h_source[0], eh->h_source[1], eh->h_source[2],
+            eh->h_source[3], eh->h_source[4], eh->h_source[5]);
     }
     if (proto != ETH_P_MIP) {
-        printf("PROTO ER FEIL");
+        printf("[DEBUG] PROTO ER FEIL (ikke MIP)\n");
         return;
     }
         
-    printf("JEG ER RIKTIG PROTOKOLL FØR SWITCHEN");
+    if(debug_mode){
+        printf("[DEBUG] PROTO = MIP! Nå kan vi parse PDU.\n");
+    }
 
     //mip pakken starter etter ethernet header
     const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
