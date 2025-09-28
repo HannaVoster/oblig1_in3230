@@ -131,13 +131,13 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
             size_t arp_len;
             uint8_t* arp_pdu = mip_build_pdu(
-                dest_addr,             // dest
+                0xFF,                  // broadcast dest
                 my_mip_address,        // src
-                4,                     // ttl
-                SDU_TYPE_PING,         // type
-                payload,               // payload
-                payload_length,        // payload_len (bytes!)
-                &pdu_len
+                1,                     // ttl
+                SDU_TYPE_ARP,          // type
+                (uint8_t*)&req,        // payload
+                sizeof(req),           // payload_len
+                &arp_len
             );
             unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
             send_pdu(raw_sock, arp_pdu, arp_len, bmac);
@@ -217,7 +217,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         case SDU_TYPE_ARP: {
-            if (sdu_len < sizeof(mip_arp_msg)) {
+            if (sdu_len < (ssize_t)sizeof(mip_arp_msg)) {
                 printf("[ERROR] ARP SDU for kort (%zd bytes)\n", sdu_len);
                 return;
             }
