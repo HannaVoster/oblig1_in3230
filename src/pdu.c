@@ -121,11 +121,16 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
 
     // Bygg Ethernet-ramme
     size_t frame_len = sizeof(struct ethhdr) + pdu_length;
-    uint8_t *frame = malloc(frame_len);
+    size_t alloc_len = frame_len < 60 ? 60 : frame_len; // ny linje forå fikse malloc
+
+    uint8_t *frame = malloc(alloc_len);
+
     if (!frame) {
         perror("malloc");
         return -1;
     }
+
+    memset(frame, 0, alloc_len);
 
     struct ethhdr *eh = (struct ethhdr *)frame;
     memcpy(eh->h_dest, dest_mac, ETH_ALEN);
@@ -156,7 +161,9 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     }
     printf("\n");
 
-    int sent = sendto(rawsocket, frame, frame_len, 0,
+    size_t send_len = alloc_len;
+
+    int sent = sendto(rawsocket, frame, send_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
 
     free(frame);

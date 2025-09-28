@@ -7,41 +7,54 @@
 #include "pdu.h"
 #include "arp.h"
 
-#define MAX_EVENTS 10
+#define MAX_EVENTS 10 // epoll
 
-int debug_mode = 0;
-int last_unix_client_fd = -1;
-int my_mip_address = -1;
-char iface_name[IFNAMSIZ] = {0};
+int debug_mode = 0; // debug flagg
+int last_unix_client_fd = -1; // siste unix klient
+int my_mip_address = -1; // min mip addresse
+char iface_name[IFNAMSIZ] = {0}; //navn på interface
+pending_entry pending_queue[MAX_PENDING] = {0}; // kø av meldinger
+
+/*
+Denne funksjonen starter MIP-daemonen. 
+Den håndterer flaggene -h og -d, henter inn socket-sti og MIP-adresse fra argumentene,
+ finner nettverksinterface og oppretter både UNIX- og råsocket. 
+ Disse legges i en epoll-instans, og programmet går deretter i en løkke som behandler 
+ enten klientforespørsler eller mottatte MIP-pakker
+ */
 
 int main(int argc, char *argv[]) {
     // Håndterer -h og -d
+    // getopt() returnerer flagg-bokstaven som en char eller -1 når det ikke er flere flagg
     int opt;
     while ((opt = getopt(argc, argv, "hd")) != -1) {
         switch(opt) {
             case 'h':
                 printf("Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
                 printf("Options:\n");
-                printf("  -h      print help and exit\n");
-                printf("  -d      enable debug mode\n");
+                printf("  -h print help and exit\n");
+                printf("  -d enable debug mode\n");
                 return 0;
             case 'd':
                 debug_mode = 1;
                 break;
             default:
+                //stderr skriver til standard error
                 fprintf(stderr, "Unknown option\n");
                 return 1;
         }
     }
-
+    //sjekker at argumentene gis riktig, avslutter hvis det ikke finnes mindt 2
     if (optind + 2 > argc) {
         fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-  
+    
+    //henter ut filsti og adresse fra argumentene
     char *socket_path = argv[optind];
     my_mip_address = atoi(argv[optind+1]);
 
+    //finner interface, metode i mipd
     find_iface();
 
     if (debug_mode) {
@@ -51,6 +64,7 @@ int main(int argc, char *argv[]) {
         print_arp_cache();
     }
 
+    //lager sockets
     int unix_sock = create_unix_socket(socket_path);
     int raw_sock = create_raw_socket();
     
@@ -113,7 +127,6 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
     //ferdig - lukker socketene
     close(unix_sock);
     close(raw_sock);
