@@ -76,15 +76,6 @@ int create_raw_socket() {
         exit(EXIT_FAILURE);
     }
 
-    // Slå på mottak av egne sendte rammer (loopback)
-    int one = 1;
-    if (setsockopt(sock, SOL_PACKET, PACKET_LOOPBACK,
-                   &one, sizeof(one)) < 0) {
-        perror("setsockopt PACKET_LOOPBACK");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-
     // Bind socketen til valgt interface (iface_name settes i find_iface())
     struct sockaddr_ll sll = {0};
     sll.sll_family = AF_PACKET;
