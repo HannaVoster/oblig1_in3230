@@ -58,38 +58,27 @@ uint8_t get_type(const mip_header_t *h) {
 //------------------PDU------------------
 
 // pdu = header + payload
-
-uint8_t* build_pdu(
-    uint8_t dest_addr, 
-    uint8_t src_addr, 
-    uint8_t ttl, 
-    uint16_t sdu_length_bytes,
-    uint8_t sdu_type,
-    const uint8_t* payload,
-    size_t* out_length
-    ){ 
-
-    printf("[DEBUG] build_pdu CALLED: dest=%d src=%d ttl=%d type=%d sdu_length_bytes=%u\n",
-           dest_addr, src_addr, ttl, sdu_type, sdu_length_bytes);
-    //build buffer with both header and payload
-
-    //kontroller lengde på payload for å gjøre pdu delelig med 4
-    // RFC: SDU length skal lagres i words (32-bit ord)
+uint8_t* build_pdu(uint8_t dest_addr,
+                   uint8_t src_addr,
+                   uint8_t ttl,
+                   uint16_t sdu_length_bytes,
+                   uint8_t sdu_type,
+                   const uint8_t* payload,
+                   size_t* out_length) 
+{
+    // Align til 32-bit (RFC: payload må være delelig på 4)
     uint16_t aligned_length_bytes = (sdu_length_bytes + 3) & ~0x03;
     uint16_t length_in_words = aligned_length_bytes / 4;
 
-    // Alloker plass: header (4 byte) + payload (padded)
+    // Alloker buffer: header (4) + payload (aligned)
     size_t total_len = sizeof(mip_header_t) + aligned_length_bytes;
     uint8_t* pdu = malloc(total_len);
     if (!pdu) {
-        perror("malloc build pdu");
-        exit(1);
+        perror("malloc build_pdu");
+        exit(EXIT_FAILURE);
     }
 
-    printf("[DEBUG] build_pdu: aligned=%u words=%u total=%zu\n",
-           aligned_length_bytes, length_in_words, total_len);
-
-    // Bygg header
+    // Sett opp header
     mip_header_t hdr = {0};
     set_dest(&hdr, dest_addr);
     set_src(&hdr, src_addr);
@@ -97,32 +86,37 @@ uint8_t* build_pdu(
     set_length(&hdr, length_in_words);
     set_type(&hdr, sdu_type);
 
-    printf("ttl_len=0x%02X len_type=0x%02X\n", hdr.ttl_len, hdr.len_type);
-
-    printf("[DEBUG] Header: dest=%u src=%u ttl=%u len_words=%u type=%u\n",
-       get_dest(&hdr), get_src(&hdr), get_ttl(&hdr),
-       get_length(&hdr), get_type(&hdr));
-
-    printf("[DEBUG] build_pdu: len_words=%u, sdu_type=%u\n", length_in_words, sdu_type);
-    // Kopier header inn i PDU
+    // Kopier header
     memcpy(pdu, &hdr, sizeof(mip_header_t));
 
-    printf("sizeof(mip_header_t)=%zu\n", sizeof(mip_header_t));
-    // Kopier payload
-    memcpy(pdu + sizeof(mip_header_t), payload, sdu_length_bytes);
+    // Kopier reell payload (kan være 17)
+    if (sdu_length_bytes > 0 && payload) {
+        memcpy(pdu + sizeof(mip_header_t), payload, sdu_length_bytes);
+    }
 
-    // Nullfyll padding hvis nødvendig
+    // Pad resten med nuller (hvis ikke allerede aligned)
     if (aligned_length_bytes > sdu_length_bytes) {
-        memset(pdu + sizeof(mip_header_t) + sdu_length_bytes, 0,
+        memset(pdu + sizeof(mip_header_t) + sdu_length_bytes,
+               0,
                aligned_length_bytes - sdu_length_bytes);
     }
-    // Total PDU-lengde i bytes (inkl. header)
+
+    // Sett ut-lengde (total PDU)
     if (out_length) {
-        *out_length = sizeof(mip_header_t) + aligned_length_bytes;
+        *out_length = total_len;
+    }
+
+    if (debug_mode) {
+        printf("[DEBUG] build_pdu: dest=%u src=%u ttl=%u type=%u "
+               "sdu_length=%u aligned=%u words=%u total=%zu\n",
+               dest_addr, src_addr, ttl, sdu_type,
+               sdu_length_bytes, aligned_length_bytes,
+               length_in_words, total_len);
     }
 
     return pdu;
 }
+
 
 
 // Bygger en Ethernet + MIP-ramme
