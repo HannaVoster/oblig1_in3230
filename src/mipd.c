@@ -21,7 +21,6 @@
 #define MAX_EVENTS 10
 #define UNIX_PATH "/tmp/mip_socket"
 
-int debug_mode = 0; // global flagg for debug
 int last_unix_client_fd = -1; 
 int my_mip_address = -1;
 char iface_name[IFNAMSIZ] = {0};
