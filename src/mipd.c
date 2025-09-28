@@ -213,9 +213,12 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
     //sjekekr at protokollen er mip
-    if (ntohs(eh->h_proto) != ETH_P_MIP)
+    if (ntohs(eh->h_proto) != ETH_P_MIP){
         printf("JEG ER FEIL PROTOKOLL");
-        return; // feil protokoll
+        return; 
+    }
+        
+        // feil protokoll
 
     //mip pakken starter etter ethernet header
     const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
