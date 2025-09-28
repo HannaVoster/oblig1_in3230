@@ -76,21 +76,13 @@ int create_raw_socket() {
         exit(EXIT_FAILURE);
     }
 
-    unsigned ifidx = if_nametoindex(iface_name);
-    
-    if (!ifidx) { perror("if_nametoindex"); exit(EXIT_FAILURE); }
-
-    if(debug_mode){
-        printf("[DEBUG] create_raw_socket: ifindex=%d iface=%s proto=0x%X\n",
-        ifidx, iface_name, ETH_P_MIP);
-    }
-
-    // Join promiscuous mode
-    struct packet_mreq mreq = {0};
-    mreq.mr_ifindex = ifidx;
-    mreq.mr_type = PACKET_MR_PROMISC;
-    if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        perror("setsockopt PROMISC");
+    // Slå på mottak av egne sendte rammer (loopback)
+    int one = 1;
+    if (setsockopt(sock, SOL_PACKET, PACKET_LOOPBACK,
+                   &one, sizeof(one)) < 0) {
+        perror("setsockopt PACKET_LOOPBACK");
+        close(sock);
+        exit(EXIT_FAILURE);
     }
 
     // Bind socketen til valgt interface (iface_name settes i find_iface())
