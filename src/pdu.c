@@ -1,5 +1,10 @@
+#include <stdio.h>    // for perror
+#include <stdlib.h>   // for malloc, exit
+#include <string.h>   // for memcpy, memset
+#include <stdint.h>   // for uint8_t, uint32_t
+#include <arpa/inet.h> // for htonl, ntohl
 #include "pdu.h"
-#include <arpa/inet.h>
+
 
 uint32_t mip_pack_header(uint8_t dest,
                          uint8_t src,
