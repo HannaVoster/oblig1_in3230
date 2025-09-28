@@ -231,11 +231,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     int len = recvmsg(raw_sock, &msg, 0);
 
-    if(debug_mode){
-        printf("[DEBUG] RX via ifindex=%d proto=0x%X len=%zd\n",
-        addr.sll_ifindex, ntohs(addr.sll_protocol), n);
-    }
-    
     if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
 
     // Tolker starten av bufferet som en Ethernet-header
