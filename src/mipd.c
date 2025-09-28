@@ -70,7 +70,7 @@ funksjonen binder socketen til det valgte nettverksinterface,
 og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt.
 */
 int create_raw_socket() {
-    int sock = socket(AF_PACKET, SOCK_RAW, ETH_P_MIP);
+    int sock = socket(AF_PACKET, SOCK_RAW, ETH_P_ALL);
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
@@ -79,12 +79,12 @@ int create_raw_socket() {
     // Bind socketen til valgt interface (iface_name settes i find_iface())
     struct sockaddr_ll sll = {0};
     sll.sll_family = AF_PACKET;
-    sll.sll_protocol = htons(ETH_P_MIP);
+    sll.sll_protocol = htons(ETH_P_ALL);
     sll.sll_ifindex  = if_nametoindex(iface_name);
 
     if(debug_mode){
         printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n",
-           iface_name, sll.sll_ifindex, ETH_P_MIP);
+           iface_name, sll.sll_ifindex, ETH_P_ALL);
     }
 
     if (bind(sock, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
