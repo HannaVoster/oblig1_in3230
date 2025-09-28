@@ -214,6 +214,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     //sjekekr at protokollen er mip
     if (ntohs(eh->h_proto) != ETH_P_MIP)
+        printf("JEG ER FEIL PROTOKOLL")
         return; // feil protokoll
 
     //mip pakken starter etter ethernet header
