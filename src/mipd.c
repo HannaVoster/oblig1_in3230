@@ -218,7 +218,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return; 
     }
         
-        // feil protokoll
+    printf("JEG ER RIKTIG PROTOKOLL FØR SWITCHEN");
 
     //mip pakken starter etter ethernet header
     const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
