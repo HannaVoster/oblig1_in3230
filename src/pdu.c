@@ -12,35 +12,14 @@
 #include "mipd.h"
 #include "pdu.h"
 
-void mip_build_header_bytes(uint8_t *hdr,
-                            uint8_t dest,
-                            uint8_t src,
-                            uint8_t ttl,
-                            uint16_t len_words,
-                            uint8_t sdu_type)
-{
-    hdr[0] = dest;
-    hdr[1] = src;
-    hdr[2] = ((ttl & 0x0F) << 4) | ((len_words >> 5) & 0x0F);
-    hdr[3] = ((len_words & 0x1F) << 3) | (sdu_type & 0x07);
-}
+/*
+Bygger en komplett MIP_PDU protocol data unit som består av:
+4 byte mip header
+sdu, service data unit (padded til 32 bit grense)
 
-
-void mip_unpack_header(const uint8_t *hdr,
-                       uint8_t *dest,
-                       uint8_t *src,
-                       uint8_t *ttl,
-                       uint16_t *len_words,
-                       uint8_t *sdu_type)
-{
-    *dest = hdr[0];
-    *src  = hdr[1];
-    *ttl  = (hdr[2] >> 4) & 0x0F;                 // øverste 4 bits av byte 2
-    *len_words = ((hdr[2] & 0x0F) << 5) |         // nederste 4 bits av byte 2
-                 ((hdr[3] >> 3) & 0x1F);          // øverste 5 bits av byte 3
-    *sdu_type  = hdr[3] & 0x07;                   // nederste 3 bits av byte 3
-}
-
+metoden returnerer en peker til en nyallokert buffer som holder PDU
+*out_len settes også til den totale lengden så den kan brukes til å sende pdu senere
+*/
 uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                        uint8_t sdu_type,
                        const uint8_t *sdu, uint16_t sdu_len_bytes,
@@ -50,7 +29,7 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
     uint16_t aligned = (sdu_len_bytes + 3) & ~0x03;
     uint16_t len_words = aligned / 4;
 
-    // alloker (4 byte header + SDU pad)
+    // alloker buffer (4 byte header + SDU + pad)
     size_t total = 4 + aligned;
     uint8_t *buf = (uint8_t *)malloc(total);
     if (!buf) {
@@ -58,7 +37,7 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
         exit(EXIT_FAILURE);
     }
 
-    // pakk header (manuelt)
+    // pakk inn headerfeltene
     buf[0] = dest;
     buf[1] = src;
     buf[2] = ((ttl & 0x0F) << 4) | ((len_words >> 5) & 0x0F);
@@ -68,10 +47,12 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
     if (sdu_len_bytes && sdu) {
         memcpy(buf + 4, sdu, sdu_len_bytes);
     }
+    //pad resterende bytes opp til aligned length
     if (aligned > sdu_len_bytes) {
         memset(buf + 4 + sdu_len_bytes, 0, aligned - sdu_len_bytes);
     }
 
+    // Gi total lengde tilbake til caller
     if (out_len) *out_len = total;
 
     if (debug_mode) {
@@ -111,7 +92,6 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
     }
     return (ssize_t)sdu_bytes;
 }
-
 
 
 int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac) {
