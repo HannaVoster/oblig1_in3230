@@ -16,6 +16,7 @@
 
 extern char iface_name[IFNAMSIZ];
 
+extern int debug_mode;
 
 typedef struct {
     int valid;
