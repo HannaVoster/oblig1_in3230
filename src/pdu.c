@@ -190,7 +190,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     if (sent < 0) {
         perror("sendto");
     } else {
-        if(debug_mode){printf("[DEBUG] sendto ok, bytes=%d\n", sent);}
+        if(debug_mode){printf("[DEBUG] sendto OK, bytes=%d\n\n", sent);}
     }
     return sent;
 }
