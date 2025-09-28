@@ -5,6 +5,7 @@
 #include <net/ethernet.h>  // For ETH_ALEN
 
 #define MAX_ARP 256
+
 #define SDU_TYPE_ARP   0x01
 
 // ARP message (SDU payload)
@@ -14,8 +15,6 @@ typedef struct __attribute__((packed)) {
     uint16_t reserved;  // padding = 0
 } mip_arp_msg;
 
-
-
 // ARP entry
 typedef struct {
     uint8_t mip_addr;
@@ -23,9 +22,9 @@ typedef struct {
     int valid;
 } arp_entry;
 
-extern arp_entry arp_cache[MAX_ARP];
+extern arp_entry arp_cache[MAX_ARP]; 
 
-// Funksjoner
+// Funksjoner for å bruke arp tabellen/vise den
 void arp_update(int mip_addr, const unsigned char *mac);
 int arp_lookup(int mip_addr, unsigned char *mac_out);
 void print_arp_cache(void);

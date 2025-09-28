@@ -12,34 +12,63 @@
 #include "mipd.h"
 #include "pdu.h"
 
-uint32_t mip_pack_header(uint8_t dest,
-                         uint8_t src,
-                         uint8_t ttl,
-                         uint16_t len_words,
-                         uint8_t sdu_type)
+// uint32_t mip_pack_header(uint8_t dest,
+//                          uint8_t src,
+//                          uint8_t ttl,
+//                          uint16_t len_words,
+//                          uint8_t sdu_type)
+// {
+//     uint32_t h = 0;
+//     h |= ((uint32_t)dest      & 0xFF) << 24; //& 0xFF bare 8 bit flyttes til å være 8 øverste
+//     h |= ((uint32_t)src       & 0xFF) << 16; //flyttes til 16-23
+//     h |= ((uint32_t)ttl       & 0x0F) << 12; //& 0x0F så bare de 4 nederste brukes, bit 12-15
+//     h |= ((uint32_t)len_words & 0x1FF) << 3; //0x1FF maks 9 bit, på plass 3-11
+//     h |= ((uint32_t)sdu_type  & 0x07); //& 0x07 maks 3 bit på 0-2
+//     return h;
+// }
+
+// void mip_unpack_header(uint32_t h_net,
+//                        uint8_t *dest,
+//                        uint8_t *src,
+//                        uint8_t *ttl,
+//                        uint16_t *len_words,
+//                        uint8_t *sdu_type)
+// {
+//     uint32_t h = ntohl(h_net);
+//     if (dest)      *dest      = (h >> 24) & 0xFF;
+//     if (src)       *src       = (h >> 16) & 0xFF;
+//     if (ttl)       *ttl       = (h >> 12) & 0x0F;
+//     if (len_words) *len_words = (h >> 3)  & 0x1FF;
+//     if (sdu_type)  *sdu_type  =  h        & 0x07;
+// }
+
+void mip_build_header_bytes(uint8_t *hdr,
+                            uint8_t dest,
+                            uint8_t src,
+                            uint8_t ttl,
+                            uint16_t len_words,
+                            uint8_t sdu_type)
 {
-    uint32_t h = 0;
-    h |= ((uint32_t)dest      & 0xFF) << 24;
-    h |= ((uint32_t)src       & 0xFF) << 16;
-    h |= ((uint32_t)ttl       & 0x0F) << 12;
-    h |= ((uint32_t)len_words & 0x1FF) << 3;
-    h |= ((uint32_t)sdu_type  & 0x07);
-    return h;
+    hdr[0] = dest;
+    hdr[1] = src;
+    hdr[2] = ((ttl & 0x0F) << 4) | ((len_words >> 5) & 0x0F);
+    hdr[3] = ((len_words & 0x1F) << 3) | (sdu_type & 0x07);
 }
 
-void mip_unpack_header(uint32_t h_net,
+
+void mip_unpack_header(const uint8_t *hdr,
                        uint8_t *dest,
                        uint8_t *src,
                        uint8_t *ttl,
                        uint16_t *len_words,
                        uint8_t *sdu_type)
 {
-    uint32_t h = ntohl(h_net);
-    if (dest)      *dest      = (h >> 24) & 0xFF;
-    if (src)       *src       = (h >> 16) & 0xFF;
-    if (ttl)       *ttl       = (h >> 12) & 0x0F;
-    if (len_words) *len_words = (h >> 3)  & 0x1FF;
-    if (sdu_type)  *sdu_type  =  h        & 0x07;
+    *dest = hdr[0];
+    *src  = hdr[1];
+    *ttl  = (hdr[2] >> 4) & 0x0F;                 // øverste 4 bits av byte 2
+    *len_words = ((hdr[2] & 0x0F) << 5) |         // nederste 4 bits av byte 2
+                 ((hdr[3] >> 3) & 0x1F);          // øverste 5 bits av byte 3
+    *sdu_type  = hdr[3] & 0x07;                   // nederste 3 bits av byte 3
 }
 
 uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
@@ -59,12 +88,13 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
         exit(EXIT_FAILURE);
     }
 
-    // pakk header -> nettverksbyteorden
-    uint32_t h_host = mip_pack_header(dest, src, ttl, len_words, sdu_type);
-    uint32_t h_net  = htonl(h_host);
-    memcpy(buf, &h_net, 4);
+    // ---- Pakk header (manuelt) ----
+    buf[0] = dest;
+    buf[1] = src;
+    buf[2] = ((ttl & 0x0F) << 4) | ((len_words >> 5) & 0x0F);
+    buf[3] = ((len_words & 0x1F) << 3) | (sdu_type & 0x07);
 
-    // kopier SDU + pad med nuller
+    // ---- Kopier SDU + pad ----
     if (sdu_len_bytes && sdu) {
         memcpy(buf + 4, sdu, sdu_len_bytes);
     }
@@ -74,32 +104,99 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
 
     if (out_len) *out_len = total;
 
-    if(debug_mode){
+    if (debug_mode) {
         printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
-           "sdu_len=%u aligned=%u words=%u total=%zu\n",
-           dest, src, ttl, sdu_type,
-           sdu_len_bytes, aligned, len_words, total);
+               "sdu_len=%u aligned=%u words=%u total=%zu\n",
+               dest, src, ttl, sdu_type,
+               sdu_len_bytes, aligned, len_words, total);
     }
     return buf;
 }
+
+
+
+// uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
+//                        uint8_t sdu_type,
+//                        const uint8_t *sdu, uint16_t sdu_len_bytes,
+//                        size_t *out_len)
+// {
+//     // SDU må være 32-bit justert
+//     uint16_t aligned = (sdu_len_bytes + 3) & ~0x03;
+//     uint16_t len_words = aligned / 4;
+
+//     // alloker (4 byte header + SDU pad)
+//     size_t total = 4 + aligned;
+//     uint8_t *buf = (uint8_t *)malloc(total);
+//     if (!buf) {
+//         perror("malloc mip_build_pdu");
+//         exit(EXIT_FAILURE);
+//     }
+
+//     // pakk header -> nettverksbyteorden
+//     uint32_t h_host = mip_pack_header(dest, src, ttl, len_words, sdu_type);
+//     uint32_t h_net  = htonl(h_host);
+//     memcpy(buf, &h_net, 4);
+
+//     // kopier SDU + pad med nuller
+//     if (sdu_len_bytes && sdu) {
+//         memcpy(buf + 4, sdu, sdu_len_bytes);
+//     }
+//     if (aligned > sdu_len_bytes) {
+//         memset(buf + 4 + sdu_len_bytes, 0, aligned - sdu_len_bytes);
+//     }
+
+//     if (out_len) *out_len = total;
+
+//     if(debug_mode){
+//         printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
+//            "sdu_len=%u aligned=%u words=%u total=%zu\n",
+//            dest, src, ttl, sdu_type,
+//            sdu_len_bytes, aligned, len_words, total);
+//     }
+//     return buf;
+// }
+
+// ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
+//                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
+//                   uint8_t *sdu_type, const uint8_t **sdu_out)
+// {
+//     if (rcv_len < 4) return -1;
+//     uint32_t h_net;
+//     memcpy(&h_net, rcv, 4);
+
+//     uint16_t len_words = 0;
+//     mip_unpack_header(h_net, dest, src, ttl, &len_words, sdu_type);
+
+//     size_t sdu_bytes = (size_t)len_words * 4;
+//     if (rcv_len < 4 + sdu_bytes) return -1;
+
+//     if (sdu_out) *sdu_out = rcv + 4;
+//     return (ssize_t)sdu_bytes;
+// }
 
 ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
                   uint8_t *sdu_type, const uint8_t **sdu_out)
 {
     if (rcv_len < 4) return -1;
-    uint32_t h_net;
-    memcpy(&h_net, rcv, 4);
 
-    uint16_t len_words = 0;
-    mip_unpack_header(h_net, dest, src, ttl, &len_words, sdu_type);
+    // ---- Unpack header ----
+    *dest = rcv[0];
+    *src  = rcv[1];
+    *ttl  = (rcv[2] >> 4) & 0x0F;
+    uint16_t len_words = ((rcv[2] & 0x0F) << 5) | ((rcv[3] >> 3) & 0x1F);
+    *sdu_type = rcv[3] & 0x07;
 
+    // ---- Beregn SDU-lengde ----
     size_t sdu_bytes = (size_t)len_words * 4;
     if (rcv_len < 4 + sdu_bytes) return -1;
 
     if (sdu_out) *sdu_out = rcv + 4;
     return (ssize_t)sdu_bytes;
 }
+
+
+
 
 int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac) {
     if (rawsocket < 0) {
