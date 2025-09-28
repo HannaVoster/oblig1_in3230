@@ -12,6 +12,7 @@
 int debug_mode = 0;
 int last_unix_client_fd = -1;
 int my_mip_address = -1;
+char iface_name[IFNAMSIZ] = {0};
 
 int main(int argc, char *argv[]) {
     // Håndterer -h og -d
