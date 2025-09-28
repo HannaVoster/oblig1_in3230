@@ -237,6 +237,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
     uint16_t proto = ntohs(eh->h_proto);
+    //SJEKK 
 
     if (debug_mode) {
         printf("[DEBUG] RX frame ethertype=0x%04X\n", proto);
