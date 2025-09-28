@@ -83,7 +83,7 @@ int create_raw_socket() {
     sll.sll_ifindex  = if_nametoindex(iface_name);
 
     if(debug_mode){
-        printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n",
+        printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n\n",
            iface_name, sll.sll_ifindex, ETH_P_ALL);
     }
 
@@ -122,14 +122,14 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
         size_t payload_length = n - 1;   // korrekt lengde
 
         if(debug_mode){
-            printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n",
+            printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n\n",
                n, dest_addr, payload_length);
             printf("[DEBUG] payload bytes: ");
             for (size_t i = 0; i < payload_length && i < 8; i++) {
                 printf("%02X ", payload[i]);
             }
             printf("[DEBUG] Checking ARP for dest=%u\n", dest_addr);
-            printf("\n");
+            printf("\n\n");
         }
         
         unsigned char mac[6];
@@ -200,8 +200,9 @@ pending_queue – tømmes når ventende meldinger sendes etter en ARP-RESP (send
 Bruker debug_mode for logging
 */
 void handle_raw_packet(int raw_sock, int my_mip_address) {
-    printf("[DEBUG] handle_raw_packet CALLED\n");
-
+    if(debug_mode){
+        printf("[DEBUG] handle_raw_packet CALLED\n\n");
+    }
     uint8_t buffer[2000]; // Buffer for å lagre innkommende råpakke
     struct sockaddr_ll src_addr; // Struktur for å lagre avsenderadresse
 
@@ -223,22 +224,22 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     //SJEKK 
 
     if (debug_mode) {
-        printf("[DEBUG] RX frame ethertype=0x%04X\n", proto);
+        printf("[DEBUG] RX frame ethertype=0x%04X\n\n", proto);
         // Dump Ethernet-header (14 bytes)
         printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
-            "src=%02X:%02X:%02X:%02X:%02X:%02X\n",
+            "src=%02X:%02X:%02X:%02X:%02X:%02X\n\n",
             eh->h_dest[0], eh->h_dest[1], eh->h_dest[2],
             eh->h_dest[3], eh->h_dest[4], eh->h_dest[5],
             eh->h_source[0], eh->h_source[1], eh->h_source[2],
             eh->h_source[3], eh->h_source[4], eh->h_source[5]);
     }
     if (proto != ETH_P_MIP) {
-        printf("[DEBUG] PROTO ER FEIL (ikke MIP)\n");
+        printf("[DEBUG] PROTO ER FEIL (ikke MIP)\n\n");
         return;
     }
         
     if(debug_mode){
-        printf("[DEBUG] PROTO = MIP! Nå kan vi parse PDU.\n");
+        printf("[DEBUG] PROTO = MIP! Nå kan vi parse PDU.\n\n");
     }
 
     //mip pakken starter etter ethernet header
@@ -265,7 +266,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
         case SDU_TYPE_PING: {
-            printf("[RAW] PING mottatt fra MIP %u\n", src);
+            printf("[RAW] PING mottatt fra MIP %u\n\n", src);
 
             // Oppretter en PONG som svar, med samme payload som kom i PING
             size_t pdu_len = 0;
@@ -288,7 +289,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
         case SDU_TYPE_PONG: {
             // Mottatt et PONG-svar fra en node vi tidligere sendte en PING til
-            printf("[RAW] PONG mottatt fra MIP %u: %.*s\n",
+            printf("[RAW] PONG mottatt fra MIP %u: %.*s\n\n",
                    src, (int)sdu_len, (char*)sdu);
 
             // Skriver svaret (payloaden) tilbake til UNIX-klienten som startet forespørselen
@@ -308,7 +309,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
             //payload må være stor nok til å inneholde en mip_arp_msg
             if (sdu_len < (ssize_t)sizeof(mip_arp_msg)) {
-                printf("[ERROR] ARP SDU for kort (%zd bytes)\n", sdu_len);
+                printf("[ERROR] ARP SDU for kort (%zd bytes)\n\n", sdu_len);
                 return;
             }
 
@@ -317,7 +318,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             const mip_arp_msg *arp = (const mip_arp_msg*)sdu;
 
             if(debug_mode){
-                printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%zd)\n",
+                printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%zd)\n\n",
                    arp->type, arp->mip_addr, sdu_len);
             }
 
@@ -342,7 +343,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             else if (arp->type == 0x01) {
                 // Dette er en ARP response (0x01)
                 //oppdatterer arp med mac adresse og mip
-                printf("[RAW] ARP-RESP mottatt for MIP %d\n", arp->mip_addr);
+                printf("[RAW] ARP-RESP mottatt for MIP %d\n\n", arp->mip_addr);
                 arp_update(arp->mip_addr, eh->h_source);
 
                 //har fått response, så kan sjekke om det er noen pakker som venter på å bli sent
@@ -353,7 +354,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         default:
-            printf("[RAW] Ukjent SDU-type: %u\n", sdu_type);
+            printf("[RAW] Ukjent SDU-type: %u\n\n", sdu_type);
             break;
     }
 }
@@ -378,7 +379,7 @@ void find_iface(void) {
         if (ifa->ifa_addr == NULL) continue; // Hopp over ugyldige entries
 
         if (debug_mode) {
-            printf("[DEBUG] Fant interface: %s (family=%d)\n",
+            printf("[DEBUG] Fant interface: %s (family=%d)\n\n",
                    ifa->ifa_name,
                    ifa->ifa_addr->sa_family);
         }

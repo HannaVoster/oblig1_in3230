@@ -36,12 +36,6 @@ void mip_unpack_header(const uint8_t *hdr,
                        uint16_t *len_words, uint8_t *sdu_type);
 
 
-// void mip_unpack_header(const uint8_t *hdr,
-//                        uint8_t *dest,
-//                        uint8_t *src,
-//                        uint8_t *ttl,
-//                        uint16_t *len_words,
-//                        uint8_t *sdu_type);
 
 uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                        uint8_t sdu_type,
