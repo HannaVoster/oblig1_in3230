@@ -12,6 +12,8 @@
 #include <arpa/inet.h>      
 #include <netinet/if_ether.h> 
 #include <ifaddrs.h>       
+#include <linux/if_packet.h>
+
 
 #include "mipd.h"
 #include "pdu.h"
@@ -74,6 +76,17 @@ int create_raw_socket() {
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
+    }
+
+    unsigned ifidx = if_nametoindex(iface_name);
+    if (!ifidx) { perror("if_nametoindex"); exit(EXIT_FAILURE); }
+
+    // Join promiscuous mode
+    struct packet_mreq mreq = {0};
+    mreq.mr_ifindex = ifidx;
+    mreq.mr_type = PACKET_MR_PROMISC;
+    if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        perror("setsockopt PROMISC");
     }
 
     // Bind socketen til valgt interface (iface_name settes i find_iface())
@@ -218,10 +231,14 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     // Tolker starten av bufferet som en Ethernet-header
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
-    //sjekekr at protokollen er mip
-    if (eh->h_proto != htons(ETH_P_MIP)){
-        printf("JEG ER FEIL PROTOKOLL");
-        return; 
+    uint16_t proto = ntohs(eh->h_proto);
+
+    if (debug_mode) {
+        printf("[DEBUG] RX frame ethertype=0x%04X\n", proto);
+    }
+    if (proto != ETH_P_MIP) {
+        printf("PROTO ER FEIL");
+        return;
     }
         
     printf("JEG ER RIKTIG PROTOKOLL FØR SWITCHEN");

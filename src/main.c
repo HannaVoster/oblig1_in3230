@@ -21,6 +21,9 @@ Den håndterer flaggene -h og -d, henter inn socket-sti og MIP-adresse fra argum
  finner nettverksinterface og oppretter både UNIX- og råsocket. 
  Disse legges i en epoll-instans, og programmet går deretter i en løkke som behandler 
  enten klientforespørsler eller mottatte MIP-pakker
+
+ main setter globale variabler som debug_mode, my_mip_address og iface_name,
+ Disse variablene brukes senere av andre funksjoner
  */
 
 int main(int argc, char *argv[]) {
