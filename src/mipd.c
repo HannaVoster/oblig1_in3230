@@ -128,8 +128,8 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             for (size_t i = 0; i < payload_length && i < 8; i++) {
                 printf("%02X ", payload[i]);
             }
-            printf("[DEBUG] Checking ARP for dest=%u\n", dest_addr);
-            printf("\n\n");
+            printf("\n")
+            printf("[DEBUG] Checking ARP for dest=%u\n\n", dest_addr);
         }
         
         unsigned char mac[6];
