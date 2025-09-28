@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <net/if.h>
 #include "mipd.h"
+#include "pdu.h"
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <arpa/inet.h> 
@@ -246,34 +247,6 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     return sent;
 }
 
-
-//Broadcast
-int send_broadcast(int dst, int rawsocket){
-    //raw socket broadcast kode
-    mip_arp_msg req;
-    req.type = 0x00; // ARP Request
-    req.mip_addr = dst;
-    req.reserved = 0;
-
-    size_t pdu_len;
-    uint8_t* pdu = build_pdu(
-        dst,
-        my_mip_address,
-        1, //TTL
-        sizeof(req), 
-        SDU_TYPE_ARP,  
-        (uint8_t*)&req,
-        &pdu_len)
-        ;
-
-    unsigned char broadcast_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}; // broadcast mac adresse
-
-    send_pdu(rawsocket, pdu, pdu_len, broadcast_mac);
-  
-    free(pdu);
-    return 0;
-}
-
 // Legg melding i pending-kø
 void queue_message(uint8_t dest_mip, uint8_t sdu_type,
                    uint8_t *data, size_t length_bytes) {
@@ -306,7 +279,6 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
 }
 
 
-// Send alle meldinger til gitt dest MIP (brukes når ARP-respons er mottatt)
 void send_pending_messages(int raw_sock, uint8_t mip_addr,
                            unsigned char *mac, int my_mip_address) {
 
@@ -326,20 +298,20 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             }
 
             printf("[DEBUG] send_pending_messages using slot=%d len=%zu type=%d dest=%d\n",
-            i,
-            pending_queue[i].length,
-            pending_queue[i].sdu_type,
-            pending_queue[i].dest_mip);
+                   i,
+                   pending_queue[i].length,
+                   pending_queue[i].sdu_type,
+                   pending_queue[i].dest_mip);
 
-            // Bygg PDU på nytt fra payload (build_pdu håndterer padding/words)
+            // Bygg PDU på nytt fra payload
             size_t pdu_len;
-            uint8_t *pdu = build_pdu(
-                pending_queue[i].dest_mip,
-                my_mip_address,
-                4,  // TTL
-                pending_queue[i].length,      // NB: alltid bytes!
-                pending_queue[i].sdu_type,
-                pending_queue[i].payload,
+            uint8_t *pdu = mip_build_pdu(
+                pending_queue[i].dest_mip,    // dest
+                my_mip_address,               // src
+                4,                            // TTL
+                pending_queue[i].sdu_type,    // SDU type
+                pending_queue[i].payload,     // SDU data
+                pending_queue[i].length,      // SDU lengde i bytes
                 &pdu_len
             );
 
@@ -354,6 +326,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
         }
     }
 }
+
 
 
 
