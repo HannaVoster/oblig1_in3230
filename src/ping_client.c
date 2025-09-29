@@ -1,5 +1,4 @@
-// program som brukes til å sende melding via mipd
-//sender til en destinasjons mip addresse
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,9 +9,18 @@
 #include <sys/time.h>
 #include <stdint.h>
 
+/* 
+ PING CLIENT
+Program som sender en melding via MIP-daemonen (mipd), selve brukerprogrammet som sender/avslutter
+  - Kobler seg til mipd via en UNIX domain socket (navn gis som argument)
+  - Sender en melding til en spesifisert MIP-adresse
+  - Venter på svar i opptil 1 sekund, og beregner RTT hvis svar mottas
+*/
+
 #define BUF_SIZE 512
 
 int main(int argc, char *argv[]) {
+    //sjekker at riktige argumenter er gitt
     if (argc < 4 || strcmp(argv[1], "-h") == 0) {
         printf("Usage: %s <socket_lower> <message> <destination_host>\n", argv[0]);
         return 0;
@@ -22,6 +30,7 @@ int main(int argc, char *argv[]) {
     const char *message = argv[2];
     uint8_t dest_host = atoi(argv[3]);
 
+    //unix socket
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock < 0) {
         perror("socket");
@@ -33,6 +42,8 @@ int main(int argc, char *argv[]) {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
+    
+    // Koble til mipd via UNIX-socketen
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("connect");
         exit(EXIT_FAILURE);
@@ -43,16 +54,18 @@ int main(int argc, char *argv[]) {
     buf[0] = dest_host;
     snprintf(&buf[1], BUF_SIZE - 1, "PING:%s", message);
 
+    // Ta starttidspunkt (for RTT-måling)
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
-    if (write(sock, buf, strlen(&buf[1]) + 1) < 0) {
+    // Send melding til mipd
+    if (write(sock, buf, 1 + strlen(&buf[1])) < 0) {
         perror("write");
         close(sock);
         return 1;
     }
 
-    // Sett timeout på 1 sekund
+    // Sett timeout på 1 sekund (venter på svar fra server)
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(sock, &fds);
@@ -65,6 +78,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    //henter var hvis det er data å lese
     char reply[BUF_SIZE];
     int n = read(sock, reply, sizeof(reply) - 1);
     if (n > 0) {
