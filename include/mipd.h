@@ -6,10 +6,10 @@
 #include <net/if.h>  //for IFNAMIZ til interface
 
 //globale verdier
-extern char iface_name[IFNAMSIZ];
-extern int my_mip_address;
-extern int debug_mode;
-extern int last_unix_client_fd;
+extern char iface_name[IFNAMSIZ]; // Navnet på nettverksinterfacet som brukes (f.eks. "A-eth0")
+extern int my_mip_address; // MIP-adressen som er tildelt denne daemon-instansen
+extern int debug_mode; // Flag som skrur på/av debug-utskrifter, gis som arg i main
+extern int last_unix_client_fd; // filbeskrivelse til den sist koblede unix klienten
 
 //til å legge pakker i kø
 #define MAX_PENDING 20

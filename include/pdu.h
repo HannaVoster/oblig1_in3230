@@ -8,7 +8,7 @@
 #define SDU_TYPE_PING  0x02
 #define SDU_TYPE_PONG  0x03
 
-#define ETH_P_MIP 0x88B5
+#define ETH_P_MIP 0x88B5 //gitt av oppgaven
 
 // PDU header
 typedef struct __attribute__((packed)) {
@@ -23,9 +23,6 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                        const uint8_t *sdu, uint16_t sdu_len_bytes,
                        size_t *out_len);
 
-// Parse en mottatt PDU-buffer (fra etter Ethernet-headeren)
-// Returnerer SDU-lengde i bytes, eller -1 ved feil.
-// Setter ut-parametere dest/src/ttl/type, og gir peker til SDU-området.
 ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
                   uint8_t *sdu_type, const uint8_t **sdu_out);
@@ -39,6 +36,7 @@ uint8_t get_type(const mip_header_t *h);
 uint16_t get_length(const mip_header_t *h);
 uint8_t get_ttl(const mip_header_t *h);
 
+//sette funksjoner
 void set_dest(mip_header_t *h, uint8_t dest);
 void set_src(mip_header_t *h, uint8_t src);
 void set_ttl(mip_header_t *h, uint8_t ttl);

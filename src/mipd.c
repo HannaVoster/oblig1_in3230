@@ -17,10 +17,8 @@
 #include "pdu.h"
 #include "arp.h"
 
-
-//#define UNIX_PATH "/tmp/mip_socket"
-
 /*
+- create_unix_socket
 oppretter en UNIX-socket på en gitt filbane gitt som argument - path. 
 Den binder socketen til adressen, sørger for at en eventuell gammel socket-fil slettes,
 og setter den i lyttemodus slik at klienter kan koble seg til. 
@@ -65,6 +63,7 @@ int create_unix_socket(const char *path) {
 }
 
 /*
+-create_raw_socket
 lager en råsocket for å sende og motta MIP-pakker direkte over Ethernet. 
 funksjonen binder socketen til det valgte nettverksinterface, 
 og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt.
@@ -96,6 +95,7 @@ int create_raw_socket() {
     return sock;
 }
 /*
+- handle_unix_request
 Håndterer forespørsler som kommer fra klient programmer (ping_client).
 tar inn unic_sock som er fildeskriptor for socketen
 raw_sock som er fildeskriptor for raw socket som brukes til å for sende 
@@ -150,11 +150,11 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             free(pdu);
 
         } else {
-            // MAC finnes IKKE → legg på vent i kø
+            // MAC finnes IKKE - legg på vent i kø
             queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
 
             // Send ARP request
-            mip_arp_msg req = { .type = 0x00, .mip_addr = dest_addr, .reserved = 0 };
+            mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
             size_t arp_len;
             uint8_t* arp_pdu = mip_build_pdu(
                 0xFF,                  // broadcast dest
@@ -182,6 +182,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     close(client);
 }
 /*
+- handle_raw_packet
 mottar råpakker fra nettverkskortet via raw_sock. 
 Den sjekker at det faktisk er en MIP-pakke, pakker opp headeren, og håndterer innholdet avhengig av SDU-typen
 
@@ -258,6 +259,14 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return;
     }
 
+    // Håndterer TTL
+    if (--ttl == 0) {
+        if (debug_mode) {
+            printf("[DEBUG] Dropping packet: TTL expired\n\n");
+        }
+        return; // Ikke prosesser videre
+    }
+
     if (dest != my_mip_address && dest != 0xFF) {
         // ikke til meg og ikke broadcast
         return;
@@ -271,10 +280,10 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             // Oppretter en PONG som svar, med samme payload som kom i PING
             size_t pdu_len = 0;
             uint8_t *pdu = mip_build_pdu(
-                /*dest*/ src, //svar skal tilbake til avsenderr
-                /*src */ my_mip_address,
-                /*ttl */ 4,
-                /*type*/ SDU_TYPE_PONG,
+                src, //dest, svar skal tilbake til avsenderr
+                my_mip_address, //src  
+                4, // ttl 
+                SDU_TYPE_PONG, //type
                 sdu, (uint16_t)sdu_len,
                 &pdu_len
             );
@@ -445,8 +454,6 @@ int get_iface_mac(const char *ifname, unsigned char *mac) {
     close(fd);
     return 0;
 }
-
-
 /*
 Legg melding i pending-kø dersom mottakers addresse er ukjent
  - venter på å sende PING uten arp resp
