@@ -61,7 +61,7 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                dest, src, ttl, sdu_type,
                sdu_len_bytes, aligned, len_words, total);
     }
-    return buf;
+    return buf; //caller må free()
 }
 
 
