@@ -180,80 +180,6 @@ void handle_ping_client_message(int client, char *buffer, int n, int raw_sock, i
         last_unix_client_fd = client;
 }
 
-void handle_ping_server_message(int client, char *buffer, int n) {
-
-    ssen til noden
-
-Leser melding fra klienten, første byte er dest_addr og resten payload
-dest_addr sjekkes opp mot arp cashe, og pakken håndteres ulikt avhengig av om mac er lagret
-
-miss - bygg pakke, legg i kø og send broadcast arp req for å finne mottaker
-
-hit - har riktig mac, kan sende PING
-*/
-void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
-    int client = accept(unix_sock, NULL, NULL);
-    if (client < 0) return;
-
-    char buffer[256];
-    int n = read(client, buffer, sizeof(buffer));
-
-    if (n <= 0) {
-        close(client);
-        return;
-    }
-
-    // Hvis ping_waiting og det ikke er en ny PING, betyr det at dette er ping_server
-    if (ping_waiting && strncmp(buffer, "PING:", 5) != 0) {
-        handle_ping_server_message(client, buffer, n);
-        return;
-    }
-
-    // Ellers er det ping_client som sender melding
-    handle_ping_client_message(client, buffer, n, raw_sock, my_mip_address);
-}
-
-void handle_ping_client_message(int client, char *buffer, int n, int raw_sock, int my_mip_address) {
-    uint8_t dest_addr;
-    uint8_t *payload;
-    size_t payload_length;
-    uint8_t sdu_type;
-
-    if (strncmp(buffer, "PONG:", 5) == 0) {
-        if (last_ping_src < 0) {
-            printf("[WARNING] PONG mottatt, men ingen tidligere PING-avsender lagret\n");
-            close(client);
-            return;
-        }
-        dest_addr = (uint8_t)last_ping_src;
-        payload = (uint8_t*)buffer;
-        payload_length = n;
-        sdu_type = SDU_TYPE_PONG;
-    } else {
-        dest_addr = buffer[0];
-        payload = (uint8_t*)&buffer[1];
-        payload_length = n - 1;
-        sdu_type = SDU_TYPE_PING;
-    }
-
-    if (debug_mode) {
-        printf("[DEBUG] handle_ping_client_message: dest=%u len=%zu\n", dest_addr, payload_length);
-    }
-
-    unsigned char mac[6];
-    if (arp_lookup(dest_addr, mac)) {
-        size_t pdu_len;
-        uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, 4, sdu_type, payload, payload_length, &pdu_len);
-        send_pdu(raw_sock, pdu, pdu_len, mac);
-        free(pdu);
-    } else {
-        queue_message(dest_addr, sdu_type, payload, payload_length);
-        send_arp_request(raw_sock, dest_addr, my_mip_address);
-    }
-
-    if (last_unix_client_fd > 0) close(last_unix_client_fd);
-        last_unix_client_fd = client;
-}
 
 void handle_ping_server_message(int client, char *buffer, int n) {
     (void)buffer;
@@ -269,26 +195,6 @@ void handle_ping_server_message(int client, char *buffer, int n) {
     close(client);
 }
 
-void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
-    mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
-    size_t arp_len;
-    uint8_t *arp_pdu = mip_build_pdu(
-        0xFF, my_mip_address, 1, SDU_TYPE_ARP,
-        (uint8_t*)&req, sizeof(req), &arp_len
-    );
-    unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-    send_pdu(raw_sock, arp_pdu, arp_len, bmac);
-    free(arp_pdu);
-}
-    write(client, last_ping_payload, last_ping_payload_len);
-    ping_waiting = 0;
-
-    if (debug_mode) {
-        printf("[DEBUG] Sent pending PING to server: '%.*s'\n", (int)last_ping_payload_len, last_ping_payload);
-    }
-
-    close(client);
-}
 
 void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
     mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
