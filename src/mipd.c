@@ -17,6 +17,8 @@
 #include "pdu.h"
 #include "arp.h"
 
+#include <linux/if_packet.h>
+
 /*
 - create_unix_socket
 oppretter en UNIX-socket på en gitt filbane gitt som argument - path. 
@@ -102,6 +104,15 @@ int create_raw_socket() {
         perror("bind raw socket");
         close(sock);
         exit(EXIT_FAILURE);
+    }
+
+    struct packet_mreq mreq;
+    memset(&mreq, 0, sizeof(mreq));
+    mreq.mr_ifindex = if_nametoindex(iface_name);
+    mreq.mr_type = PACKET_MR_PROMISC;
+
+    if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        perror("setsockopt PROMISC");
     }
 
     return sock;
@@ -314,6 +325,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                           .msg_iov = &iov, .msg_iovlen = 1 };
 
     int len = recvmsg(raw_sock, &msg, 0);
+    printf("[DEBUG] handle_raw_packet CALLED, len=%d\n", len);
 
     if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
 
