@@ -138,7 +138,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
             dest_addr = buffer[0];
             payload = (uint8_t*)&buffer[1];
             payload_length = n - 1;
-            sdu_type = SDU_TYPE_PING
+            sdu_type = SDU_TYPE_PING;
         }
 
         if(debug_mode){

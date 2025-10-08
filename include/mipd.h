@@ -36,7 +36,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t len
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, int my_mip_address);
 
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address);
-void handle_raw_packet(int raw_sock, int my_mip_address);
+void handle_raw_packet(int raw_sock, int my_mip_address, int unix_sock);
 
 int create_raw_socket();
 int create_unix_socket(const char *path);
