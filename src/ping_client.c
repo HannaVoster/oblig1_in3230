@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     uint8_t dest_host = atoi(argv[3]);
 
     //unix socket
-    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) {
         perror("socket");
         exit(EXIT_FAILURE);

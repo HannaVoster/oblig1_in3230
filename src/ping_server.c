@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 
     const char *socket_path = argv[1]; //unix socket som kobles til mipd
 
-    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
