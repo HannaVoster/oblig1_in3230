@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
             if (events[n].data.fd == unix_sock) {
                 handle_unix_request(unix_sock, raw_sock, my_mip_address);
             } else if (events[n].data.fd == raw_sock) {
-                handle_raw_packet(raw_sock, my_mip_address, unix_sock);
+                handle_raw_packet(raw_sock, my_mip_address);
             }
         }
     }

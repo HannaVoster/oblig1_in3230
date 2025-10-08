@@ -13,6 +13,10 @@ extern int last_unix_client_fd; // filbeskrivelse til den sist koblede unix klie
 
 extern int last_ping_src;
 
+extern char last_ping_payload[];
+extern size_t last_ping_payload_len;
+extern int ping_waiting;
+
 
 //til å legge pakker i kø
 #define MAX_PENDING 20
@@ -36,7 +40,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t len
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, int my_mip_address);
 
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address);
-void handle_raw_packet(int raw_sock, int my_mip_address, int unix_sock);
+void handle_raw_packet(int raw_sock, int my_mip_address);
 
 int create_raw_socket();
 int create_unix_socket(const char *path);

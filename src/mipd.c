@@ -25,6 +25,13 @@ og setter den i lyttemodus slik at klienter kan koble seg til.
 returnerer filbeskriveren for socketen, eller avslutter programmet hvis noe feiler
 */
 
+#define MAX_PING_PAYLOAD 512
+
+char last_ping_payload[MAX_PING_PAYLOAD];
+size_t last_ping_payload_len = 0;
+int ping_waiting = 0;  // 0 = ingen ny ping tilgjengelig, 1 = klar for ping_server
+
+
 int create_unix_socket(const char *path) {
     int sock;
     struct sockaddr_un addr;
@@ -117,11 +124,19 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     int n = read(client, buffer, sizeof(buffer));
 
     if (n > 0) {
+        //hvis ping_server kobler til for å lese ventende PING fra mipd
+        if (ping_waiting && strncmp(buffer, "PING:", 5) != 0) {
+            write(client, last_ping_payload, last_ping_payload_len);
+            ping_waiting = 0;
+            close(client);
+            return;
+        }
+
         uint8_t dest_addr;
         uint8_t* payload;
         size_t payload_length;
         uint8_t sdu_type;
-
+        
         if (strncmp(buffer, "PONG:", 5) == 0) {
             // Dette er et PONG-svar fra applikasjonen
             if (last_ping_src < 0) {
@@ -220,7 +235,7 @@ arp_cache – oppdateres når ARP-RESP mottas (gjennom arp_update)
 pending_queue – tømmes når ventende meldinger sendes etter en ARP-RESP (send_pending_message)
 Bruker debug_mode for logging
 */
-void handle_raw_packet(int raw_sock, int my_mip_address, int unix_sock) {
+void handle_raw_packet(int raw_sock, int my_mip_address) {
     if(debug_mode){
         printf("[DEBUG] handle_raw_packet CALLED\n\n");
     }
@@ -301,15 +316,11 @@ void handle_raw_packet(int raw_sock, int my_mip_address, int unix_sock) {
 
             last_ping_src = src;
 
-            // Lever SDU-en opp til applikasjonen (ping_server)
-            int client_fd = accept(unix_sock, NULL, NULL);
-            if (client_fd >= 0) {
-                write(client_fd, sdu, sdu_len);
-                close(client_fd);
-            } else {
-                perror("accept (ping_server)");
-            }
-
+            memset(last_ping_payload, 0, sizeof(last_ping_payload));
+            memcpy(last_ping_payload, sdu, sdu_len);
+            last_ping_payload_len = sdu_len;
+            ping_waiting = 1;
+         
             break;
         }
 
