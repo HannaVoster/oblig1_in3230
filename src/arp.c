@@ -53,7 +53,7 @@ void arp_update(int mip_addr, const unsigned char *mac) {
 int arp_lookup(int mip_addr, unsigned char *mac_out) {
     for (int i = 0; i < MAX_ARP; i++) {
         if(debug_mode){
-                printf("[DEBUG][ARP] cache[%d]: valid=%d, mip=%d\n", i, arp_cache[i].valid, arp_cache[i].mip);
+                printf("[DEBUG][ARP] cache[%d]: valid=%d, mip=%d\n", i, arp_cache[i].valid, arp_cache[i].mip_addr);
         }
         // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
