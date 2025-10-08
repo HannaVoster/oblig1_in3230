@@ -37,9 +37,6 @@ typedef struct {
 //liste over unix klienter
 unix_client unix_clients[MAX_UNIX_CLIENT];
 
-
-
-
 int create_unix_socket(const char *path) {
     int sock;
     struct sockaddr_un addr;
@@ -365,8 +362,20 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
             arp_update(src, eh->h_source); //lagrer avsender i ARP til senere
 
-           //DO SOMETHING
-         
+           for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_PONG) {
+                    uint8_t msg[256];
+                    msg[0] = src;   // avsender MIP
+                    msg[1] = ttl;   // TTL
+                    memcpy(&msg[2], sdu, sdu_len);
+                    write(unix_clients[i].fd, msg, 2 + sdu_len);
+                    if (debug_mode) {
+                        printf("[DEBUG] Sent PING to UNIX app (src=%u ttl=%u len=%zd)\n",
+                            src, ttl, sdu_len);
+                    }
+                    break;
+                }
+            }
             break;
         }
 
@@ -376,13 +385,16 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                    src, (int)sdu_len, (char*)sdu);
 
             // Skriver svaret (payloaden) tilbake til UNIX-klienten som startet forespørselen
-            if (last_unix_client_fd > 0) {
-                (void)write(last_unix_client_fd, sdu, sdu_len);
-
-                //lukker klientens socket og 'last_unix_client_fd' settes til -1
-                //så klart til senere
-                close(last_unix_client_fd);
-                last_unix_client_fd = -1;
+            // må finne hvilken unix klient
+            for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_PING) {
+                    uint8_t reply[256];
+                    reply[0] = src;   // hvem meldingen kom fra
+                    reply[1] = ttl;
+                    memcpy(&reply[2], sdu, sdu_len);
+                    write(unix_clients[i].fd, reply, 2 + sdu_len);
+                    break;
+                }
             }
             break;
         }
