@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     uint8_t reply[BUF_SIZE];
     reply[0] = src;
     reply[1] = 4;
-    snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%s", &buf[2]);
+    snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%.500s", (char*)&buf[2]);
 
     // Sender svaret tilbake via samme socket (til mipd → ping_client)
     if (write(sock, reply, strlen((char*)&reply[2])) < 0) {
