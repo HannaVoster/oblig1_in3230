@@ -20,9 +20,13 @@ class Oblig(Topo):
         B = self.addHost('B')
         C = self.addHost('C')
 
-        # Linker: A-B og B-C
-        self.addLink(A, B, bw=10, delay='10ms', loss=0.0, use_tbf=False)
-        self.addLink(B, C, bw=10, delay='10ms', loss=0.0, use_tbf=False)
+         # Legg til én switch
+        s1 = self.addSwitch('s1')
+
+        # Koble hostene til switchen
+        self.addLink(A, s1, bw=10, delay='10ms')
+        self.addLink(B, s1, bw=10, delay='10ms')
+        self.addLink(C, s1, bw=10, delay='10ms')
 
 
 def init_oblig(self, line):
