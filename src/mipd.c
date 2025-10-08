@@ -658,7 +658,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
 
             if (debug_mode) {
                 printf("[DEBUG] Etter send_pending_messages():\n");
-                arp_print_cache();
+                print_arp_cache();
             }
         }
     }
