@@ -145,7 +145,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
 
             if(debug_mode){
                 printf("[UNIX] New client registered: fd=%d, sdu_type=0x%02X\n",
-                   client_fd, sdu_type);
+                   client, sdu_type);
             }
             break;
         }
@@ -184,15 +184,15 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
 
     uint8_t dest_addr = buffer[0];
     uint8_t ttl = buffer[1];
-    uint8_t *payload = (uint8_t)&buffer[2];
-    size_t payload_length = n - 2;
+    uint8_t *payload = (uint8_t *)&buffer[2];
+    size_t payload_length = bytes_read - 2;
 
     //bruker tabellen til å finne riktig sdu type
     uint8_t sdu_type;
     for (int i = 0; i < MAX_UNIX_CLIENT; i++){
-        if (unix_clients[i].active && unix_clients.fd = client) {
+        if (unix_clients[i].active && unix_clients.fd == client) {
             sdu_type = unix_clients[i].sdu_type;
-            break
+            break;
         }
     }
 
@@ -242,7 +242,7 @@ void handle_ping_server_message(int client, char *buffer, int bytes_read) {
 
     if (debug_mode) {
         printf("[DEBUG] Sent PING to server app (src=%u ttl=%u, len=%zu)\n",
-               src, ttl, payload_len);
+               src, ttl, payload_length);
     }
 
     close(client);
