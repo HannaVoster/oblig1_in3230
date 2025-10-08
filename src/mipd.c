@@ -17,7 +17,6 @@
 #include "pdu.h"
 #include "arp.h"
 
-#include <linux/if_packet.h>
 
 /*
 - create_unix_socket
