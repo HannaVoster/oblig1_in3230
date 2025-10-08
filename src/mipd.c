@@ -120,102 +120,222 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     int client = accept(unix_sock, NULL, NULL);
     if (client < 0) return;
 
-    char buffer[256];
-    int n = read(client, buffer, sizeof(buffer));
+    // === 1) Hvis ping_server kobler til og det finnes en ventende PING ===
+    if (ping_waiting) {
+        if (debug_mode)
+            printf("[DEBUG] ping_server koblet til — sender ventende PING (%zu bytes)\n",
+                   last_ping_payload_len);
 
-    if (n > 0) {
-        //hvis ping_server kobler til for å lese ventende PING fra mipd
-        if (ping_waiting && strncmp(buffer, "PING:", 5) != 0) {
-            write(client, last_ping_payload, last_ping_payload_len);
-            ping_waiting = 0;
-            close(client);
-            return;
-        }
+        // Send PING til ping_server
+        write(client, last_ping_payload, last_ping_payload_len);
+        ping_waiting = 0;
 
-        uint8_t dest_addr;
-        uint8_t* payload;
-        size_t payload_length;
-        uint8_t sdu_type;
-        
-        if (strncmp(buffer, "PONG:", 5) == 0) {
-            // Dette er et PONG-svar fra applikasjonen
-            if (last_ping_src < 0) {
-                printf("[WARNING] PONG mottatt, men ingen tidligere PING-avsender lagret\n");
-                close(client);
-                return;
+        // Vent på svar (PONG) fra ping_server
+        char buf[256];
+        int n = read(client, buf, sizeof(buf));
+
+        if (n > 0 && strncmp(buf, "PONG:", 5) == 0 && last_ping_src >= 0) {
+            if (debug_mode)
+                printf("[DEBUG] Mottok PONG fra ping_server, videresender til MIP %d\n",
+                       last_ping_src);
+
+            unsigned char mac[6];
+            if (arp_lookup((uint8_t)last_ping_src, mac)) {
+                size_t pdu_len = 0;
+                uint8_t *pdu = mip_build_pdu(
+                    (uint8_t)last_ping_src, my_mip_address, 4,
+                    SDU_TYPE_PONG, (uint8_t*)buf, (uint16_t)n, &pdu_len
+                );
+                send_pdu(raw_sock, pdu, pdu_len, mac);
+                free(pdu);
+            } else {
+                // Ikke i ARP cache → legg i kø og send ARP request
+                queue_message((uint8_t)last_ping_src, SDU_TYPE_PONG, (uint8_t*)buf, (size_t)n);
+
+                mip_arp_msg req = {
+                    .type = ARP_REQUEST,
+                    .mip_addr = (uint8_t)last_ping_src,
+                    .reserved = 0
+                };
+                size_t arp_len = 0;
+                uint8_t *arp_pdu = mip_build_pdu(
+                    0xFF, my_mip_address, 1, SDU_TYPE_ARP,
+                    (uint8_t*)&req, sizeof(req), &arp_len
+                );
+                unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+                send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+                free(arp_pdu);
             }
-            dest_addr = (uint8_t)last_ping_src;
-            payload = (uint8_t*)buffer;
-            payload_length = n;
-            sdu_type = SDU_TYPE_PONG;
-        } else {
-            // Vanlig klientmelding: første byte er destinasjon
-            dest_addr = buffer[0];
-            payload = (uint8_t*)&buffer[1];
-            payload_length = n - 1;
-            sdu_type = SDU_TYPE_PING;
+        } else if (debug_mode) {
+            printf("[DEBUG] Ingen PONG mottatt fra ping_server\n");
         }
 
-        if(debug_mode){
-            printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n\n",
-               n, dest_addr, payload_length);
-            printf("[DEBUG] payload bytes: ");
-            for (size_t i = 0; i < payload_length && i < 8; i++) {
-                printf("%02X ", payload[i]);
-            }
-            printf("\n\n");
-            printf("[DEBUG] Checking ARP for dest=%u\n\n", dest_addr);
-        }
-        
-        unsigned char mac[6];
-    
-        if (arp_lookup(dest_addr, mac)) {
-            // MAC finnes - bygg og send PING nå
-            size_t pdu_len; //oppdateres av funksjonen under
-            uint8_t* pdu = mip_build_pdu(
-                dest_addr,             
-                my_mip_address,        
-                4,                     
-                sdu_type,        
-                payload,               
-                payload_length, // payload_len (bytes!)
-                &pdu_len
-            );
-            send_pdu(raw_sock, pdu, pdu_len, mac);
-            free(pdu);
-
-        } else {
-            // MAC finnes IKKE - legg på vent i kø
-            queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
-
-            // Send ARP request
-            mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
-            size_t arp_len;
-            uint8_t* arp_pdu = mip_build_pdu(
-                0xFF,                  // broadcast dest
-                my_mip_address,        // src
-                1,                     //ttl
-                SDU_TYPE_ARP,          // type
-                (uint8_t*)&req,        // payload
-                sizeof(req),           // payload_len
-                &arp_len
-            );
-            //sender arp request med broadcast mac for å finne riktig mottaker
-            unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-            send_pdu(raw_sock, arp_pdu, arp_len, bmac);
-            free(arp_pdu);
-        }
-
-        // Håndter UNIX client FD
-        if (last_unix_client_fd > 0) {
-            close(last_unix_client_fd);
-        }
-        last_unix_client_fd = client;
+        close(client);
         return;
     }
 
-    close(client);
+    // === 2) Ellers — dette er en melding fra ping_client ===
+    char buffer[256];
+    int n = read(client, buffer, sizeof(buffer));
+    if (n <= 0) {
+        close(client);
+        return;
+    }
+
+    uint8_t dest_addr;
+    uint8_t* payload;
+    size_t payload_length;
+    uint8_t sdu_type;
+
+    // Vanlig klientmelding: første byte er destinasjon
+    dest_addr = buffer[0];
+    payload = (uint8_t*)&buffer[1];
+    payload_length = n - 1;
+    sdu_type = SDU_TYPE_PING;
+
+    if (debug_mode) {
+        printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n",
+               n, dest_addr, payload_length);
+        printf("[DEBUG] payload bytes: ");
+        for (size_t i = 0; i < payload_length && i < 8; i++) {
+            printf("%02X ", payload[i]);
+        }
+        printf("\n");
+        printf("[DEBUG] Checking ARP for dest=%u\n", dest_addr);
+    }
+
+    unsigned char mac[6];
+    if (arp_lookup(dest_addr, mac)) {
+        // MAC finnes — bygg og send PING
+        size_t pdu_len;
+        uint8_t* pdu = mip_build_pdu(
+            dest_addr, my_mip_address, 4,
+            sdu_type, payload, payload_length, &pdu_len
+        );
+        send_pdu(raw_sock, pdu, pdu_len, mac);
+        free(pdu);
+    } else {
+        // MAC finnes ikke — legg på vent i kø og send ARP request
+        queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
+
+        mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
+        size_t arp_len;
+        uint8_t* arp_pdu = mip_build_pdu(
+            0xFF, my_mip_address, 1, SDU_TYPE_ARP,
+            (uint8_t*)&req, sizeof(req), &arp_len
+        );
+        unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+        send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+        free(arp_pdu);
+    }
+
+    // Håndter UNIX client FD (ping_client)
+    if (last_unix_client_fd > 0) {
+        close(last_unix_client_fd);
+    }
+    last_unix_client_fd = client;
 }
+
+// void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
+//     int client = accept(unix_sock, NULL, NULL);
+//     if (client < 0) return;
+
+//     char buffer[256];
+//     int n = read(client, buffer, sizeof(buffer));
+
+//     if (n > 0) {
+//         //hvis ping_server kobler til for å lese ventende PING fra mipd
+//         if (ping_waiting && strncmp(buffer, "PING:", 5) != 0) {
+//             write(client, last_ping_payload, last_ping_payload_len);
+//             ping_waiting = 0;
+//             close(client);
+//             return;
+//         }
+
+//         uint8_t dest_addr;
+//         uint8_t* payload;
+//         size_t payload_length;
+//         uint8_t sdu_type;
+
+//         if (strncmp(buffer, "PONG:", 5) == 0) {
+//             // Dette er et PONG-svar fra applikasjonen
+//             if (last_ping_src < 0) {
+//                 printf("[WARNING] PONG mottatt, men ingen tidligere PING-avsender lagret\n");
+//                 close(client);
+//                 return;
+//             }
+//             dest_addr = (uint8_t)last_ping_src;
+//             payload = (uint8_t*)buffer;
+//             payload_length = n;
+//             sdu_type = SDU_TYPE_PONG;
+//         } else {
+//             // Vanlig klientmelding: første byte er destinasjon
+//             dest_addr = buffer[0];
+//             payload = (uint8_t*)&buffer[1];
+//             payload_length = n - 1;
+//             sdu_type = SDU_TYPE_PING;
+//         }
+
+//         if(debug_mode){
+//             printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n\n",
+//                n, dest_addr, payload_length);
+//             printf("[DEBUG] payload bytes: ");
+//             for (size_t i = 0; i < payload_length && i < 8; i++) {
+//                 printf("%02X ", payload[i]);
+//             }
+//             printf("\n\n");
+//             printf("[DEBUG] Checking ARP for dest=%u\n\n", dest_addr);
+//         }
+        
+//         unsigned char mac[6];
+    
+//         if (arp_lookup(dest_addr, mac)) {
+//             // MAC finnes - bygg og send PING nå
+//             size_t pdu_len; //oppdateres av funksjonen under
+//             uint8_t* pdu = mip_build_pdu(
+//                 dest_addr,             
+//                 my_mip_address,        
+//                 4,                     
+//                 sdu_type,        
+//                 payload,               
+//                 payload_length, // payload_len (bytes!)
+//                 &pdu_len
+//             );
+//             send_pdu(raw_sock, pdu, pdu_len, mac);
+//             free(pdu);
+
+//         } else {
+//             // MAC finnes IKKE - legg på vent i kø
+//             queue_message(dest_addr, SDU_TYPE_PING, payload, payload_length);
+
+//             // Send ARP request
+//             mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
+//             size_t arp_len;
+//             uint8_t* arp_pdu = mip_build_pdu(
+//                 0xFF,                  // broadcast dest
+//                 my_mip_address,        // src
+//                 1,                     //ttl
+//                 SDU_TYPE_ARP,          // type
+//                 (uint8_t*)&req,        // payload
+//                 sizeof(req),           // payload_len
+//                 &arp_len
+//             );
+//             //sender arp request med broadcast mac for å finne riktig mottaker
+//             unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+//             send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+//             free(arp_pdu);
+//         }
+
+//         // Håndter UNIX client FD
+//         if (last_unix_client_fd > 0) {
+//             close(last_unix_client_fd);
+//         }
+//         last_unix_client_fd = client;
+//         return;
+//     }
+
+//     close(client);
+// }
 /*
 - handle_raw_packet
 mottar råpakker fra nettverkskortet via raw_sock. 
