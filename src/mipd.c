@@ -324,6 +324,11 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     //SJEKK 
 
     if (debug_mode) {
+        printf("[DEBUG] handle_raw_packet: mottatt proto=0x%04X (ETH_P_MIP=0x%04X)\n",
+            proto, ETH_P_MIP);
+    }
+
+    if (debug_mode) {
         printf("[DEBUG] RX frame ethertype=0x%04X\n\n", proto);
         // Dump Ethernet-header (14 bytes)
         printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "

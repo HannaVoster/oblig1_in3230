@@ -154,6 +154,11 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         dest_mac[0], dest_mac[1], dest_mac[2],
         dest_mac[3], dest_mac[4], dest_mac[5]);
     }
+    if (debug_mode) {
+        printf("[DEBUG] send_pdu: eh->h_proto=0x%04X (ETH_P_MIP=0x%04X)\n",
+            ntohs(eh->h_proto), ETH_P_MIP);
+    }
+
     int sent = sendto(rawsocket, frame, frame_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
 
