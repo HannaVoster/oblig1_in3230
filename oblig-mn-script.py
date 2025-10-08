@@ -7,6 +7,7 @@
 from mininet.topo import Topo
 from mininet.cli import CLI
 import time
+import os
 
 class Oblig(Topo):
     "Simple topology for Oblig."
@@ -23,12 +24,18 @@ class Oblig(Topo):
         self.addLink(A, B, bw=10, delay='10ms', loss=0.0, use_tbf=False)
         self.addLink(B, C, bw=10, delay='10ms', loss=0.0, use_tbf=False)
 
+
 def init_oblig(self, line):
     "Starter MIP-daemoner, server og klienter"
     net = self.mn
     A = net.get('A')
     B = net.get('B')
     C = net.get('C')
+
+    # --- 🔧 NYTT: Åpne for MIP-protokollen i OVS ---
+    print("*** Åpner for MIP (ethertype 0x88B5) i OVS-switchen")
+    os.system("ovs-ofctl add-flow s1 'priority=100,dl_type=0x88B5,actions=normal' 2>/dev/null || ovs-ofctl add-flow s0 'priority=100,dl_type=0x88B5,actions=normal'")
+    # -------------------------------------------------
 
     print("*** Starter mipd på A, B, C")
     A.cmd("./bin/mipd -d usockA 10 &")
@@ -53,6 +60,7 @@ def init_oblig(self, line):
 
     print("*** Kjører ping_client fra A → B (20) igjen (cache, lavere RTT)")
     print(A.cmd("./bin/ping_client usockA \"Hello again IN4230\" 20"))
+
 
 # Koble custom kommando inn i Mininet CLI
 CLI.do_init_oblig = init_oblig
