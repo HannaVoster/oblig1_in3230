@@ -135,13 +135,13 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     }
 
     //funnet sdu, n kan vi legge til i klientlisten
-    int client_index = -1;
+    //int client_index = -1;
     for (int i = 0; i < MAX_UNIX_CLIENT; i++){
         if(!unix_clients[i].active) {
             unix_clients[i].fd = client;
             unix_clients[i].sdu_type = sdu_type;
             unix_clients[i].active = 1;
-            client_index = 1;
+            //client_index = 1;
 
             if(debug_mode){
                 printf("[UNIX] New client registered: fd=%d, sdu_type=0x%02X\n",
