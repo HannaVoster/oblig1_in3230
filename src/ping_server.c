@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-
+#include <stdint.h>
 //  PING SERVER
 // Program som kjører på en host sammen med mipd.
 // Lytter på en UNIX-socket (koblet til mipd) for å motta meldinger.
