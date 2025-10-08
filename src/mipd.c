@@ -155,26 +155,36 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     char buffer[256];
     int bytes_read = read(client, buffer, sizeof(buffer));
 
-    switch (sdu_type) {
-
-    case SDU_TYPE_PONG:
-        handle_ping_client_message(client, buffer, bytes_read, raw_sock, my_mip_address);
-        break;
-    
-    case SDU_TYPE_PING:
-        handle_ping_server_message(client, buffer, bytes_read);
-        break;
-
-    case SDU_TYPE_ROUTING:
-        //handle_routing_message(client, buffer, bytes_read);
-    
-    default:
-        printf("[WARNING] Unknown SDU type 0x%02X from UNIX client\n", sdu_type);
-        close(client);
-        unix_clients[client_index].active = 0;
- 
-        break;
+    if (bytes_read <= 0){
+        return;
     }
+
+    if (sdu_type == SDU_TYPE_PING) {
+        handle_ping_client_message(client, buffer, bytes_read, raw_sock, my_mip_address);
+    } else {
+        if (debug_mode)
+            printf("[UNIX] Client type 0x%02X only registered, not sending data now.\n", sdu_type);
+    }
+
+    // switch (sdu_type) {
+    //     case SDU_TYPE_PONG:
+    //         handle_ping_client_message(client, buffer, bytes_read, raw_sock, my_mip_address);
+    //         break;
+        
+    //     case SDU_TYPE_PING:
+    //         handle_ping_server_message(client, buffer, bytes_read);
+    //         break;
+
+    //     case SDU_TYPE_ROUTING:
+    //         //handle_routing_message(client, buffer, bytes_read);
+        
+    //     default:
+    //         printf("[WARNING] Unknown SDU type 0x%02X from UNIX client\n", sdu_type);
+    //         close(client);
+    //         unix_clients[client_index].active = 0;
+    
+    //         break;
+    //     }
 }
 
 void handle_ping_client_message(int client, char *buffer, int bytes_read, int raw_sock, int my_mip_address) {
@@ -370,11 +380,11 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
            for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
                 if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_PONG) {
-                    uint8_t msg[256];
-                    msg[0] = src;   // avsender MIP
-                    msg[1] = ttl;   // TTL
-                    memcpy(&msg[2], sdu, sdu_len);
-                    write(unix_clients[i].fd, msg, 2 + sdu_len);
+                    uint8_t reply[256];
+                    reply[0] = src;   // avsender MIP
+                    reply[1] = ttl;   // TTL
+                    memcpy(&reply[2], sdu, sdu_len);
+                    write(unix_clients[i].fd, reply, 2 + sdu_len);
                     if (debug_mode) {
                         printf("[DEBUG] Sent PING to UNIX app (src=%u ttl=%u len=%zd)\n",
                             src, ttl, sdu_len);
