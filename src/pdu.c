@@ -105,27 +105,17 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         perror("if_nametoindex");
         return -1;
     }
-
     unsigned char src_mac[ETH_ALEN];
     if (get_iface_mac(iface_name, src_mac) < 0) {
         perror("get_iface_mac");
         return -1;
     }
-
     // Bygg Ethernet-ramme
     size_t frame_len = sizeof(struct ethhdr) + pdu_length;
     if (frame_len < 60) frame_len = 60;                   
-    //size_t alloc_len = frame_len < 60 ? 60 : frame_len; // ny linje forå fikse malloc
 
     uint8_t *frame = malloc(1, frame_len);
-
-    if (!frame) {
-        perror("malloc");
-        return -1;
-    }
-
-    memset(frame, 0, alloc_len);
-
+    
     struct ethhdr *eh = (struct ethhdr *)frame;
     memcpy(eh->h_dest, dest_mac, ETH_ALEN);
     memcpy(eh->h_source, src_mac, ETH_ALEN);
@@ -160,9 +150,6 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         dest_mac[0], dest_mac[1], dest_mac[2],
         dest_mac[3], dest_mac[4], dest_mac[5]);
     }
-
-    //size_t send_len = alloc_len;
-
     int sent = sendto(rawsocket, frame, frame_len, 0,
                       (struct sockaddr*)&device, sizeof(device));
 
