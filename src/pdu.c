@@ -114,8 +114,12 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     size_t frame_len = sizeof(struct ethhdr) + pdu_length;
     if (frame_len < 60) frame_len = 60;                   
 
-    uint8_t *frame = malloc(1, frame_len);
-    
+    uint8_t *frame = calloc(1, frame_len);
+    if (!frame) {
+        perror("calloc");
+        return -1;
+    }
+
     struct ethhdr *eh = (struct ethhdr *)frame;
     memcpy(eh->h_dest, dest_mac, ETH_ALEN);
     memcpy(eh->h_source, src_mac, ETH_ALEN);
