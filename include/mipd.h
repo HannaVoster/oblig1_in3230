@@ -11,6 +11,9 @@ extern int my_mip_address; // MIP-adressen som er tildelt denne daemon-instansen
 extern int debug_mode; // Flag som skrur på/av debug-utskrifter, gis som arg i main
 extern int last_unix_client_fd; // filbeskrivelse til den sist koblede unix klienten
 
+extern int last_ping_src;
+
+
 //til å legge pakker i kø
 #define MAX_PENDING 20
 

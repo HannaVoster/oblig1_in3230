@@ -117,9 +117,29 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
     int n = read(client, buffer, sizeof(buffer));
 
     if (n > 0) {
-        uint8_t dest_addr = buffer[0];
-        uint8_t* payload = (uint8_t*)&buffer[1];
-        size_t payload_length = n - 1;   // korrekt lengde
+        uint8_t dest_addr;
+        uint8_t* payload;
+        size_t payload_length;
+        uint8_t sdu_type;
+
+        if (strncmp(buffer, "PONG:", 5) == 0) {
+            // Dette er et PONG-svar fra applikasjonen
+            if (last_ping_src < 0) {
+                printf("[WARNING] PONG mottatt, men ingen tidligere PING-avsender lagret\n");
+                close(client);
+                return;
+            }
+            dest_addr = (uint8_t)last_ping_src;
+            payload = (uint8_t*)buffer;
+            payload_length = n;
+            sdu_type = SDU_TYPE_PONG;
+        } else {
+            // Vanlig klientmelding: første byte er destinasjon
+            dest_addr = buffer[0];
+            payload = (uint8_t*)&buffer[1];
+            payload_length = n - 1;
+            sdu_type = SDU_TYPE_PING
+        }
 
         if(debug_mode){
             printf("[DEBUG] handle_unix_request: n=%d dest=%d payload_len=%zu\n\n",
@@ -141,7 +161,7 @@ void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
                 dest_addr,             
                 my_mip_address,        
                 4,                     
-                SDU_TYPE_PING,        
+                sdu_type,        
                 payload,               
                 payload_length, // payload_len (bytes!)
                 &pdu_len
@@ -200,7 +220,7 @@ arp_cache – oppdateres når ARP-RESP mottas (gjennom arp_update)
 pending_queue – tømmes når ventende meldinger sendes etter en ARP-RESP (send_pending_message)
 Bruker debug_mode for logging
 */
-void handle_raw_packet(int raw_sock, int my_mip_address) {
+void handle_raw_packet(int raw_sock, int my_mip_address, int unix_sock) {
     if(debug_mode){
         printf("[DEBUG] handle_raw_packet CALLED\n\n");
     }
@@ -277,22 +297,19 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         case SDU_TYPE_PING: {
             printf("[RAW] PING mottatt fra MIP %u\n\n", src);
 
-            // Oppretter en PONG som svar, med samme payload som kom i PING
-            size_t pdu_len = 0;
-            uint8_t *pdu = mip_build_pdu(
-                src, //dest, svar skal tilbake til avsenderr
-                my_mip_address, //src  
-                4, // ttl 
-                SDU_TYPE_PONG, //type
-                sdu, (uint16_t)sdu_len,
-                &pdu_len
-            );
-
             arp_update(src, eh->h_source); //lagrer avsender i ARP til senere
 
-            //eh->h_source er feltet i Ethernet-headeren som inneholder MAC-adressen til avsenderen
-            send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
-            free(pdu);
+            last_ping_src = src;
+
+            // Lever SDU-en opp til applikasjonen (ping_server)
+            int client_fd = accept(unix_sock, NULL, NULL);
+            if (client_fd >= 0) {
+                write(client_fd, sdu, sdu_len);
+                close(client_fd);
+            } else {
+                perror("accept (ping_server)");
+            }
+
             break;
         }
 

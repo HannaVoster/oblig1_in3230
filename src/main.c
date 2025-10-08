@@ -11,6 +11,7 @@
 
 int debug_mode = 0; // debug flagg
 int last_unix_client_fd = -1; // siste unix klient
+int last_ping_src = -1;
 int my_mip_address = -1; // min mip addresse
 char iface_name[IFNAMSIZ] = {0}; //navn på interface
 pending_entry pending_queue[MAX_PENDING] = {0}; // kø av meldinger
@@ -126,7 +127,7 @@ int main(int argc, char *argv[]) {
             if (events[n].data.fd == unix_sock) {
                 handle_unix_request(unix_sock, raw_sock, my_mip_address);
             } else if (events[n].data.fd == raw_sock) {
-                handle_raw_packet(raw_sock, my_mip_address);
+                handle_raw_packet(raw_sock, my_mip_address, unix_sock);
             }
         }
     }
