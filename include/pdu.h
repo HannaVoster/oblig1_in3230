@@ -8,6 +8,8 @@
 #define SDU_TYPE_PING  0x02
 #define SDU_TYPE_PONG  0x03
 
+#define SDU_TYPE_ROUTING 0x04
+
 #define ETH_P_MIP 0x88B5 //gitt av oppgaven
 
 // PDU header
