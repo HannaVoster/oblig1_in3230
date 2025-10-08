@@ -81,7 +81,7 @@ funksjonen binder socketen til det valgte nettverksinterface,
 og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt.
 */
 int create_raw_socket() {
-    int sock = socket(AF_PACKET, SOCK_RAW, ETH_P_MIP);
+    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
     if (sock < 0) {
         perror("raw socket");
         exit(EXIT_FAILURE);
