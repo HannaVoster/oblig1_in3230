@@ -31,8 +31,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Setter opp adresse-strukturen for å koble til socketen
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
@@ -42,28 +41,38 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // Registrer SDU-type, PONG = 0x03
+    uint8_t sdu_type = 0x03;
+    if (write(sock, &sdu_type, 1) != 1) {
+        perror("write sdu_type");
+        close(sock);
+        return 1;
+    }
+
     // leser meldingen fra mips, som opprinnellig kom gjennom nettverket fra ping_client
     char buf[BUF_SIZE];
-    int n = read(sock, buf, sizeof(buf) - 1);
+    int n = read(sock, buf, sizeof(buf));
     if (n <= 0) {
         perror("read");
         close(sock);
         return 1;
     }
-    buf[n] = '\0';
 
-    printf("[PING_SERVER] Received: %s\n", buf);
+    uint8_t src = buf[0];
+    uint8_t ttl = buf[1];
+    printf("[PING_SERVER] From MIP %u (TTL=%u): %s\n", src, ttl, &buf[2]);
 
-    // Lag svar: "PONG:<received>"
-    char reply[BUF_SIZE];
-    snprintf(reply, sizeof(reply), "PONG:%.*s",
-         (int)(sizeof(reply) - 6), buf);
+    // Lag svar: [dest=src][ttl=4][PONG:<payload>]
+    uint8_t reply[BUF_SIZE];
+    reply[0] = src;
+    reply[1] = 4;
+    snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%s", &buf[2]);
 
     // Sender svaret tilbake via samme socket (til mipd → ping_client)
-    if (write(sock, reply, strlen(reply)) < 0) {
+    if (write(sock, reply, strlen((char*)&reply[2])) < 0) {
         perror("write");
     } else {
-        printf("[PING_SERVER] Sent: %s\n", reply);
+        printf("[PING_SERVER] Sent reply: PONG:%s\n", &buf[2]);
     }
 
     close(sock);
