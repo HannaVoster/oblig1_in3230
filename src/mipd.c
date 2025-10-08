@@ -229,6 +229,7 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
         send_pdu(raw_sock, pdu, pdu_len, mac);
 
         if (debug_mode){
+            printf("ok");
             print_arp_cache();
         }
 
