@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <net/ethernet.h>  // For ETH_ALEN
 
-#define MAX_ARP 256
+#define MAX_ARP 20
 
 #define SDU_TYPE_ARP 0x01
 

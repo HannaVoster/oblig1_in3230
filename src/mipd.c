@@ -366,10 +366,10 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return; // Ikke prosesser videre
     }
 
-    if (dest != my_mip_address && dest != 0xFF) {
-        // ikke til meg og ikke broadcast
-        return;
-    }
+    // if (dest != my_mip_address && dest != 0xFF) {
+    //     // ikke til meg og ikke broadcast
+    //     return;
+    // }
 
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
