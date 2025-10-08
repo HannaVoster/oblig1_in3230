@@ -206,6 +206,11 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
         size_t pdu_len;
         uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, 4, sdu_type, payload, payload_length, &pdu_len);
         send_pdu(raw_sock, pdu, pdu_len, mac);
+
+        if (debug_mode){
+            print_arp_cache();
+        }
+
         free(pdu);
     } else {
         queue_message(dest_addr, sdu_type, payload, payload_length);
@@ -441,6 +446,10 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 printf("[RAW] ARP-RESP mottatt for MIP %d\n\n", arp->mip_addr);
                 arp_update(arp->mip_addr, eh->h_source);
 
+                if (debug_mode){
+                    print_arp_cache();
+                }
+
                 //har fått response, så kan sjekke om det er noen pakker som venter på å bli sent
                 //og som venter på denne aaddressen
                 send_pending_messages(raw_sock, arp->mip_addr, eh->h_source, my_mip_address);
@@ -646,6 +655,11 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             pending_queue[i].payload = NULL;
 
             printf("[QUEUE] Sendt kø-melding til MIP %d\n\n", mip_addr);
+
+            if (debug_mode) {
+                printf("[DEBUG] Etter send_pending_messages():\n");
+                arp_print_cache();
+            }
         }
     }
 }
