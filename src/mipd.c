@@ -190,7 +190,7 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
     //bruker tabellen til å finne riktig sdu type
     uint8_t sdu_type;
     for (int i = 0; i < MAX_UNIX_CLIENT; i++){
-        if (unix_clients[i].active && unix_clients.fd == client) {
+        if (unix_clients[i].active && unix_clients[i].fd == client) {
             sdu_type = unix_clients[i].sdu_type;
             break;
         }
