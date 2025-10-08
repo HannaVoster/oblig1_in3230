@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
     const char *socket_path = argv[1];
     const char *message = argv[2];
     uint8_t dest_host = atoi(argv[3]);
+    uint8_t ttl = 4; //standard default TTL
 
     //unix socket
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -37,8 +38,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
@@ -49,17 +49,25 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Lag melding: [dest_host][PING:<message>]
+    //registrerer SDU type melding, klienten starter med PING, 0x02
+    uint8_t sdu_type = 0x02;
+    if (write(sock, &sdu_type, 1) != 1) {
+        perror("write sdu_type");
+        close(sock);
+        return 1;
+    }
+    // Lag melding: [dest_host][ttl][PING:<message>]
     char buf[BUF_SIZE];
     buf[0] = dest_host;
-    snprintf(&buf[1], BUF_SIZE - 1, "PING:%s", message);
+    buf[1] = ttl;
+    snprintf((char*)&buf[2], BUF_SIZE - 2, "PING:%s", message);
 
     // Ta starttidspunkt (for RTT-måling)
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
     // Send melding til mipd
-    if (write(sock, buf, 1 + strlen(&buf[1])) < 0) {
+    if (write(sock, buf, 1 + strlen((char*)&buf[2])) < 0) {
         perror("write");
         close(sock);
         return 1;
@@ -86,9 +94,13 @@ int main(int argc, char *argv[]) {
         gettimeofday(&end, NULL);
         long ms = (end.tv_sec - start.tv_sec) * 1000 +
                   (end.tv_usec - start.tv_usec) / 1000;
-        printf("[PING_CLIENT] Reply: %s (RTT=%ld ms)\n", reply, ms);
+        uint8_t src = reply[0];
+        uint8_t ttl_reply = reply[1];
+
+        printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
+               src, ttl_reply, &reply[2], ms);
     } else {
-        printf("timeout\n");
+        printf("client timeout\n");
     }
 
     close(sock);
