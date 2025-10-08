@@ -21,7 +21,7 @@ typedef struct __attribute__((packed)) {
 // ARP entry
 typedef struct {
     uint8_t mip_addr;
-    unsigned char mac[ETH_ALEN]; //alltid 6
+    unsigned char mac[6]; //alltid 6
     int valid;
 } arp_entry;
 
@@ -31,5 +31,6 @@ extern arp_entry arp_cache[MAX_ARP];
 void arp_update(int mip_addr, const unsigned char *mac);
 int arp_lookup(int mip_addr, unsigned char *mac_out);
 void print_arp_cache(void);
+void arp_init_cache();
 
 #endif

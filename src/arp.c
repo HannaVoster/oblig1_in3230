@@ -10,6 +10,14 @@
 
 arp_entry arp_cache[MAX_ARP] = {0};
 
+
+void arp_init_cache() {
+    for (int i = 0; i < MAX_ARP; i++) {
+        arp_cache[i].valid = 0;
+        arp_cache[i].mip_addr = 0;
+        memset(arp_cache[i].mac, 0, 6);
+    }
+}
 // Oppdaterer ARP-cachen med en MIP-adresse og tilhørende MAC-adresse
 void arp_update(int mip_addr, const unsigned char *mac) {
     if (!mac) return;
@@ -43,11 +51,10 @@ void arp_update(int mip_addr, const unsigned char *mac) {
 // Søker i ARP-cachen etter en gitt MIP-adresse
 // unsigned char *mac_out peker til bufferet hvor mac addressen eventuellt lagres
 int arp_lookup(int mip_addr, unsigned char *mac_out) {
-    if(debug_mode){
-        printf("[DEBUG] arp_lookup CALLED for mip=%u\n\n", mip_addr);
-    }
-    
     for (int i = 0; i < MAX_ARP; i++) {
+        if(debug_mode){
+                printf("[DEBUG][ARP] cache[%d]: valid=%d, mip=%d\n", i, arp_cache[i].valid, arp_cache[i].mip);
+        }
         // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
             if(debug_mode){

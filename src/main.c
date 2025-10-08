@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
 
     //finner interface, metode i mipd
     find_iface();
+    arp_init_cache();
 
     if (debug_mode) {
         printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",
