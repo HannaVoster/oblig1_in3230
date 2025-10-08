@@ -20,13 +20,9 @@ class Oblig(Topo):
         B = self.addHost('B')
         C = self.addHost('C')
 
-         # Legg til én switch
-        s1 = self.addSwitch('s1')
-
-        # Koble hostene til switchen
-        self.addLink(A, s1, bw=10, delay='10ms')
-        self.addLink(B, s1, bw=10, delay='10ms')
-        self.addLink(C, s1, bw=10, delay='10ms')
+        # Linker: A-B og B-C
+        self.addLink(A, B, bw=10, delay='10ms', loss=0.0, use_tbf=False)
+        self.addLink(B, C, bw=10, delay='10ms', loss=0.0, use_tbf=False)
 
 
 def init_oblig(self, line):
@@ -35,12 +31,7 @@ def init_oblig(self, line):
     A = net.get('A')
     B = net.get('B')
     C = net.get('C')
-
-    # --- 🔧 NYTT: Åpne for MIP-protokollen i OVS ---
-    print("*** Åpner for MIP (ethertype 0x88B5) i OVS-switchen")
-    os.system("ovs-ofctl add-flow s1 'priority=100,dl_type=0x88B5,actions=normal' 2>/dev/null || ovs-ofctl add-flow s0 'priority=100,dl_type=0x88B5,actions=normal'")
-    # -------------------------------------------------
-
+    
     print("*** Starter mipd på A, B, C")
     A.cmd("./bin/mipd -d usockA 10 &")
     B.cmd("./bin/mipd -d usockB 20 &")

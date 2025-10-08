@@ -241,7 +241,6 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
     last_unix_client_fd = client;
 }
 
-
 void handle_ping_server_message(int client, char *buffer, int bytes_read) {
 
     if (bytes_read < 2){
@@ -331,7 +330,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     // Tolker starten av bufferet som en Ethernet-header
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
-    uint16_t proto = ntohs(eh->h_proto);
+    uint16_t proto = htons(eh->h_proto);
     //SJEKK 
 
     if (debug_mode) {
@@ -382,10 +381,10 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return; // Ikke prosesser videre
     }
 
-    // if (dest != my_mip_address && dest != 0xFF) {
-    //     // ikke til meg og ikke broadcast
-    //     return;
-    // }
+    if (dest != my_mip_address && dest != 0xFF) {
+        // ikke til meg og ikke broadcast
+        return;
+    }
 
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
