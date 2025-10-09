@@ -31,7 +31,6 @@ typedef struct {
 
 extern pending_entry pending_queue[MAX_PENDING];
 
-
 #define MAX_UNIX_CLIENT 10
 
 typedef struct {

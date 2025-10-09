@@ -27,6 +27,7 @@ returnerer filbeskriveren for socketen, eller avslutter programmet hvis noe feil
 */
 
 #define MAX_PING_PAYLOAD 512
+unix_client unix_clients[MAX_UNIX_CLIENT];
 
 
 int create_unix_socket(const char *path) {
