@@ -6,6 +6,7 @@
 #include "mipd.h"
 #include "pdu.h"
 #include "arp.h"
+#include "routing.h"
 
 #define MAX_EVENTS 10 // epoll
 
@@ -61,6 +62,10 @@ int main(int argc, char *argv[]) {
     //finner interface, metode i mipd
     find_iface();
     arp_init_cache();
+
+    //legger til ruter for å teste routing table
+    routing_table[0].dest = 30; //ruten skal gå til mip 30
+    routing_table[0].next = 20 //skal gå gjennom MIP 20, B, som er mellom A og C i scriptet
 
     if (debug_mode) {
         printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",

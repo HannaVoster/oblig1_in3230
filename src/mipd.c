@@ -16,6 +16,7 @@
 #include "mipd.h"
 #include "pdu.h"
 #include "arp.h"
+#include "routing.h"
 
 
 /*
@@ -278,6 +279,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                           .msg_iov = &iov, .msg_iovlen = 1 };
 
     int len = recvmsg(raw_sock, &msg, 0);
+
     printf("[DEBUG] handle_raw_packet CALLED, len=%d\n", len);
 
     if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
@@ -286,7 +288,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
     uint16_t proto = htons(eh->h_proto);
-    //SJEKK 
 
     if (debug_mode) {
         printf("[DEBUG] handle_raw_packet: mottatt proto=0x%04X (ETH_P_MIP=0x%04X)\n",
@@ -336,8 +337,53 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return; // Ikke prosesser videre
     }
 
-    if (dest != my_mip_address && dest != 0xFF) {
-        // ikke til meg og ikke broadcast
+    if (dest != my_mip_address && dest != 255) { //255 = broadcast
+        // ikke til meg og ikke broadcast - forward pakken
+        uint8_t next;
+        for (int i = 0; i < MAX_ROUTES; i++) {
+            if(routing_table[i].dest == dest) {
+                uint8_t next = routing_table[i].next;
+            }
+
+            if (ttl <= 1) {
+                printf("[FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
+                return;
+            }
+            
+            //justerer ttl før den forwardes
+            uint8_t ttl_new = ttl -1;
+
+            if (debug_mode) {
+                printf("[FWD] Forwarding packet: dest=%d via next-hop=%d (TTL=%d→%d)\n",
+                   dest, next_hop, ttl, new_ttl);
+            }
+
+            //bygger en ny pdu, src addresse er ny (denne noden) og ttl er ny (en mindre)
+            size_t new_pdu_len;
+            uint8_t *new_pdu = mip_build_pdu(
+                dest,          //slutt-destinasjon samme
+                my_mip_address,//ny kilde = denne noden
+                ttl_new, //en mindre
+                sdu_type,
+                sdu,
+                sdu_len,
+                &new_pdu_len
+            );
+
+            //sjekker om vi har addressen til neste hopp
+            unsigned char mac[6];
+            if (arp_lookup(next, mac)) {
+                send_pdu(raw_sock, new_pdu, new_pdu_len, mac);
+            } else {
+                // Hvis vi ikke har MAC, send ARP-request
+                queue_message(next, sdu_type, sdu, sdu_len);
+                send_arp_request(raw_sock, next, my_mip_address);
+            }
+            free(new_pdu);
+            return;
+        }
+        // Fant ingen rute
+        printf("[FWD] Ingen rute til dest %d → droppet.\n", dest);
         return;
     }
 
