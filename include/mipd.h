@@ -41,7 +41,7 @@ typedef struct {
 } unix_client;
 
 //liste over unix klienter
-unix_client unix_clients[MAX_UNIX_CLIENT];
+extern unix_client unix_clients[MAX_UNIX_CLIENT];
 
 //mipd.c funksjoner
 
