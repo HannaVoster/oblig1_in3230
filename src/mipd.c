@@ -355,7 +355,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
             if (debug_mode) {
                 printf("[FWD] Forwarding packet: dest=%d via next-hop=%d (TTL=%d→%d)\n",
-                   dest, next_hop, ttl, new_ttl);
+                   dest, next, ttl, ttl_new);
             }
 
             //bygger en ny pdu, src addresse er ny (denne noden) og ttl er ny (en mindre)
