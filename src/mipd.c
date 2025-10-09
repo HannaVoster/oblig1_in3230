@@ -229,14 +229,29 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
         send_pdu(raw_sock, pdu, pdu_len, mac);
 
         if (debug_mode){
-            printf("ok");
             print_arp_cache();
         }
 
         free(pdu);
     } else {
-        queue_message(dest_addr, sdu_type, payload, payload_length);
-        send_arp_request(raw_sock, dest_addr, my_mip_address);
+
+            // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
+        unsigned char fake_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, dest_addr};
+        arp_update(dest_addr, fake_mac);
+
+        printf("[DEBUG][TEST] Ingen ARP entry for MIP %d → lagt inn fake MAC\n", dest_addr);
+
+        // Hent den rett etterpå som normalt
+        if (arp_lookup(dest_addr, mac)) {
+            size_t pdu_len;
+            uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, 4, sdu_type, payload, payload_length, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, mac);
+            free(pdu);
+        }
+        else {
+            queue_message(dest_addr, sdu_type, payload, payload_length);
+            send_arp_request(raw_sock, dest_addr, my_mip_address);
+        }
     }
 
     last_unix_client_fd = client;
