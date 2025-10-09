@@ -27,16 +27,7 @@ returnerer filbeskriveren for socketen, eller avslutter programmet hvis noe feil
 */
 
 #define MAX_PING_PAYLOAD 512
-#define MAX_UNIX_CLIENT 10
 
-typedef struct {
-    int fd;
-    uint8_t sdu_type;
-    int active;
-} unix_client;
-
-//liste over unix klienter
-unix_client unix_clients[MAX_UNIX_CLIENT];
 
 int create_unix_socket(const char *path) {
     int sock;
@@ -131,75 +122,36 @@ miss - bygg pakke, legg i kø og send broadcast arp req for å finne mottaker
 
 hit - har riktig mac, kan sende PING
 */
-void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address) {
-    int client = accept(unix_sock, NULL, NULL);
-    if (client < 0) return;
+void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
+    char buffer[256];
+    int bytes_read = read(client_fd, buffer, sizeof(buffer));
 
-    //leser første byte for å registrere hvilken SDU type
-    uint8_t sdu_type;
-    int n = read(client, &sdu_type, 1); //første byte
-    if (n != 1){
-        printf("[WARNING] UNIX client is not sending sdu type");
-        close(client);
+    if (bytes_read <= 0) {
+        // Klienten koblet fra
+        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+            if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
+                unix_clients[i].active = 0;
+                close(client_fd);
+                if (debug_mode)
+                    printf("[UNIX] Client fd=%d disconnected\n", client_fd);
+                break;
+            }
+        }
         return;
     }
 
-    //funnet sdu, n kan vi legge til i klientlisten
-    //int client_index = -1;
-    for (int i = 0; i < MAX_UNIX_CLIENT; i++){
-        if(!unix_clients[i].active) {
-            unix_clients[i].fd = client;
-            unix_clients[i].sdu_type = sdu_type;
-            unix_clients[i].active = 1;
-            //client_index = 1;
-
-            if(debug_mode){
-                printf("[UNIX] New client registered: fd=%d, sdu_type=0x%02X\n",
-                   client, sdu_type);
-            }
+    // Finn hvilken SDU-type denne klienten har
+    uint8_t sdu_type = 0;
+    for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+        if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
+            sdu_type = unix_clients[i].sdu_type;
             break;
         }
     }
-    //
 
-    char buffer[256];
-    int bytes_read = read(client, buffer, sizeof(buffer));
-
-    if (bytes_read <= 0){
-        return;
-    }
-
-    if (sdu_type == SDU_TYPE_PING) {
-        handle_ping_client_message(client, buffer, bytes_read, raw_sock, my_mip_address);
-    } else {
-        if (debug_mode)
-            printf("[UNIX] Client type 0x%02X only registered, not sending data now.\n", sdu_type);
-    }
-
-    // switch (sdu_type) {
-    //     case SDU_TYPE_PONG:
-    //         handle_ping_client_message(client, buffer, bytes_read, raw_sock, my_mip_address);
-    //         break;
-        
-    //     case SDU_TYPE_PING:
-    //         handle_ping_server_message(client, buffer, bytes_read);
-    //         break;
-
-    //     case SDU_TYPE_ROUTING:
-    //         //handle_routing_message(client, buffer, bytes_read);
-        
-    //     default:
-    //         printf("[WARNING] Unknown SDU type 0x%02X from UNIX client\n", sdu_type);
-    //         close(client);
-    //         unix_clients[client_index].active = 0;
-    
-    //         break;
-    //     }
-}
-
-void handle_ping_client_message(int client, char *buffer, int bytes_read, int raw_sock, int my_mip_address) {
-    if (bytes_read < 2){
-        printf("[ERROR] unix msg too short");
+    // Les data etter nytt format: [dest:1][ttl:1][payload]
+    if (bytes_read < 2) {
+        fprintf(stderr, "[UNIX] Invalid message: too short\n");
         return;
     }
 
@@ -208,34 +160,21 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
     uint8_t *payload = (uint8_t *)&buffer[2];
     size_t payload_length = bytes_read - 2;
 
-    //bruker tabellen til å finne riktig sdu type
-    uint8_t sdu_type;
-    for (int i = 0; i < MAX_UNIX_CLIENT; i++){
-        if (unix_clients[i].active && unix_clients[i].fd == client) {
-            sdu_type = unix_clients[i].sdu_type;
-            break;
-        }
+    if (debug_mode) {
+        printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
+               client_fd, sdu_type, dest_addr, ttl, payload_length);
     }
 
-    if (debug_mode){
-        printf("[DEBUG] handle_ping_client_message: dest=%u ttl=%u len=%zu sdu_type=0x%02X\n",
-               dest_addr, ttl, payload_length, sdu_type);
-    }
-
+    // Slå opp MAC i ARP-cache og send eller kølegg
     unsigned char mac[6];
     if (arp_lookup(dest_addr, mac)) {
         size_t pdu_len;
-        uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, 4, sdu_type, payload, payload_length, &pdu_len);
+        uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
+                                     sdu_type, payload, payload_length, &pdu_len);
         send_pdu(raw_sock, pdu, pdu_len, mac);
-
-        if (debug_mode){
-            print_arp_cache();
-        }
-
         free(pdu);
     } else {
-
-            // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
+             // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
         unsigned char fake_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, dest_addr};
         arp_update(dest_addr, fake_mac);
 
@@ -253,9 +192,8 @@ void handle_ping_client_message(int client, char *buffer, int bytes_read, int ra
             send_arp_request(raw_sock, dest_addr, my_mip_address);
         }
     }
-
-    last_unix_client_fd = client;
 }
+
 
 void handle_ping_server_message(int client, char *buffer, int bytes_read) {
 

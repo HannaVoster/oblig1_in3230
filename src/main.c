@@ -70,13 +70,8 @@ int main(int argc, char *argv[]) {
     }
 
     //lager sockets
-    int unix_sock = create_unix_socket(socket_path);
+    int unix_sock = create_unix_socket(socket_path); //lytte socket
     int raw_sock = create_raw_socket();
-    
-    //ev brukes til å registrere en enkelt socket
-    //events er et array av hendelser som epoll_wait() returnerer og forteller hvilke
-    //sockets som har tilgjengelig data
-    struct epoll_event ev, events[MAX_EVENTS];
 
     // oppretter en epoll instans
     // epoll instans er en beholder som kan overvåle flere fildeskroptorer samtidig
@@ -87,6 +82,11 @@ int main(int argc, char *argv[]) {
         perror("epoll_create1");
         exit(EXIT_FAILURE);
     }
+
+     //ev brukes til å registrere en enkelt socket
+    //events er et array av hendelser som epoll_wait() returnerer og forteller hvilke
+    //sockets som har tilgjengelig data
+    struct epoll_event ev, events[MAX_EVENTS];
 
     // Registrer UNIX-socket
     ev.events = EPOLLIN; // ønsker å overvåke innkommende data
@@ -122,13 +122,51 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        //går igjennom eventuelle events i events array og sjekker om det er en unix/raw socket
-        //kaller de respektive metodene for å håndtere informasjonen som mottas i forbindelsene
-        for (int n = 0; n < nfds; n++) {
-            if (events[n].data.fd == unix_sock) {
-                handle_unix_request(unix_sock, raw_sock, my_mip_address);
-            } else if (events[n].data.fd == raw_sock) {
+        for(int n = 0; n < nfds; n++){
+            int fd = events[n].data.fd;
+
+            if (fd == unix_sock){
+                int client_fd = accept(unix_sock, NULL, NULL);
+                if (client_fd == -1) {
+                    perror("accept");
+                    continue;
+                }
+
+                uint8_t sdu_type;
+                if(read(client_fd, &sdu_type, 1) != 1) {
+                    perror("read sdu type");
+                    close(client_fd);
+                    continue;
+                }
+
+                for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                    if (!unix_clients[i].active) {
+                        unix_clients[i].fd = client_fd;
+                        unix_clients[i].sdu_type = sdu_type;
+                        unix_clients[i].active = 1;
+                        if (debug_mode)
+                            printf("[UNIX] New client registered: fd=%d, sdu_type=0x%02X\n",
+                                   client_fd, sdu_type);
+                        break;
+                    }
+                }
+
+                // Legg til klient-socketen i epoll
+                ev.events = EPOLLIN;
+                ev.data.fd = client_fd;
+                if (epoll_ctl(epollfd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
+                    perror("epoll_ctl: client_fd");
+                    close(client_fd);
+                    continue;
+                }
+            }
+
+            else if(fd == raw_sock) {
                 handle_raw_packet(raw_sock, my_mip_address);
+            }
+
+            else {
+                handle_unix_request(fd, raw_sock, my_mip_address);
             }
         }
     }
