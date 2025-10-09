@@ -334,9 +334,16 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         uint8_t dest = 30;
         uint8_t src = 10;
         uint8_t ttl = 4;
+        uint8_t ttl_new = ttl - 1;
         uint8_t sdu_type = 2;
         const char *sdu = "PING TEST PAYLOAD";
         ssize_t sdu_len = strlen(sdu);
+
+        size_t pdu_len;
+        uint8_t *pdu = mip_build_pdu(dest, src, ttl_new, sdu_type,
+                                    (uint8_t*)sdu, sdu_len, &pdu_len);
+        printf("[FWD TEST] bygget ny PDU på %zu bytes\n", pdu_len);
+        free(pdu);
 
         // Her limes rett inn forwarding-blokken din:
         uint8_t next = 0;
@@ -354,7 +361,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             return;
         }
 
-        uint8_t ttl_new = ttl - 1;
         printf("[FWD TEST] dest=%d src=%d via next-hop=%d (TTL=%d→%d)\n",
             dest, src, next, ttl, ttl_new);
 
@@ -362,10 +368,8 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         if (arp_lookup(next, mac)) {
             printf("[FWD TEST] ville sendt til MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        } else {
-            printf("[FWD TEST] har ingen ARP for next-hop=%d\n", next);
         }
-    }
+
 
 
     if (dest != my_mip_address && dest != 255) { //255 = broadcast
