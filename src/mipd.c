@@ -329,6 +329,45 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return;
     }
 
+    if (debug_mode && my_mip_address == 10) {
+        printf("[TEST] Simulerer forwarding fra A (10) til C (30)\n");
+        uint8_t dest = 30;
+        uint8_t src = 10;
+        uint8_t ttl = 4;
+        uint8_t sdu_type = 2;
+        const char *sdu = "PING TEST PAYLOAD";
+        ssize_t sdu_len = strlen(sdu);
+
+        // Her limes rett inn forwarding-blokken din:
+        uint8_t next = 0;
+        int found = 0;
+        for (int i = 0; i < MAX_ROUTES; i++) {
+            if (routing_table[i].dest == dest) {
+                next = routing_table[i].next;
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            printf("[FWD TEST] Ingen rute til dest %d → droppet.\n", dest);
+            return;
+        }
+
+        uint8_t ttl_new = ttl - 1;
+        printf("[FWD TEST] dest=%d src=%d via next-hop=%d (TTL=%d→%d)\n",
+            dest, src, next, ttl, ttl_new);
+
+        unsigned char mac[6];
+        if (arp_lookup(next, mac)) {
+            printf("[FWD TEST] ville sendt til MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
+                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        } else {
+            printf("[FWD TEST] har ingen ARP for next-hop=%d\n", next);
+        }
+    }
+
+
     if (dest != my_mip_address && dest != 255) { //255 = broadcast
         // ikke til meg og ikke broadcast - forward pakken
         uint8_t next = 0;
@@ -691,26 +730,6 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
     }
 }
 
-void test_forwarding_logic(int raw_sock, int my_mip) {
-    printf("\n[TEST] Starter forwarding-test for MIP %d\n", my_mip);
-
-    // Simuler en innkommende MIP-pakke fra A(10) → C(30)
-    uint8_t src = 10;
-    uint8_t dest = 30;
-    uint8_t ttl = 4;
-    uint8_t sdu_type = 0x02; // PING
-    const char *payload = "PING:Hello forwarding-test";
-    size_t payload_len = strlen(payload);
-
-    size_t pdu_len;
-    uint8_t *pdu = mip_build_pdu(dest, src, ttl, sdu_type,
-                                 (uint8_t *)payload, payload_len, &pdu_len);
-
-    // Kall direkte på handle_raw_packet() med denne “innkommende” pakken
-    handle_raw_packet(raw_sock, my_mip);
-
-    free(pdu);
-}
 
 
 

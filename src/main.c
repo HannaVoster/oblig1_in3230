@@ -117,9 +117,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Daemon running. Listening on UNIX + RAW sockets...\n");
-    if (debug_mode) {
-        test_forwarding_logic(raw_sock, my_mip_address);
-    }
+
 
     //overvåking av sockets i en evig løkke
     while (1) {
