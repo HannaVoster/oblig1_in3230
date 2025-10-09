@@ -329,58 +329,58 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return;
     }
 
-    // Håndterer TTL
-    if (--ttl == 0) {
-        if (debug_mode) {
-            printf("[DEBUG] Dropping packet: TTL expired\n\n");
-        }
-        return; // Ikke prosesser videre
-    }
-
     if (dest != my_mip_address && dest != 255) { //255 = broadcast
         // ikke til meg og ikke broadcast - forward pakken
-        uint8_t next = -1;
+        uint8_t next = 0;
+        int found = 0;
         for (int i = 0; i < MAX_ROUTES; i++) {
             if(routing_table[i].dest == dest) {
                next = routing_table[i].next;
+               found = 1;
+               break;
             }
 
-            if (ttl <= 1) {
-                printf("[FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
-                return;
-            }
-            
-            //justerer ttl før den forwardes
-            uint8_t ttl_new = ttl -1;
-
-            if (debug_mode) {
-                printf("[FWD] Forwarding packet: dest=%d via next-hop=%d (TTL=%d→%d)\n",
-                   dest, next, ttl, ttl_new);
-            }
-
-            //bygger en ny pdu, src addresse er ny (denne noden) og ttl er ny (en mindre)
-            size_t new_pdu_len;
-            uint8_t *new_pdu = mip_build_pdu(
-                dest,          //slutt-destinasjon samme
-                my_mip_address,//ny kilde = denne noden
-                ttl_new, //en mindre
-                sdu_type,
-                sdu,
-                sdu_len,
-                &new_pdu_len
-            );
-
-            //sjekker om vi har addressen til neste hopp
-            unsigned char mac[6];
-            if (arp_lookup(next, mac)) {
-                send_pdu(raw_sock, new_pdu, new_pdu_len, mac);
-            } else {
-                // Hvis vi ikke har MAC, send ARP-request
-                queue_message(next, sdu_type, (uint8_t*)sdu, sdu_len);
-                send_arp_request(raw_sock, next, my_mip_address);
-            }
-            free(new_pdu);
+        if(!found){
+            printf("[FWD] Ingen rute til dest %d → droppet.\n", dest);
             return;
+        }
+
+        if (ttl <= 1) {
+            printf("[FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
+            return;
+        }
+        
+        //justerer ttl før den forwardes
+        uint8_t ttl_new = ttl -1;
+
+        if (debug_mode) {
+            printf("[FWD] Forwarding packet: dest=%d via next-hop=%d (TTL=%d→%d)\n",
+                dest, next, ttl, ttl_new);
+        }
+
+        //bygger en ny pdu, ttl er ny (en mindre)
+        size_t new_pdu_len;
+        uint8_t *new_pdu = mip_build_pdu(
+            dest,          //slutt-destinasjon samme
+            src,
+            ttl_new, //en mindre
+            sdu_type,
+            sdu,
+            sdu_len,
+            &new_pdu_len
+        );
+
+        //sjekker om vi har addressen til neste hopp
+        unsigned char mac[6];
+        if (arp_lookup(next, mac)) {
+            send_pdu(raw_sock, new_pdu, new_pdu_len, mac);
+        } else {
+            // Hvis vi ikke har MAC, send ARP-request
+            queue_message(next, sdu_type, (uint8_t*)sdu, sdu_len);
+            send_arp_request(raw_sock, next, my_mip_address);
+        }
+        free(new_pdu);
+        return;
         }
         // Fant ingen rute
         printf("[FWD] Ingen rute til dest %d → droppet.\n", dest);
