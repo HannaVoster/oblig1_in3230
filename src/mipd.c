@@ -376,7 +376,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 send_pdu(raw_sock, new_pdu, new_pdu_len, mac);
             } else {
                 // Hvis vi ikke har MAC, send ARP-request
-                queue_message(next, sdu_type, sdu, sdu_len);
+                queue_message(next, sdu_type, (uint8_t*)sdu, sdu_len);
                 send_arp_request(raw_sock, next, my_mip_address);
             }
             free(new_pdu);
