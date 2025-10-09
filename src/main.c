@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
     routing_table[0].dest = 30; //ruten skal gå til mip 30
     routing_table[0].next = 20; //skal gå gjennom MIP 20, B, som er mellom A og C i scriptet
 
+
     if (debug_mode) {
         printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",
                socket_path, my_mip_address);
@@ -116,6 +117,9 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Daemon running. Listening on UNIX + RAW sockets...\n");
+    if (debug_mode) {
+        test_forwarding_logic(raw_sock, my_mip_address);
+    }
 
     //overvåking av sockets i en evig løkke
     while (1) {

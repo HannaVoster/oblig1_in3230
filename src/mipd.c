@@ -691,6 +691,26 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
     }
 }
 
+void test_forwarding_logic(int raw_sock, int my_mip) {
+    printf("\n[TEST] Starter forwarding-test for MIP %d\n", my_mip);
+
+    // Simuler en innkommende MIP-pakke fra A(10) → C(30)
+    uint8_t src = 10;
+    uint8_t dest = 30;
+    uint8_t ttl = 4;
+    uint8_t sdu_type = 0x02; // PING
+    const char *payload = "PING:Hello forwarding-test";
+    size_t payload_len = strlen(payload);
+
+    size_t pdu_len;
+    uint8_t *pdu = mip_build_pdu(dest, src, ttl, sdu_type,
+                                 (uint8_t *)payload, payload_len, &pdu_len);
+
+    // Kall direkte på handle_raw_packet() med denne “innkommende” pakken
+    handle_raw_packet(raw_sock, my_mip);
+
+    free(pdu);
+}
 
 
 

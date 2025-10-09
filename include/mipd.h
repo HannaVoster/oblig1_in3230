@@ -59,5 +59,6 @@ int create_unix_socket(const char *path);
 void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address);
 void handle_ping_server_message(int client, char *buffer, int n);
 void handle_ping_client_message(int client, char *buffer, int n, int raw_sock, int my_mip_address);
+void test_forwarding_logic(int raw_sock, int my_mip);
 
 #endif
