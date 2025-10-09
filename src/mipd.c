@@ -342,7 +342,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         uint8_t next;
         for (int i = 0; i < MAX_ROUTES; i++) {
             if(routing_table[i].dest == dest) {
-                uint8_t next = routing_table[i].next;
+               next = routing_table[i].next;
             }
 
             if (ttl <= 1) {
