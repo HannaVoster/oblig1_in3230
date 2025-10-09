@@ -339,7 +339,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     if (dest != my_mip_address && dest != 255) { //255 = broadcast
         // ikke til meg og ikke broadcast - forward pakken
-        uint8_t next;
+        uint8_t next = -1;
         for (int i = 0; i < MAX_ROUTES; i++) {
             if(routing_table[i].dest == dest) {
                next = routing_table[i].next;
