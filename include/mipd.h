@@ -31,6 +31,18 @@ typedef struct {
 
 extern pending_entry pending_queue[MAX_PENDING];
 
+
+#define MAX_UNIX_CLIENT 10
+
+typedef struct {
+    int fd;
+    uint8_t sdu_type;
+    int active;
+} unix_client;
+
+//liste over unix klienter
+unix_client unix_clients[MAX_UNIX_CLIENT];
+
 //mipd.c funksjoner
 
 int get_iface_mac(const char *ifname, unsigned char *mac);
