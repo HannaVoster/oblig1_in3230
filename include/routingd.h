@@ -10,6 +10,8 @@ typedef struct {
 
 #define MAX_ROUTES 12
 
+#define SDU_TYPE_ROUTING 0x04
+
 extern routing_entry routing_table[MAX_ROUTES];
 
 
