@@ -232,11 +232,22 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         free(pdu);
     } else {
              // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
-       if (dest_addr == 20 || dest_addr == 10) {
-        // naboer: fake for å få i gang trafikken
+       if ((my_mip_address == 10 && dest_addr == 20) ||
+        (my_mip_address == 20 && (dest_addr == 10 || dest_addr == 30)) ||
+        (my_mip_address == 30 && dest_addr == 20)) {
+
         unsigned char fake_mac[6] = {0,0,0,0,0,dest_addr};
         arp_update(dest_addr, fake_mac);
         printf("[DEBUG] Fake MAC for direkte nabo %d\n", dest_addr);
+
+        // Hent den rett etterpå og send pakken
+        if (arp_lookup(dest_addr, mac)) {
+            size_t pdu_len;
+            uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
+                                         sdu_type, payload, payload_length, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, mac);
+            free(pdu);
+        }
     } else {
         printf("[DEBUG] Ikke direkte nabo — sender ARP request (routing vil trigges)\n");
         queue_message(dest_addr, sdu_type, payload, payload_length);
