@@ -160,6 +160,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         }
         return;
     }
+    //prover
 
     // Finn hvilken SDU-type denne klienten har
     uint8_t sdu_type = 0;
