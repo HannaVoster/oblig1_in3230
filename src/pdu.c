@@ -85,9 +85,7 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
     if (sdu_out) *sdu_out = rcv + 4;
 
     if (debug_mode) {
-        printf("[DEBUG] mip_parse raw header bytes: %02X %02X %02X %02X\n\n",
-            rcv[0], rcv[1], rcv[2], rcv[3]);
-        printf("[DEBUG] mip_parse decoded: dest=%u src=%u ttl=%u len_words=%u sdu_type=%u\n\n",
+        printf("[DEBUG][PDU] mip_parse decoded: dest=%u src=%u ttl=%u len_words=%u sdu_type=%u\n\n",
             *dest, *src, *ttl, len_words, *sdu_type);
     }
     return (ssize_t)sdu_bytes;
