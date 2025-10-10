@@ -21,7 +21,7 @@ extern int ping_waiting;
 //til å legge pakker i kø
 #define MAX_PENDING 20
 
-typedef struct {
+typedef struct { //hvor er ttl og src her?
     int valid;
     uint8_t dest_mip;
     uint8_t sdu_type;
@@ -41,6 +41,19 @@ typedef struct {
 
 //liste over unix klienter
 extern unix_client unix_clients[MAX_UNIX_CLIENT];
+
+#define MAX_ROUTE_WAIT 16
+typedef struct {
+    uint8_t dest;
+    uint8_t src;
+    uint8_t ttl;
+    uint8_t sdu_type;
+    uint8_t *sdu;
+    size_t sdu_len;
+    int valid;
+} route_wait_t;
+
+extern route_wait_t route_wait_queue[MAX_ROUTE_WAIT];
 
 //mipd.c funksjoner
 

@@ -30,6 +30,8 @@ returnerer filbeskriveren for socketen, eller avslutter programmet hvis noe feil
 #define MAX_PING_PAYLOAD 512
 unix_client unix_clients[MAX_UNIX_CLIENT];
 
+routing_entry route_wait_queue[16];
+
 
 int create_unix_socket(const char *path) {
     int sock;
@@ -149,6 +151,59 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             sdu_type = unix_clients[i].sdu_type;
             break;
         }
+    }
+
+    if (sdu_type == SDU_TYPE_ROUTING) {
+        //sjekker om noen av pakkene i kø har samme dest og trenger neste hopp?
+        if (bytes_read >= 6 && buffer[2] == 'R' && buffer[3] = 'S' && buffer[4] == 'P') {
+            uint8_t next = buffer[5]; 
+            printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
+
+            //sjekker of next = 255 for da er ingen rute funnet
+            if (next == 255) {
+                printf("[ROUTING] Ingen rute funnet — dropper pakke.\n");
+                return;
+            }
+
+            //går igjennom køen av finner første pakke i kø
+            //oppgaven sier at routing deamon skal håndtere pakker i rekkefølgen de kommer i
+            //så første gyldige pakke i køen vil være den svaret gjelder for
+            for (int i = 0; i < MAX_ROUTE_WAIT; i++){
+                if (route_wait_queue[i].valid) {
+                    //lagrer verdiene for pakken som skal sendes
+                    uint8_t dest = route_wait_queue[i].dest;
+                    uint8_t src = route_wait_queue[i].src;
+                    uint8_t ttl = route_wait_queue[i].ttl;
+                    uint8_t sdu_type = route_wait_queue[i].sdu_type;
+                    uint8_t *sdu = route_wait_queue[i].sdu;
+                    size_t sdu_len = route_wait_queue[i].sdu_len;
+                    
+                    //sjekker i arp tabellen om vi har addressen til neste
+                    unsigned char mac[6];
+                    if (arp_lookup(next, mac)) {
+                        //treff - addressen finnes - bygg og send pdu
+                        size_t new_pdu_length;
+                        uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
+                        send_pdu(raw_sock, new_pdu, new_pdu_length, mac);
+                        free(new_pdu);
+                        printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
+                           next, dest);
+                    }
+                    //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
+                    else{
+                        printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next_hop);
+                        queue_message(next, sdu_type, sdu, sdu_len);
+                        send_arp_request(raw_sock, next, my_mip_address);
+                    }
+
+                    free(route_wait_queue[i].sdu);
+                    route_wait_queue[i].valid = 0;
+                    return;
+                }
+            }
+            printf("[ROUTING] Ingen ventende pakker — ignorerer RESPONSE.\n");
+        }
+        return;
     }
 
     // Les data etter nytt format: [dest:1][ttl:1][payload]
@@ -331,60 +386,29 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     //denne koden kjører ikke fordi man ikke kan motta pakker over rawsocket
     if (dest != my_mip_address && dest != 255) { //255 = broadcast
-        // ikke til meg og ikke broadcast - forward pakken
-        uint8_t next = 0;
-        int found = 0;
-        for (int i = 0; i < MAX_ROUTES; i++) {
-            if(routing_table[i].dest == dest) {
-               next = routing_table[i].next;
-               found = 1;
-               break;
-            }
-
-        if(!found){
-            printf("[FWD] Ingen rute til dest %d → droppet.\n", dest);
-            return;
-        }
-
+        // ikke til meg og ikke broadcast - FORWARD PAKKEN  
         if (ttl <= 1) {
             printf("[FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
             return;
         }
-        
         //justerer ttl før den forwardes
-        uint8_t ttl_new = ttl -1;
+        uint8_t ttl_new = ttl - 1;
 
         if (debug_mode) {
-            printf("[FWD] Forwarding packet: dest=%d via next-hop=%d (TTL=%d→%d)\n",
-                dest, next, ttl, ttl_new);
+            printf("[FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
+               dest, src, ttl, ttl_new);
         }
 
-        //bygger en ny pdu, ttl er ny (en mindre)
-        size_t new_pdu_len;
-        uint8_t *new_pdu = mip_build_pdu(
-            dest,          //slutt-destinasjon samme
-            src,
-            ttl_new, //en mindre
-            sdu_type,
-            sdu,
-            sdu_len,
-            &new_pdu_len
-        );
+        queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
 
-        //sjekker om vi har addressen til neste hopp
-        unsigned char mac[6];
-        if (arp_lookup(next, mac)) {
-            send_pdu(raw_sock, new_pdu, new_pdu_len, mac);
-        } else {
-            // Hvis vi ikke har MAC, send ARP-request
-            queue_message(next, sdu_type, (uint8_t*)sdu, sdu_len);
-            send_arp_request(raw_sock, next, my_mip_address);
+        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+            if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                send_route_request(unix_clients[i].fd, my_mip_address, dest);
+                break;
+            }
         }
-        free(new_pdu);
-        return;
-        }
-        // Fant ingen rute
-        printf("[FWD] Ingen rute til dest %d → droppet.\n", dest);
+
+        printf("[FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
         return;
     }
 
@@ -692,8 +716,54 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
     }
 }
 
+void send_route_request(int routing_fd, uint8_t my_addr, uint8_t dest) {
+    uint8_t req[6] = { my_addr, 0, 'R', 'E', 'Q', dest };
+    if (write(routing_fd, req, sizeof(req)) != sizeof(req))
+        perror("[MIPD] write route request");
+    else
+        printf("[MIPD] Sent ROUTE REQUEST for dest=%d\n", dest);
+}
 
+void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
+                           uint8_t sdu_type, const uint8_t *sdu, size_t sdu_len) {
 
+    for (int i = 0; i < MAX_ROUTE_WAIT; i++) {
+        if (!route_wait_queue[i].valid) {
+            if (debug_mode) {
+                printf("[DEBUG] queue_routing_message: dest=%d type=%d len=%zu bytes\n\n",
+                       dest, sdu_type, sdu_len);
+            }
+
+            // Nullstill og sett metadata
+            route_wait_queue[i].dest = dest;
+            route_wait_queue[i].src = src;
+            route_wait_queue[i].ttl = ttl;
+            route_wait_queue[i].sdu_type = sdu_type;
+            //route_wait_queue[i].sdu = malloc(sdu_len);
+            
+            route_wait_queue[i].sdu_len = sdu_len;
+            route_wait_queue[i].valid = 1;
+
+            // Alloker minne kun hvis data faktisk finnes
+            if (sdu_len > 0) {
+                route_wait_queue[i].sdu = malloc(sdu_len);
+                if (!route_wait_queue[i].sdu) {
+                    perror("[ERROR] malloc queue_message");
+                    exit(EXIT_FAILURE);
+                }
+                //kopierer payload
+                memcpy(route_wait_queue[i].sdu, sdu, sdu_len);
+            }
+
+            if (debug_mode) {
+                printf("[DEBUG] routing queue_message saved: len=%zu at slot=%d",
+                       route_wait_queue[i].sdu_len, i);
+            }
+            return;
+        }
+    }
+    printf("[WARNING] route_wait_queue is full, dropping packet (dest=%d)\n", dest);
+}
 
 
 
