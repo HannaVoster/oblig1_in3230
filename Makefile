@@ -33,4 +33,4 @@ $(BIN_DIR)/routingd: $(SRC_DIR)/routingd.c include/routingd.h | $(BIN_DIR)
 
 # Rydd opp
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) $(SRC_DIR)/*.o
