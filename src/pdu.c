@@ -11,6 +11,7 @@
 
 #include "mipd.h"
 #include "pdu.h"
+#include "iface.h"
 
 /*
 Bygger en komplett MIP_PDU protocol data unit som består av:
