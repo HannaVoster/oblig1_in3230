@@ -93,41 +93,7 @@ int create_raw_socket() {
     return sock;
 }
 
-// int create_raw_socket() {
-//     int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
-//     if (sock < 0) {
-//         perror("raw socket");
-//         exit(EXIT_FAILURE);
-//     }
 
-//     // Bind socketen til valgt interface (iface_name settes i find_iface())
-//     struct sockaddr_ll sll = {0};
-//     sll.sll_family = AF_PACKET;
-//     sll.sll_protocol = htons(ETH_P_MIP);
-//     sll.sll_ifindex  = if_nametoindex(iface_name);
-
-//     if(debug_mode){
-//         printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n\n",
-//            iface_name, sll.sll_ifindex, ETH_P_MIP);
-//     }
-
-//     if (bind(sock, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
-//         perror("bind raw socket");
-//         close(sock);
-//         exit(EXIT_FAILURE);
-//     }
-
-//     struct packet_mreq mreq;
-//     memset(&mreq, 0, sizeof(mreq));
-//     mreq.mr_ifindex = if_nametoindex(iface_name);
-//     mreq.mr_type = PACKET_MR_PROMISC;
-
-//     if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-//         perror("setsockopt PROMISC");
-//     }
-
-//     return sock;
-// }
 /*
 - handle_unix_request
 Håndterer forespørsler som kommer fra klient programmer (ping_client).
@@ -323,9 +289,6 @@ void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
 
     unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
-    if (debug_mode) {
-        printf("[DEBUG] Sender ARP broadcast til alle interfaces (%d stk)\n", iface_count);
-    }
 
     // Nå håndterer send_pdu() looping over alle interfaces
     send_pdu(raw_sock, arp_pdu, arp_len, bmac);
@@ -557,106 +520,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
 
 
-void find_all_ifaces() {
-    struct ifaddrs *ifaddr, *ifa;
-    iface_count = 0;
-    getifaddrs(&ifaddr);
 
-    for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr) continue;
-        if (ifa->ifa_addr->sa_family == AF_PACKET &&
-            strcmp(ifa->ifa_name, "lo") != 0) {
-            iface_indices[iface_count++] = if_nametoindex(ifa->ifa_name);
-            if (debug_mode)
-                printf("[DEBUG] Found interface %s (index=%d)\n",
-                       ifa->ifa_name, iface_indices[iface_count-1]);
-        }
-    }
-    freeifaddrs(ifaddr);
-}
-
-// void find_iface(void) {
-//     //deklarerer to pekere, ifaddr til starten av listen, ifa til løpepeker
-//     struct ifaddrs *ifaddr, *ifa;
-
-//     // Henter en lenket liste over alle nettverksinterfaces på maskinen.
-//     // ifaddr peker til starten av lista.
-//     if (getifaddrs(&ifaddr) == -1) {
-//         perror("getifaddrs"); // Skriver feilmelding hvis det feiler
-//         exit(1);
-//     }
-
-//     // Går gjennom alle entries i lista
-//     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-//         if (ifa->ifa_addr == NULL) continue; // Hopp over ugyldige entries
-
-//         if (debug_mode) {
-//             printf("[DEBUG] Fant interface: %s (family=%d)\n\n",
-//                    ifa->ifa_name,
-//                    ifa->ifa_addr->sa_family);
-//         }
-//         // Kun interessert i interfaces av type AF_PACKET, lavnivå nettverksinterfaces (Ethernet)
-//         // Ikke f.eks. IPv4 eller IPv6 
-//         if (ifa->ifa_addr->sa_family == AF_PACKET &&
-//             strcmp(ifa->ifa_name, "lo") != 0) { // Hopper over "lo" (loopback)
-            
-//             // kopierer inntil IFNAMSIZ tegn fra ifa->ifa_name inn i iface_name
-//             strncpy(iface_name, ifa->ifa_name, IFNAMSIZ);
-
-//             iface_name[IFNAMSIZ - 1] = '\0'; // Sørger for at string alltid nulltermineres
-
-//             if (debug_mode) {
-//                 printf("[DEBUG] Valgte interface: %s\n\n", iface_name);
-//             }
-
-//             break; //  tar det første gyldige 
-//         }
-//     }
-
-//     // Ferdig med lista – frigjør minnet
-//     freeifaddrs(ifaddr);
-
-//     // Hvis ikke fant noe interface, feiler 
-//     if (iface_name[0] == '\0') {
-//         fprintf(stderr, "Fant ikke noe gyldig interface!\n\n");
-//         exit(1);
-//     }
-
-//     // Debug: skriv ut hvilket interface vi valgte
-//     if (debug_mode) {
-//         printf("[DEBUG] Bruker interface: %s\n\n", iface_name);
-//     }
-// }
-
-/*
-Denne funksjonen tar inn navnet på et nettverksinterface, 
-oppretter en socket for å spørre kjernen om informasjon, 
-og bruker ioctl med flagget SIOCGIFHWADDR for å hente MAC-adressen. 
-
-Resultatet kopieres til bufferet mac. Den returnerer 0 hvis alt gikk bra, ellers -1
-
-brukes av send_pdu i pdu.c
-*/
-int get_iface_mac(const char *ifname, unsigned char *mac) {
-
-    // Åpner en socket for å kunne utføre ioctl-kall på interfacet
-    int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) return -1;
-
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
-
-    // Henter hardware-adressen (MAC) via ioctl
-    if (ioctl(fd, SIOCGIFHWADDR, &ifr) == -1) {
-        close(fd);
-        return -1;
-    }
-
-    memcpy(mac, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
-    close(fd);
-    return 0;
-}
 /*
 Legg melding i pending-kø dersom mottakers addresse er ukjent
  - venter på å sende PING uten arp resp

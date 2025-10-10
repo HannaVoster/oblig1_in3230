@@ -1,0 +1,58 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "iface.h"
+
+int iface_indices[5];
+int iface_count = 0;
+
+void find_all_ifaces() {
+    struct ifaddrs *ifaddr, *ifa;
+    iface_count = 0;
+    getifaddrs(&ifaddr);
+
+    for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) continue;
+        if (ifa->ifa_addr->sa_family == AF_PACKET &&
+            strcmp(ifa->ifa_name, "lo") != 0) {
+            iface_indices[iface_count++] = if_nametoindex(ifa->ifa_name);
+            if (debug_mode)
+                printf("[DEBUG] Found interface %s (index=%d)\n",
+                       ifa->ifa_name, iface_indices[iface_count-1]);
+        }
+    }
+    freeifaddrs(ifaddr);
+}
+
+
+
+/*
+Denne funksjonen tar inn navnet på et nettverksinterface, 
+oppretter en socket for å spørre kjernen om informasjon, 
+og bruker ioctl med flagget SIOCGIFHWADDR for å hente MAC-adressen. 
+
+Resultatet kopieres til bufferet mac. Den returnerer 0 hvis alt gikk bra, ellers -1
+
+brukes av send_pdu i pdu.c
+*/
+int get_iface_mac(const char *ifname, unsigned char *mac) {
+
+    // Åpner en socket for å kunne utføre ioctl-kall på interfacet
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return -1;
+
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+
+    // Henter hardware-adressen (MAC) via ioctl
+    if (ioctl(fd, SIOCGIFHWADDR, &ifr) == -1) {
+        close(fd);
+        return -1;
+    }
+
+    memcpy(mac, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+    close(fd);
+    return 0;
+}
