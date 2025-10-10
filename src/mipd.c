@@ -30,7 +30,7 @@ returnerer filbeskriveren for socketen, eller avslutter programmet hvis noe feil
 #define MAX_PING_PAYLOAD 512
 unix_client unix_clients[MAX_UNIX_CLIENT];
 
-routing_entry route_wait_queue[16];
+route_wait route_wait_queue[MAX_ROUTE_WAIT];
 
 
 int create_unix_socket(const char *path) {

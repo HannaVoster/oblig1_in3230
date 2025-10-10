@@ -51,9 +51,9 @@ typedef struct {
     uint8_t *sdu;
     size_t sdu_len;
     int valid;
-} route_wait_t;
+} route_wait;
 
-extern route_wait_t route_wait_queue[MAX_ROUTE_WAIT];
+extern route_wait route_wait_queue[MAX_ROUTE_WAIT];
 
 //mipd.c funksjoner
 
