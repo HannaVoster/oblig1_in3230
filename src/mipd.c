@@ -344,6 +344,24 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     uint16_t proto = htons(eh->h_proto);
 
+    int if_index = src_addr.sll_ifindex;
+
+    char if_name[IFNAMSIZ];
+    if_indextoname(if_index, if_name); // oversett til navn (f.eks. "A-eth0")
+
+    if (debug_mode) {
+        printf("[DEBUG] Packet received on interface %s (index=%d)\n",
+               if_name, if_index);
+        printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
+               "src=%02X:%02X:%02X:%02X:%02X:%02X proto=0x%04X\n",
+               eh->h_dest[0], eh->h_dest[1], eh->h_dest[2],
+               eh->h_dest[3], eh->h_dest[4], eh->h_dest[5],
+               eh->h_source[0], eh->h_source[1], eh->h_source[2],
+               eh->h_source[3], eh->h_source[4], eh->h_source[5],
+               proto);
+    }
+
+
     if (debug_mode) {
         printf("[DEBUG] handle_raw_packet: mottatt proto=0x%04X (ETH_P_MIP=0x%04X)\n",
             proto, ETH_P_MIP);
