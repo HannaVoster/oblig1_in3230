@@ -76,6 +76,5 @@ void handle_ping_client_message(int client, char *buffer, int n, int raw_sock, i
 
 void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
                            uint8_t sdu_type, const uint8_t *sdu, size_t sdu_len);
-void send_pending_messages(int raw_sock, uint8_t mip_addr,
-                           unsigned char *mac, int my_mip_address);
+void send_route_request(int routing_fd, uint8_t my_addr, uint8_t dest);
 #endif
