@@ -249,10 +249,10 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         free(pdu);
     } else {
              // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
-        unsigned char fake_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, dest_addr};
-        arp_update(dest_addr, fake_mac);
+        // unsigned char fake_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, dest_addr};
+        // arp_update(dest_addr, fake_mac);
 
-        printf("[DEBUG][TEST] Ingen ARP entry for MIP %d → lagt inn fake MAC\n", dest_addr);
+        // printf("[DEBUG][TEST] Ingen ARP entry for MIP %d → lagt inn fake MAC\n", dest_addr);
 
         // Hent den rett etterpå som normalt
         if (arp_lookup(dest_addr, mac)) {
