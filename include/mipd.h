@@ -73,4 +73,9 @@ void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address);
 void handle_ping_server_message(int client, char *buffer, int n);
 void handle_ping_client_message(int client, char *buffer, int n, int raw_sock, int my_mip_address);
 
+
+void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
+                           uint8_t sdu_type, const uint8_t *sdu, size_t sdu_len);
+void send_pending_messages(int raw_sock, uint8_t mip_addr,
+                           unsigned char *mac, int my_mip_address);
 #endif

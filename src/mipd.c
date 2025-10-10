@@ -155,7 +155,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
 
     if (sdu_type == SDU_TYPE_ROUTING) {
         //sjekker om noen av pakkene i kø har samme dest og trenger neste hopp?
-        if (bytes_read >= 6 && buffer[2] == 'R' && buffer[3] = 'S' && buffer[4] == 'P') {
+        if (bytes_read >= 6 && buffer[2] == 'R' && buffer[3] == 'S' && buffer[4] == 'P') {
             uint8_t next = buffer[5]; 
             printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
 
@@ -191,7 +191,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
                     }
                     //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
                     else{
-                        printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next_hop);
+                        printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
                         queue_message(next, sdu_type, sdu, sdu_len);
                         send_arp_request(raw_sock, next, my_mip_address);
                     }
