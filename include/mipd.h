@@ -17,6 +17,8 @@ extern char last_ping_payload[];
 extern size_t last_ping_payload_len;
 extern int ping_waiting;
 
+extern int iface_indices[5];
+extern int iface_count;
 
 //til å legge pakker i kø
 #define MAX_PENDING 20

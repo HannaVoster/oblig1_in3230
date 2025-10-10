@@ -17,6 +17,9 @@ int my_mip_address = -1; // min mip addresse
 char iface_name[IFNAMSIZ] = {0}; //navn på interface
 pending_entry pending_queue[MAX_PENDING] = {0}; // kø av meldinger
 routing_entry routing_table[MAX_ROUTES];
+int iface_indices[5];
+int iface_count = 0;
+
 
 /*
 Denne funksjonen starter MIP-daemonen. 

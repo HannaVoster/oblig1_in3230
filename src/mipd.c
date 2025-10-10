@@ -32,6 +32,8 @@ unix_client unix_clients[MAX_UNIX_CLIENT];
 
 route_wait route_wait_queue[MAX_ROUTE_WAIT];
 
+// For interface-håndtering
+
 
 int create_unix_socket(const char *path) {
     int sock;
@@ -83,34 +85,49 @@ int create_raw_socket() {
         exit(EXIT_FAILURE);
     }
 
-    // Bind socketen til valgt interface (iface_name settes i find_iface())
-    struct sockaddr_ll sll = {0};
-    sll.sll_family = AF_PACKET;
-    sll.sll_protocol = htons(ETH_P_MIP);
-    sll.sll_ifindex  = if_nametoindex(iface_name);
-
-    if(debug_mode){
-        printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n\n",
-           iface_name, sll.sll_ifindex, ETH_P_MIP);
-    }
-
-    if (bind(sock, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
-        perror("bind raw socket");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-
-    struct packet_mreq mreq;
-    memset(&mreq, 0, sizeof(mreq));
-    mreq.mr_ifindex = if_nametoindex(iface_name);
-    mreq.mr_type = PACKET_MR_PROMISC;
-
-    if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        perror("setsockopt PROMISC");
+    // Ikke bind til ett interface – da lytter den på alle
+    if (debug_mode) {
+        printf("[DEBUG] create_raw_socket: global listener for proto=0x%X\n\n", ETH_P_MIP);
     }
 
     return sock;
 }
+
+// int create_raw_socket() {
+//     int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
+//     if (sock < 0) {
+//         perror("raw socket");
+//         exit(EXIT_FAILURE);
+//     }
+
+//     // Bind socketen til valgt interface (iface_name settes i find_iface())
+//     struct sockaddr_ll sll = {0};
+//     sll.sll_family = AF_PACKET;
+//     sll.sll_protocol = htons(ETH_P_MIP);
+//     sll.sll_ifindex  = if_nametoindex(iface_name);
+
+//     if(debug_mode){
+//         printf("[DEBUG] create_raw_socket: iface=%s idx=%d proto=0x%X\n\n",
+//            iface_name, sll.sll_ifindex, ETH_P_MIP);
+//     }
+
+//     if (bind(sock, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
+//         perror("bind raw socket");
+//         close(sock);
+//         exit(EXIT_FAILURE);
+//     }
+
+//     struct packet_mreq mreq;
+//     memset(&mreq, 0, sizeof(mreq));
+//     mreq.mr_ifindex = if_nametoindex(iface_name);
+//     mreq.mr_type = PACKET_MR_PROMISC;
+
+//     if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+//         perror("setsockopt PROMISC");
+//     }
+
+//     return sock;
+// }
 /*
 - handle_unix_request
 Håndterer forespørsler som kommer fra klient programmer (ping_client).
@@ -286,16 +303,36 @@ void handle_ping_server_message(int client, char *buffer, int bytes_read) {
 
 
 void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
-    mip_arp_msg req = { .type = ARP_REQUEST, .mip_addr = dest_addr, .reserved = 0 };
+    mip_arp_msg req = {
+        .type = ARP_REQUEST,
+        .mip_addr = dest_addr,
+        .reserved = 0
+    };
+
     size_t arp_len;
     uint8_t *arp_pdu = mip_build_pdu(
-        0xFF, my_mip_address, 1, SDU_TYPE_ARP,
-        (uint8_t*)&req, sizeof(req), &arp_len
+        0xFF,                      // broadcast dest (MIP)
+        my_mip_address,            // source = meg
+        1,                         // TTL
+        SDU_TYPE_ARP,              // type = ARP
+        (uint8_t*)&req,
+        sizeof(req),
+        &arp_len
     );
+
     unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+
+    if (debug_mode) {
+        printf("[DEBUG] Sender ARP broadcast til alle interfaces (%d stk)\n", iface_count);
+    }
+
+    // Nå håndterer send_pdu() looping over alle interfaces
     send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+
     free(arp_pdu);
 }
+
+
 
 
 
@@ -537,11 +574,11 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 // som kan bruker for AF_PACKET rå-sockets.
 // Den hopper over "lo" (loopback), siden man ikke vil sende MIP-pakker internt
 
-int iface_indices[5];
-int iface_count = 0;
+
 
 void find_all_ifaces() {
     struct ifaddrs *ifaddr, *ifa;
+    iface_count = 0;
     getifaddrs(&ifaddr);
 
     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
