@@ -1,6 +1,7 @@
 #ifndef IFACE_H
 #define IFACE_H
 
+#define ETH_P_MIP 0x88B5 //gitt av oppgaven
 extern int iface_indices[5];
 extern int iface_count;
 
