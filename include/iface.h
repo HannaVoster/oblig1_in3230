@@ -6,5 +6,6 @@ extern int iface_count;
 
 int get_iface_mac(const char *ifname, unsigned char *mac);
 void find_all_ifaces(void);
+int create_raw_socket();
 
 #endif

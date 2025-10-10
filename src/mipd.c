@@ -72,27 +72,6 @@ int create_unix_socket(const char *path) {
     return sock;
 }
 
-/*
--create_raw_socket
-lager en råsocket for å sende og motta MIP-pakker direkte over Ethernet. 
-funksjonen binder socketen til det valgte nettverksinterface, 
-og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt.
-*/
-int create_raw_socket() {
-    int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
-    if (sock < 0) {
-        perror("raw socket");
-        exit(EXIT_FAILURE);
-    }
-
-    // Ikke bind til ett interface – da lytter den på alle
-    if (debug_mode) {
-        printf("[DEBUG] create_raw_socket: global listener for proto=0x%X\n\n", ETH_P_MIP);
-    }
-
-    return sock;
-}
-
 
 /*
 - handle_unix_request

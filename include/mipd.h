@@ -65,7 +65,7 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, i
 void handle_unix_request(int unix_sock, int raw_sock, int my_mip_address);
 void handle_raw_packet(int raw_sock, int my_mip_address);
 
-int create_raw_socket();
+
 int create_unix_socket(const char *path);
 
 void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address);
