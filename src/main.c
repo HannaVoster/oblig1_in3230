@@ -7,6 +7,7 @@
 #include "pdu.h"
 #include "arp.h"
 #include "routingd.h"
+#include "iface.h"
 
 #define MAX_EVENTS 10 // epoll
 
@@ -14,11 +15,10 @@ int debug_mode = 0; // debug flagg
 int last_unix_client_fd = -1; // siste unix klient
 int last_ping_src = -1;
 int my_mip_address = -1; // min mip addresse
-char iface_name[IFNAMSIZ] = {0}; //navn på interface
+
 pending_entry pending_queue[MAX_PENDING] = {0}; // kø av meldinger
 
-int iface_indices[5];
-int iface_count = 0;
+
 
 
 /*
@@ -28,7 +28,6 @@ Den håndterer flaggene -h og -d, henter inn socket-sti og MIP-adresse fra argum
  Disse legges i en epoll-instans, og programmet går deretter i en løkke som behandler 
  enten klientforespørsler eller mottatte MIP-pakker
 
- main setter globale variabler som debug_mode, my_mip_address og iface_name,
  Disse variablene brukes senere av andre funksjoner
  */
 

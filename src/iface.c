@@ -1,8 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netpacket/packet.h>
+#include <netinet/ether.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include "iface.h"
+#include "mipd.h"
 
 #include "iface.h"
+#include "mipd.h"
 
 int iface_indices[5];
 int iface_count = 0;
@@ -24,8 +36,6 @@ void find_all_ifaces() {
     }
     freeifaddrs(ifaddr);
 }
-
-
 
 /*
 Denne funksjonen tar inn navnet på et nettverksinterface, 

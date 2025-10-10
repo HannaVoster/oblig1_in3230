@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <net/if.h>  //for IFNAMIZ til interface
+//j
 
 //globale verdier
 extern char iface_name[IFNAMSIZ]; // Navnet på nettverksinterfacet som brukes (f.eks. "A-eth0")
@@ -16,9 +17,6 @@ extern int last_ping_src;
 extern char last_ping_payload[];
 extern size_t last_ping_payload_len;
 extern int ping_waiting;
-
-extern int iface_indices[5];
-extern int iface_count;
 
 //til å legge pakker i kø
 #define MAX_PENDING 20
@@ -59,10 +57,7 @@ extern route_wait route_wait_queue[MAX_ROUTE_WAIT];
 
 //mipd.c funksjoner
 
-int get_iface_mac(const char *ifname, unsigned char *mac);
-//void find_iface(void);
 
-void find_all_ifaces(void);
 
 void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t length);
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, int my_mip_address);
