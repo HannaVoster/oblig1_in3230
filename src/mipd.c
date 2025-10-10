@@ -358,9 +358,6 @@ pending_queue – tømmes når ventende meldinger sendes etter en ARP-RESP (send
 Bruker debug_mode for logging
 */
 void handle_raw_packet(int raw_sock, int my_mip_address) {
-    if(debug_mode){
-        printf("[DEBUG] handle_raw_packet CALLED\n\n");
-    }
     uint8_t buffer[2000]; // Buffer for å lagre innkommende råpakke
     struct sockaddr_ll src_addr; // Struktur for å lagre avsenderadresse
 
@@ -373,7 +370,9 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     int len = recvmsg(raw_sock, &msg, 0);
 
-    printf("[DEBUG] handle_raw_packet CALLED, len=%d\n", len);
+    if(debug_mode){
+        printf("[DEBUG][RAW] handle_raw_packet CALLED, len=%d\n", len);
+    }
 
     if (len < (int)sizeof(struct ethhdr)) return; // må minst ha Ethernet-header
 
@@ -388,9 +387,9 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     if_indextoname(if_index, if_name); // oversett til navn (f.eks. "A-eth0")
 
     if (debug_mode) {
-        printf("[DEBUG] Packet received on interface %s (index=%d)\n",
+        printf("[DEBUG][RAW] Packet received on interface %s (index=%d)\n",
                if_name, if_index);
-        printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
+        printf("[DEBUG][RAW] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
                "src=%02X:%02X:%02X:%02X:%02X:%02X proto=0x%04X\n",
                eh->h_dest[0], eh->h_dest[1], eh->h_dest[2],
                eh->h_dest[3], eh->h_dest[4], eh->h_dest[5],
@@ -399,30 +398,11 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                proto);
     }
 
-    if (debug_mode) {
-        printf("[DEBUG] handle_raw_packet: mottatt proto=0x%04X (ETH_P_MIP=0x%04X)\n",
-            proto, ETH_P_MIP);
-    }
-
-    if (debug_mode) {
-        printf("[DEBUG] RX frame ethertype=0x%04X\n\n", proto);
-        // Dump Ethernet-header (14 bytes)
-        printf("[DEBUG] RX dst=%02X:%02X:%02X:%02X:%02X:%02X "
-            "src=%02X:%02X:%02X:%02X:%02X:%02X\n\n",
-            eh->h_dest[0], eh->h_dest[1], eh->h_dest[2],
-            eh->h_dest[3], eh->h_dest[4], eh->h_dest[5],
-            eh->h_source[0], eh->h_source[1], eh->h_source[2],
-            eh->h_source[3], eh->h_source[4], eh->h_source[5]);
-    }
     if (proto != ETH_P_MIP) {
-        printf("[DEBUG] PROTO ER FEIL (ikke MIP)\n\n");
+        printf("[ERROR][RAW] PROTO ER FEIL (ikke MIP)\n\n");
         return;
     }
         
-    if(debug_mode){
-        printf("[DEBUG] PROTO = MIP! Nå kan vi parse PDU.\n\n");
-    }
-
     //mip pakken starter etter ethernet header
     const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
     size_t mip_len = len - sizeof(struct ethhdr);
@@ -435,7 +415,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                                 &dest, &src, &ttl,
                                 &sdu_type, &sdu);
     if (sdu_len < 0) {
-        printf("[ERROR] ugyldig MIP PDU (len=%d)\n", len);
+        printf("[ERROR][RAW] ugyldig MIP PDU (len=%d)\n", len);
         return;
     }
 
@@ -443,14 +423,14 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     if (dest != my_mip_address && dest != 255) { //255 = broadcast
         // ikke til meg og ikke broadcast - FORWARD PAKKEN  
         if (ttl <= 1) {
-            printf("[FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
+            if(debug_mode) printf("[DEBUG][FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
             return;
         }
         //justerer ttl før den forwardes
         uint8_t ttl_new = ttl - 1;
 
         if (debug_mode) {
-            printf("[FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
+            printf("[DEBUG][RAW][FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
                dest, src, ttl, ttl_new);
         }
 
@@ -463,7 +443,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             }
         }
 
-        printf("[FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
+        if(debug_mode) printf("[DEBUG][RAW][FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
         return;
     }
 
@@ -532,7 +512,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             if (arp->type == 0x00 && arp->mip_addr == my_mip_address) {
                 // Dette er en ARP request (0x00), og den spør etter nodens MIP-adresse
                 // Da bygges en ARP response (0x01) med egen MIP-adresse
-
+                printf("[RAW] ARP-REQ mottatt fra MIP %d\n\n", arp->mip_addr);
                 mip_arp_msg resp = { .type = 0x01, .mip_addr = my_mip_address, .reserved = 0 };
                 size_t pdu_len = 0;
                 uint8_t *pdu = mip_build_pdu(
