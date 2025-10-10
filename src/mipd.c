@@ -361,7 +361,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                proto);
     }
 
-
     if (debug_mode) {
         printf("[DEBUG] handle_raw_packet: mottatt proto=0x%04X (ETH_P_MIP=0x%04X)\n",
             proto, ETH_P_MIP);
@@ -537,58 +536,79 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 // Denne funksjonen finner et nettverksinterface (f.eks. "eth0")
 // som kan bruker for AF_PACKET rå-sockets.
 // Den hopper over "lo" (loopback), siden man ikke vil sende MIP-pakker internt
-void find_iface(void) {
-    //deklarerer to pekere, ifaddr til starten av listen, ifa til løpepeker
+
+int iface_indices[5];
+int iface_count = 0;
+
+void find_all_ifaces() {
     struct ifaddrs *ifaddr, *ifa;
+    getifaddrs(&ifaddr);
 
-    // Henter en lenket liste over alle nettverksinterfaces på maskinen.
-    // ifaddr peker til starten av lista.
-    if (getifaddrs(&ifaddr) == -1) {
-        perror("getifaddrs"); // Skriver feilmelding hvis det feiler
-        exit(1);
-    }
-
-    // Går gjennom alle entries i lista
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) continue; // Hopp over ugyldige entries
-
-        if (debug_mode) {
-            printf("[DEBUG] Fant interface: %s (family=%d)\n\n",
-                   ifa->ifa_name,
-                   ifa->ifa_addr->sa_family);
-        }
-        // Kun interessert i interfaces av type AF_PACKET, lavnivå nettverksinterfaces (Ethernet)
-        // Ikke f.eks. IPv4 eller IPv6 
+    for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) continue;
         if (ifa->ifa_addr->sa_family == AF_PACKET &&
-            strcmp(ifa->ifa_name, "lo") != 0) { // Hopper over "lo" (loopback)
-            
-            // kopierer inntil IFNAMSIZ tegn fra ifa->ifa_name inn i iface_name
-            strncpy(iface_name, ifa->ifa_name, IFNAMSIZ);
-
-            iface_name[IFNAMSIZ - 1] = '\0'; // Sørger for at string alltid nulltermineres
-
-            if (debug_mode) {
-                printf("[DEBUG] Valgte interface: %s\n\n", iface_name);
-            }
-
-            break; //  tar det første gyldige 
+            strcmp(ifa->ifa_name, "lo") != 0) {
+            iface_indices[iface_count++] = if_nametoindex(ifa->ifa_name);
+            if (debug_mode)
+                printf("[DEBUG] Found interface %s (index=%d)\n",
+                       ifa->ifa_name, iface_indices[iface_count-1]);
         }
     }
-
-    // Ferdig med lista – frigjør minnet
     freeifaddrs(ifaddr);
-
-    // Hvis ikke fant noe interface, feiler 
-    if (iface_name[0] == '\0') {
-        fprintf(stderr, "Fant ikke noe gyldig interface!\n\n");
-        exit(1);
-    }
-
-    // Debug: skriv ut hvilket interface vi valgte
-    if (debug_mode) {
-        printf("[DEBUG] Bruker interface: %s\n\n", iface_name);
-    }
 }
+
+// void find_iface(void) {
+//     //deklarerer to pekere, ifaddr til starten av listen, ifa til løpepeker
+//     struct ifaddrs *ifaddr, *ifa;
+
+//     // Henter en lenket liste over alle nettverksinterfaces på maskinen.
+//     // ifaddr peker til starten av lista.
+//     if (getifaddrs(&ifaddr) == -1) {
+//         perror("getifaddrs"); // Skriver feilmelding hvis det feiler
+//         exit(1);
+//     }
+
+//     // Går gjennom alle entries i lista
+//     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+//         if (ifa->ifa_addr == NULL) continue; // Hopp over ugyldige entries
+
+//         if (debug_mode) {
+//             printf("[DEBUG] Fant interface: %s (family=%d)\n\n",
+//                    ifa->ifa_name,
+//                    ifa->ifa_addr->sa_family);
+//         }
+//         // Kun interessert i interfaces av type AF_PACKET, lavnivå nettverksinterfaces (Ethernet)
+//         // Ikke f.eks. IPv4 eller IPv6 
+//         if (ifa->ifa_addr->sa_family == AF_PACKET &&
+//             strcmp(ifa->ifa_name, "lo") != 0) { // Hopper over "lo" (loopback)
+            
+//             // kopierer inntil IFNAMSIZ tegn fra ifa->ifa_name inn i iface_name
+//             strncpy(iface_name, ifa->ifa_name, IFNAMSIZ);
+
+//             iface_name[IFNAMSIZ - 1] = '\0'; // Sørger for at string alltid nulltermineres
+
+//             if (debug_mode) {
+//                 printf("[DEBUG] Valgte interface: %s\n\n", iface_name);
+//             }
+
+//             break; //  tar det første gyldige 
+//         }
+//     }
+
+//     // Ferdig med lista – frigjør minnet
+//     freeifaddrs(ifaddr);
+
+//     // Hvis ikke fant noe interface, feiler 
+//     if (iface_name[0] == '\0') {
+//         fprintf(stderr, "Fant ikke noe gyldig interface!\n\n");
+//         exit(1);
+//     }
+
+//     // Debug: skriv ut hvilket interface vi valgte
+//     if (debug_mode) {
+//         printf("[DEBUG] Bruker interface: %s\n\n", iface_name);
+//     }
+// }
 
 /*
 Denne funksjonen tar inn navnet på et nettverksinterface, 

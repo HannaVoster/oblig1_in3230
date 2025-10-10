@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     my_mip_address = atoi(argv[optind+1]);
 
     //finner interface, metode i mipd
-    find_iface();
+    find_all_ifaces();
     arp_init_cache();
 
     //legger til ruter for å teste routing table

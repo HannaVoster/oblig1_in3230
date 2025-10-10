@@ -58,7 +58,9 @@ extern route_wait route_wait_queue[MAX_ROUTE_WAIT];
 //mipd.c funksjoner
 
 int get_iface_mac(const char *ifname, unsigned char *mac);
-void find_iface(void);
+//void find_iface(void);
+
+void find_all_ifaces(void);
 
 void queue_message(uint8_t dest_mip, uint8_t sdu_type, uint8_t* data, size_t length);
 void send_pending_messages(int raw_sock, uint8_t mip_addr, unsigned char* mac, int my_mip_address);
