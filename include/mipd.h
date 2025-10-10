@@ -17,6 +17,18 @@ extern char last_ping_payload[];
 extern size_t last_ping_payload_len;
 extern int ping_waiting;
 
+//JEG PRØVER NOE NYTT HER
+#define MAX_INTERFACES 8
+
+typedef struct {
+    char name[IFNAMSIZ];
+    int raw_sock;
+    int ifindex;
+} iface_entry;
+
+extern iface_entry interfaces[MAX_INTERFACES];
+extern int iface_count;
+ //STOPP
 
 //til å legge pakker i kø
 #define MAX_PENDING 20
