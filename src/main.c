@@ -8,6 +8,7 @@
 #include "arp.h"
 #include "routingd.h"
 #include "iface.h"
+#include "queue.h"
 
 #define MAX_EVENTS 10 // epoll
 
