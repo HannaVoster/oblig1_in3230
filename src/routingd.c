@@ -88,6 +88,7 @@ int main(int argc, char *argv[]){
         if (length > 0){
             if(buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') { //request mld
                 handle_route_request(sock, buf, length); // sender videre 
+                printf("[ROUTINGD] sending------\n");
             }
             else if(length == 0){
                 printf("[ROUTINGD] Disconnected from mipd\n");
