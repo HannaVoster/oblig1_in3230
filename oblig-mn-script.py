@@ -104,7 +104,7 @@ def init_oblig(self, line):
     B.cmd("./bin/mipd -d usockB 20 &")
     C.cmd("./bin/mipd -d usockC 30 &")
 
-    time.sleep(1)
+    time.sleep(2)
 
     print("*** Starter routingd på B")
     B.cmd("./bin/routingd usockB &")
