@@ -36,19 +36,24 @@ int connect_to_mipd(const char *socket_path) {
     // Forsøk å koble til lokal MIP-daemon (usockA–usockE)
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
-    const char *sockets[] = {"usockA", "usockB", "usockC", "usockD", "usockE"};
+    const char *sockets[] = {
+    "./usockA", "./usockB", "./usockC", "./usockD", "./usockE",
+    "/tmp/usockA", "/tmp/usockB", "/tmp/usockC", "/tmp/usockD", "/tmp/usockE"
+    };
+
     int connected = 0;
     const char *connected_sock = NULL;
 
-    for (int i = 0; i < 5; i++) {
-        strncpy(addr.sun_path, sockets[i], sizeof(addr.sun_path) - 1);
-        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
-            connected = 1;
-            connected_sock = sockets[i];
-            printf("[ROUTINGD] Connected to %s\n", sockets[i]);
-            break;
-        }
+    for (int i = 0; i < 10; i++) {
+    strncpy(addr.sun_path, sockets[i], sizeof(addr.sun_path) - 1);
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+        connected = 1;
+        connected_sock = sockets[i];
+        printf("[ROUTINGD] Connected to %s\n", sockets[i]);
+        break;
     }
+    }
+
 
     if (!connected) {
         fprintf(stderr, "[ROUTINGD] Could not connect to any local MIP socket\n");
