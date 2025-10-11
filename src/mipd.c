@@ -87,12 +87,14 @@ int main(int argc, char *argv[]) {
     //lager sockets
     int unix_sock = create_unix_socket(socket_path); //lytte socket
 
-    // Start routingd hvis MIP-adressen tilsvarer router-noden (for eksempel 20)
     if (my_mip_address == 20) {
         pid_t pid = fork();
         if (pid == 0) {
-            // Barneprosess: start routingd
-            execl("./bin/routingd", "./bin/routingd", socket_path, (char *)NULL);
+            // Barneprosess: redirect output til logg
+            char cmd[128];
+            snprintf(cmd, sizeof(cmd),
+                    "./bin/routingd %s > routingd.log 2>&1", socket_path);
+            execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
             perror("execl routingd");
             exit(EXIT_FAILURE);
         } else if (pid > 0) {
@@ -101,6 +103,7 @@ int main(int argc, char *argv[]) {
             perror("fork routingd");
         }
     }
+
     int raw_sock = create_raw_socket();
 
     // oppretter en epoll instans
