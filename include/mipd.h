@@ -23,10 +23,10 @@ extern int ping_waiting;
 
 #define MAX_EVENTS 10 // epoll
 
-int debug_mode = 0; // debug flagg
-int last_unix_client_fd = -1; // siste unix klient
-int last_ping_src = -1;
-int my_mip_address = -1; // min mip addresse
+extern int debug_mode; // debug flagg
+extern int last_unix_client_fd; // siste unix klient
+extern int last_ping_src;
+extern int my_mip_address; // min mip addresse
 
 
 #endif

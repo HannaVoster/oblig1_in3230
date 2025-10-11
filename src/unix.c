@@ -21,8 +21,6 @@
 
 unix_client unix_clients[MAX_UNIX_CLIENT];
 
-
-
 /*
 - create_unix_socket
 oppretter en UNIX-socket på en gitt filbane gitt som argument - path. 
