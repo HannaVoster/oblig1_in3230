@@ -65,5 +65,4 @@ topos = {
     'oblig': (lambda: Oblig()),
 }
 
-!/usr/bin/env python
 
