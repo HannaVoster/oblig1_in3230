@@ -21,7 +21,8 @@ $(BIN_DIR)/mipd: $(SRC_DIR)/main.c \
                  $(SRC_DIR)/mipd.c \
                  $(SRC_DIR)/pdu.c \
                  $(SRC_DIR)/arp.c \
-                 $(SRC_DIR)/iface.c | $(BIN_DIR)
+                 $(SRC_DIR)/iface.c \
+				 $(SRC_DIR)/queue.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) -o $@ $^
 
 # Bygg ping_client
