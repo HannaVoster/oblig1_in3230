@@ -17,8 +17,7 @@ $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 # Bygg mipd
-$(BIN_DIR)/mipd: $(SRC_DIR)/main.c \
-                 $(SRC_DIR)/mipd.c \
+$(BIN_DIR)/mipd: $(SRC_DIR)/mipd.c \
                  $(SRC_DIR)/pdu.c \
                  $(SRC_DIR)/arp.c \
                  $(SRC_DIR)/iface.c \

@@ -22,6 +22,11 @@
 #include "unix.c"
 #include "raw_handler.h"
 
+int debug_mode = 0; // debug flagg
+int last_unix_client_fd = -1; // siste unix klient
+int last_ping_src = -1;
+int my_mip_address = -1; // min mip addresse
+
 /*
 Denne funksjonen starter MIP-daemonen. 
 Den håndterer flaggene -h og -d, henter inn socket-sti og MIP-adresse fra argumentene,
