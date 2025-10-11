@@ -122,8 +122,8 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             printf("[QUEUE] Sent melding til MIP %d, sdu type: %d\n\n", mip_addr, pending_queue[i].sdu_type);
 
             if (debug_mode) {
-                printf("[DEBUG][QUEUE] Updated ARP CASHE after send_pending_messages():\n");
-                print_arp_cache();
+                printf("[DEBUG][QUEUE] Kø etter send_pending_messages():\n");
+                print_pending_queue();
             }
         }
     }
@@ -179,4 +179,18 @@ void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
         }
     }
     printf("[WARNING] route_wait_queue is full, dropping packet (dest=%d)\n", dest);
+}
+
+
+void print_pending_queue(void) {
+    printf("[QUEUE] Status:\n");
+    for (int i = 0; i < MAX_PENDING; i++) {
+        if (pending_queue[i].valid) {
+            printf("  slot=%d → dest=%d len=%zu type=%d\n",
+                   i,
+                   pending_queue[i].dest_mip,
+                   pending_queue[i].length,
+                   pending_queue[i].sdu_type);
+        }
+    }
 }

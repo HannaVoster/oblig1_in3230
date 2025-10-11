@@ -35,5 +35,6 @@ int arp_lookup(int mip_addr, unsigned char *mac_out);
 void print_arp_cache(void);
 void arp_init_cache();
 void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address);
+void print_pending_queue(void);
 
 #endif
