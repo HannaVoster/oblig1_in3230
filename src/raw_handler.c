@@ -17,6 +17,7 @@
 #include "iface.h"
 #include "queue.h"
 #include "arp.h"
+#include "raw_handler.h"
 
 
 /*
