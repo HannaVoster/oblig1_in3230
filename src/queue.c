@@ -26,7 +26,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
     for (int i = 0; i < MAX_PENDING; i++) {
         if (!pending_queue[i].valid) {
             if (debug_mode) {
-                printf("[DEBUG] queue_message: dest=%d type=%d len=%zu bytes\n\n",
+                printf("[DEBUG][QUEUE] queue_message: dest=%d type=%d len=%zu bytes\n",
                        dest_mip, sdu_type, length_bytes);
             }
 
@@ -49,7 +49,7 @@ void queue_message(uint8_t dest_mip, uint8_t sdu_type,
             }
 
             if (debug_mode) {
-                printf("[DEBUG] queue_message saved: len=%zu at slot=%d",
+                printf("[DEBUG][QUEUE] queue_message saved: len=%zu at slot=%d",
                        pending_queue[i].length, i);
                 if (length_bytes > 0)
                     printf(", payload[0]=0x%02X", pending_queue[i].payload[0]);
@@ -82,14 +82,14 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             
             // Sjekk at køelementet er gyldig (payload finnes og lengden > 0)
             if (pending_queue[i].length == 0 || pending_queue[i].payload == NULL) {
-                printf("[ERROR] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n\n",
+                printf("[ERROR][QUEUE] Pending entry corrupt: len=0 eller payload=NULL for MIP %d\n\n",
                        pending_queue[i].dest_mip);
                 pending_queue[i].valid = 0;
                 continue;
             }
 
             if (debug_mode) {
-                printf("[DEBUG] send_pending_messages using slot=%d "
+                printf("[DEBUG][QUEUE] send_pending_messages using slot=%d "
                        "len=%zu type=%d dest=%d\n\n",
                        i,
                        pending_queue[i].length,
@@ -118,10 +118,10 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             free(pending_queue[i].payload);
             pending_queue[i].payload = NULL;
 
-            printf("[QUEUE] Sendt kø-melding til MIP %d\n\n", mip_addr);
+            printf("[QUEUE] Sent melding til MIP %d, sdu type: %d\n\n", mip_addr, pending_queue[i].sdu_type);
 
             if (debug_mode) {
-                printf("[DEBUG] Etter send_pending_messages():\n");
+                printf("[DEBUG][QUEUE] Updated ARP CASHE after send_pending_messages():\n");
                 print_arp_cache();
             }
         }
@@ -131,9 +131,9 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
 void send_route_request(int routing_fd, uint8_t my_addr, uint8_t dest) {
     uint8_t req[6] = { my_addr, 0, 'R', 'E', 'Q', dest };
     if (write(routing_fd, req, sizeof(req)) != sizeof(req))
-        perror("[MIPD] write route request");
+        perror("[ERROR][MIPD] write route request");
     else
-        printf("[MIPD] Sent ROUTE REQUEST for dest=%d\n", dest);
+        printf("[MIPD][ROUTING] Sent ROUTE REQUEST for dest=%d\n", dest);
 }
 
 void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
@@ -168,9 +168,12 @@ void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
             }
 
             if (debug_mode) {
-                printf("[DEBUG] routing queue_message saved: len=%zu at slot=%d",
+                printf("[DEBUG][QUEUE][ROUTING] routing queue_message saved: len=%zu at slot=%d",
                        route_wait_queue[i].sdu_len, i);
             }
+
+            printf("[QUEUE][ROUTING] Meldingen for dest %d lagt i kø\n", dest);
+
             return;
         }
     }

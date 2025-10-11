@@ -76,3 +76,30 @@ void print_arp_cache(void) {
         }
     }
 }
+
+
+void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
+    mip_arp_msg req = {
+        .type = ARP_REQUEST,
+        .mip_addr = dest_addr,
+        .reserved = 0
+    };
+
+    size_t arp_len;
+    uint8_t *arp_pdu = mip_build_pdu(
+        0xFF,                      // broadcast dest (MIP)
+        my_mip_address,            // source = meg
+        1,                         // TTL
+        SDU_TYPE_ARP,              // type = ARP
+        (uint8_t*)&req,
+        sizeof(req),
+        &arp_len
+    );
+
+    unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+
+    // Nå håndterer send_pdu() looping over alle interfaces
+    send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+
+    free(arp_pdu);
+}

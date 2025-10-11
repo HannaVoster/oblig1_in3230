@@ -1,0 +1,244 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+
+#include "mipd.h"
+#include "arp.h"
+#include "pdu.h"
+#include "queue.h"
+#include "iface.h"
+#include "routingd.h"
+#include "unix.h"
+
+//#define MAX_PING_PAYLOAD 512
+
+unix_client unix_clients[MAX_UNIX_CLIENT];
+
+
+
+/*
+- create_unix_socket
+oppretter en UNIX-socket på en gitt filbane gitt som argument - path. 
+Den binder socketen til adressen, sørger for at en eventuell gammel socket-fil slettes,
+og setter den i lyttemodus slik at klienter kan koble seg til. 
+returnerer filbeskriveren for socketen, eller avslutter programmet hvis noe feiler
+*/
+
+int create_unix_socket(const char *path) {
+    int sock;
+    struct sockaddr_un addr;
+
+    //lager en unix socket, stopper programmet hvis en feil skjer
+    if ((sock = socket(AF_UNIX, SOCK_SEQPACKET, 0)) == -1) {
+        perror("unix socket");
+        exit(EXIT_FAILURE);
+    }
+
+    //nullstiller struct for adressen til socketen
+    memset(&addr, 0, sizeof(addr));
+    //socket type: UNIX
+    addr.sun_family = AF_UNIX;
+
+    //kopierer UNIX_PATH som adressen
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
+
+    //sletter eventuel gammel fil med samme navn fra tidligere kjøring
+    unlink(path); 
+
+    //kobler socketen til adddressen i addr, slik at klientet kan koble seg på den gjemnnom filbanen
+    //typecaster (struct sockaddr*)&addr så bind() skjønner at det sendes en generisk socket addresse
+    if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        perror("bind unix");
+        exit(EXIT_FAILURE);
+    }
+
+    //setter socketen i lyttemodus, klar til å ta imot klienter (maks 5 i kø)
+    if (listen(sock, 5) == -1) {
+        perror("listen unix");
+        exit(EXIT_FAILURE);
+    }
+
+    return sock;
+}
+
+
+/*
+- handle_unix_request
+Håndterer forespørsler som kommer fra klient programmer (ping_client).
+tar inn unic_sock som er fildeskriptor for socketen
+raw_sock som er fildeskriptor for raw socket som brukes til å for sende 
+pakker på nettverket (send_pdu)
+og my_mip_address som er adressen til noden
+
+Leser melding fra klienten, første byte er dest_addr og resten payload
+dest_addr sjekkes opp mot arp cashe, og pakken håndteres ulikt avhengig av om mac er lagret
+
+miss - bygg pakke, legg i kø og send broadcast arp req for å finne mottaker
+
+hit - har riktig mac, kan sende PING
+*/
+void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
+    char buffer[256];
+    int bytes_read = read(client_fd, buffer, sizeof(buffer));
+
+    if (bytes_read <= 0) {
+        // Klienten koblet fra
+        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+            if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
+                unix_clients[i].active = 0;
+                close(client_fd);
+                if (debug_mode)
+                    printf("[UNIX] Client fd=%d disconnected\n", client_fd);
+                break;
+            }
+        }
+        return;
+    }
+    //prover
+
+    // Finn hvilken SDU-type denne klienten har
+    uint8_t sdu_type = 0;
+    for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+        if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
+            sdu_type = unix_clients[i].sdu_type;
+            break;
+        }
+    }
+
+    if (sdu_type == SDU_TYPE_ROUTING) {
+        //sjekker om noen av pakkene i kø har samme dest og trenger neste hopp?
+        if (bytes_read >= 6 && buffer[2] == 'R' && buffer[3] == 'S' && buffer[4] == 'P') {
+            uint8_t next = buffer[5]; 
+            printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
+
+            //sjekker of next = 255 for da er ingen rute funnet
+            if (next == 255) {
+                printf("[ROUTING] Ingen rute funnet — dropper pakke.\n");
+                return;
+            }
+
+            //går igjennom køen av finner første pakke i kø
+            //oppgaven sier at routing deamon skal håndtere pakker i rekkefølgen de kommer i
+            //så første gyldige pakke i køen vil være den svaret gjelder for
+            for (int i = 0; i < MAX_ROUTE_WAIT; i++){
+                if (route_wait_queue[i].valid) {
+                    //lagrer verdiene for pakken som skal sendes
+                    uint8_t dest = route_wait_queue[i].dest;
+                    uint8_t src = route_wait_queue[i].src;
+                    uint8_t ttl = route_wait_queue[i].ttl;
+                    uint8_t sdu_type = route_wait_queue[i].sdu_type;
+                    uint8_t *sdu = route_wait_queue[i].sdu;
+                    size_t sdu_len = route_wait_queue[i].sdu_len;
+                    
+                    //sjekker i arp tabellen om vi har addressen til neste
+                    unsigned char mac[6];
+                    if (arp_lookup(next, mac)) {
+                        //treff - addressen finnes - bygg og send pdu
+                        size_t new_pdu_length;
+                        uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
+                        send_pdu(raw_sock, new_pdu, new_pdu_length, mac);
+                        free(new_pdu);
+                        printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
+                           next, dest);
+                    }
+                    //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
+                    else{
+                        printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
+                        queue_message(next, sdu_type, sdu, sdu_len);
+                        send_arp_request(raw_sock, next, my_mip_address);
+                    }
+
+                    free(route_wait_queue[i].sdu);
+                    route_wait_queue[i].valid = 0;
+                    return;
+                }
+            }
+            printf("[ROUTING] Ingen ventende pakker — ignorerer RESPONSE.\n");
+        }
+        return;
+    }
+
+    // Les data etter nytt format: [dest:1][ttl:1][payload]
+    if (bytes_read < 2) {
+        fprintf(stderr, "[UNIX] Invalid message: too short\n");
+        return;
+    }
+
+    uint8_t dest_addr = buffer[0];
+    uint8_t ttl = buffer[1];
+    uint8_t *payload = (uint8_t *)&buffer[2];
+    size_t payload_length = bytes_read - 2;
+
+    if (debug_mode) {
+        printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
+               client_fd, sdu_type, dest_addr, ttl, payload_length);
+    }
+
+    // Slå opp MAC i ARP-cache og send eller kølegg
+    unsigned char mac[6];
+    if (arp_lookup(dest_addr, mac)) {
+        size_t pdu_len;
+        uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
+                                     sdu_type, payload, payload_length, &pdu_len);
+        send_pdu(raw_sock, pdu, pdu_len, mac);
+        free(pdu);
+    } else {
+             // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
+        // unsigned char fake_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, dest_addr};
+        // arp_update(dest_addr, fake_mac);
+
+        // printf("[DEBUG][TEST] Ingen ARP entry for MIP %d → lagt inn fake MAC\n", dest_addr);
+
+        // Hent den rett etterpå som normalt
+        if (arp_lookup(dest_addr, mac)) {
+            size_t pdu_len;
+            uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, 4, sdu_type, payload, payload_length, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, mac);
+            free(pdu);
+        }
+        else {
+            queue_message(dest_addr, sdu_type, payload, payload_length);
+            send_arp_request(raw_sock, dest_addr, my_mip_address);
+        }
+    }
+}
+
+
+void handle_ping_server_message(int client, char *buffer, int bytes_read) {
+
+    if (bytes_read < 2){
+        printf("[ERROR] unix msg too short");
+        return;
+    }
+
+    uint8_t src = buffer[0];
+    uint8_t ttl = buffer[1];
+    uint8_t *payload = (uint8_t *)&buffer[2];
+    size_t payload_length = bytes_read - 2;
+
+    uint8_t reply[256];
+    //bygger UNIX melding, src, ttl, payload
+    reply[0] = src;
+    reply[1] = ttl;
+    memcpy(&reply[2], payload, payload_length);
+
+    size_t total_len = payload_length + 2;
+
+    if (write(client, reply, total_len) < 0) {
+        perror("[ERROR] write to ping_server failed");
+    }
+
+    if (debug_mode) {
+        printf("[DEBUG] Sent PING to server app (src=%u ttl=%u, len=%zu)\n",
+               src, ttl, payload_length);
+    }
+
+    close(client);
+}
