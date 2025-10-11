@@ -19,7 +19,7 @@
 #include "routingd.h"
 #include "iface.h"
 #include "queue.h"
-#include "unix.c"
+#include "unix.h"
 #include "raw_handler.h"
 
 int debug_mode = 0; // debug flagg
