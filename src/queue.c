@@ -90,6 +90,11 @@ void send_pending_messages(int raw_sock, uint8_t mip_addr,
             }
 
             if (debug_mode) {
+                printf("[DEBUG][QUEUE] Kø FØR send_pending_messages():\n");
+                print_pending_queue();
+            }
+
+            if (debug_mode) {
                 printf("[DEBUG][QUEUE] send_pending_messages using slot=%d "
                        "len=%zu type=%d dest=%d\n\n",
                        i,
