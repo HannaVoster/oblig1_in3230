@@ -202,8 +202,29 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             free(pdu);
         }
         else {
-            queue_message(dest_addr, sdu_type, payload, payload_length);
-            send_arp_request(raw_sock, dest_addr, my_mip_address);
+                    // Mangler ARP til destinasjon – IKKE ARP direkte til dest (det funker ikke over flere hopp)
+            // 1) Legg meldingen i "route-wait"-kø
+            queue_routing_message(dest_addr, my_mip_address,
+                                (ttl == 0 ? 4 : ttl), // bruk 0=default => sett en fornuftig default (4)
+                                sdu_type, (uint8_t*)payload, payload_length);
+
+            // 2) Send ROUTE REQUEST til routingd for dest_addr
+            int sent = 0;
+            for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                    send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
+                    if (debug_mode)
+                        printf("[UNIX][ROUTING] Sent REQUEST for dest=%u\n", dest_addr);
+                    sent = 1;
+                    break;
+                }
+            }
+            if (!sent) {
+                printf("[UNIX][ROUTING] Ingen routingd tilkoblet — kan ikke slå opp rute.\n");
+            }
+
+            // 3) Returnér. Når RSP kommer, håndterer du det allerede lenger opp
+            return;
         }
     }
 }
