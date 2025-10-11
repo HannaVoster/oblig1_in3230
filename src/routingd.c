@@ -22,11 +22,7 @@ int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) { perror("socket"); exit(EXIT_FAILURE); }
 
-    struct sockaddr_un addr = {0};
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
-
-    // Lag en unik klientadresse for routingd (ellers kolliderer de på bind)
+    // Lag unik klientadresse (ellers kolliderer routingd-prosesser)
     struct sockaddr_un client_addr = {0};
     client_addr.sun_family = AF_UNIX;
     snprintf(client_addr.sun_path, sizeof(client_addr.sun_path), "routingd_%d.sock", getpid());
@@ -37,9 +33,25 @@ int connect_to_mipd(const char *socket_path) {
         exit(EXIT_FAILURE);
     }
 
-    // Nå kobler vi til serveren (mipd)
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("connect");
+    // Forsøk å koble til lokal MIP-daemon (usockA–usockE)
+    struct sockaddr_un addr = {0};
+    addr.sun_family = AF_UNIX;
+    const char *sockets[] = {"usockA", "usockB", "usockC", "usockD", "usockE"};
+    int connected = 0;
+    const char *connected_sock = NULL;
+
+    for (int i = 0; i < 5; i++) {
+        strncpy(addr.sun_path, sockets[i], sizeof(addr.sun_path) - 1);
+        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            connected = 1;
+            connected_sock = sockets[i];
+            printf("[ROUTINGD] Connected to %s\n", sockets[i]);
+            break;
+        }
+    }
+
+    if (!connected) {
+        fprintf(stderr, "[ROUTINGD] Could not connect to any local MIP socket\n");
         close(sock);
         exit(EXIT_FAILURE);
     }
@@ -51,9 +63,10 @@ int connect_to_mipd(const char *socket_path) {
         exit(EXIT_FAILURE);
     }
 
-    printf("[ROUTINGD] Connected and registered to %s (SDU=0x04)\n", socket_path);
+    printf("[ROUTINGD] Connected and registered to %s (SDU=0x04)\n", connected_sock);
     return sock;
 }
+
 
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
