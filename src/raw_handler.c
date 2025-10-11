@@ -127,6 +127,8 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
         case SDU_TYPE_PING: {
+            printf("[DEBUG][PING] På node %d: mottatt PING src=%d dest(header)=%d ultimate_dest=%d len=%zd\n",
+       my_mip_address, src, dest, sdu[0], sdu_len);
 
             uint8_t ultimate_dest = sdu[0];
 
