@@ -30,6 +30,16 @@ int connect_to_mipd(const char *socket_path) {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
+    int retries = 10;
+    while (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        if (--retries == 0) {
+            perror("[ROUTINGD] connect");
+            exit(EXIT_FAILURE);
+        }
+        printf("[ROUTINGD] Waiting for mipd socket...\n");
+        sleep(1);
+    }
+
      // Kobler til mipd sin socket
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("connect");
@@ -80,25 +90,20 @@ int main(int argc, char *argv[]){
     }
 
     int sock = connect_to_mipd(argv[1]);
+    printf("[ROUTINGD] Listening for route requests...\n");
 
     //while løkke
-    while (1)
-    {
+    while (1) {
         uint8_t buf[64];
         ssize_t length = read(sock, buf, sizeof(buf));
-        if (length > 0){
-            if(buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') { //request mld
-                handle_route_request(sock, buf, length); // sender videre 
-                printf("[ROUTINGD] sending------\n");
-            }
-            else if(length == 0){
-                printf("[ROUTINGD] Disconnected from mipd\n");
-                break;
-            }
-            else {
-                perror("read");
-                break;
-            }
+        if (length <= 0) {
+            printf("[ROUTINGD] Disconnected from mipd\n");
+            break;
+        }
+
+        if (length >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
+            printf("[ROUTINGD] Received REQUEST (dest=%u)\n", buf[5]);
+            handle_route_request(sock, buf, length);
         }
     }
      //lukker socket
