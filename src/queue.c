@@ -188,7 +188,8 @@ void queue_routing_message(uint8_t dest, uint8_t src, uint8_t ttl,
 
 
 void print_pending_queue(void) {
-    printf("[QUEUE] Status:\n");
+    int empty = 1;
+    printf("Status:\n");
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid) {
             printf("  slot=%d → dest=%d len=%zu type=%d\n",
@@ -196,6 +197,10 @@ void print_pending_queue(void) {
                    pending_queue[i].dest_mip,
                    pending_queue[i].length,
                    pending_queue[i].sdu_type);
+            empty = 0;
         }
+    }
+    if(empty){
+        printf("EMPTY PENDING QUEUE");
     }
 }
