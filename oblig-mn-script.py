@@ -81,11 +81,14 @@ class Oblig(Topo):
 
     def __init__(self):
         Topo.__init__(self)
+        
+        # Arbeidskatalog der bin/ ligger
+        workdir = "/home/debian/oblig1_in3230"
 
-        # Lag 3 hosts: A, B og C
-        A = self.addHost('A')
-        B = self.addHost('B')
-        C = self.addHost('C')
+        # Lag 3 hosts: A, B og C, med riktig arbeidskatalog
+        A = self.addHost('A', cwd=workdir)
+        B = self.addHost('B', cwd=workdir)
+        C = self.addHost('C', cwd=workdir)
 
         # Linker: A-B og B-C
         self.addLink(A, B, bw=10, delay='10ms', loss=0.0, use_tbf=False)
