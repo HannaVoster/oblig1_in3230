@@ -84,34 +84,56 @@ void handle_route_request(int sock, uint8_t *msg, ssize_t length){
 void handle_hello(){}
 void handle_update(){}
 
-int main(int argc, char *argv[]){
-    if (argc != 2){
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <unix_socket_path>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    wait_for_socket(argv[1]);
+    const char *socket_path = argv[1];
+    printf("[ROUTINGD] Starting with socket path: %s\n", socket_path);
 
-    int sock = connect_to_mipd(argv[1]);
+    // Vent på at mipd oppretter UNIX-socketen
+    wait_for_socket(socket_path);
+    printf("[ROUTINGD] Socket %s er nå tilgjengelig, kobler til...\n", socket_path);
+
+    int sock = connect_to_mipd(socket_path);
+    if (sock < 0) {
+        fprintf(stderr, "[ROUTINGD] Klarte ikke å koble til %s\n", socket_path);
+        exit(EXIT_FAILURE);
+    }
+
     printf("[ROUTINGD] Listening for route requests...\n");
 
-    //while løkke
+    // Hovedløkke for å håndtere meldinger fra mipd
     while (1) {
         uint8_t buf[64];
         ssize_t length = read(sock, buf, sizeof(buf));
-        if (length <= 0) {
+
+        if (length < 0) {
+            perror("[ROUTINGD] read");
+            break;
+        } else if (length == 0) {
             printf("[ROUTINGD] Disconnected from mipd\n");
             break;
         }
 
+        // Debug: vis hva som kom inn
+        printf("[ROUTINGD] Received %zd bytes: [%02X %02X %02X %02X %02X %02X]\n",
+               length, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+
+        // Sjekk for ROUTE REQUEST
         if (length >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
             printf("[ROUTINGD] Received REQUEST (dest=%u)\n", buf[5]);
             handle_route_request(sock, buf, length);
         }
     }
-     //lukker socket
+
     close(sock);
+    printf("[ROUTINGD] Shutting down.\n");
     return 0;
 }
+
 
 #include <sys/stat.h>
 #include <unistd.h>

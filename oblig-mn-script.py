@@ -119,8 +119,9 @@ def init_oblig(self, line):
 
     time.sleep(1)
 
-    print("*** Starter ping_server på B")
-    B.cmd("./bin/ping_server usockB &")
+    print("*** Starter routingd på B")
+    B.cmd("./bin/routingd usockB > routingd.log 2>&1 &")
+
 
     time.sleep(1)
 
