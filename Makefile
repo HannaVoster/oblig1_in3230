@@ -7,7 +7,8 @@ SRC_DIR = src
 BIN_DIR = bin
 
 # Programmer
-TARGETS = $(BIN_DIR)/mipd $(BIN_DIR)/ping_client $(BIN_DIR)/ping_server
+TARGETS = $(BIN_DIR)/mipd $(BIN_DIR)/ping_client $(BIN_DIR)/ping_server $(BIN_DIR)/routingd
+
 
 # Standardregel
 all: $(TARGETS)
