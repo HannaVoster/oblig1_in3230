@@ -18,35 +18,32 @@ gi en route respons
 #include "routingd.h"
 #include "arp.h"
 
-int connect_to_mipd(const char *socket_path) {
- 
+iint connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (sock < 0) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
-    // Setter opp adresse-strukturen for å koble til socketen
+    if (sock < 0) { perror("socket"); exit(EXIT_FAILURE); }
+
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
-    int retries = 10;
-    while (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        if (--retries == 0) {
-            perror("[ROUTINGD] connect");
-            exit(EXIT_FAILURE);
-        }
-        printf("[ROUTINGD] Waiting for mipd socket...\n");
-        sleep(1);
-    }
-
-     // Kobler til mipd sin socket
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("connect");
+    // Lag en unik klientadresse for routingd (ellers kolliderer de på bind)
+    struct sockaddr_un client_addr = {0};
+    client_addr.sun_family = AF_UNIX;
+    snprintf(client_addr.sun_path, sizeof(client_addr.sun_path), "routingd_%d.sock", getpid());
+    unlink(client_addr.sun_path);
+    if (bind(sock, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0) {
+        perror("bind client");
+        close(sock);
         exit(EXIT_FAILURE);
     }
 
-    //SENDER SDU TYPE VED OPPSTART, for å vise at vi er en routing klinet med sdu_type 0x04
+    // Nå kobler vi til serveren (mipd)
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("connect");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
     uint8_t sdu_type = SDU_TYPE_ROUTING;
     if (write(sock, &sdu_type, 1) != 1) {
         perror("register sdu_type");
@@ -57,6 +54,7 @@ int connect_to_mipd(const char *socket_path) {
     printf("[ROUTINGD] Connected and registered to %s (SDU=0x04)\n", socket_path);
     return sock;
 }
+
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
     uint8_t rsp[6] = { my_address, 0, 'R', 'S', 'P', next }; //etter format fra oppgaven
