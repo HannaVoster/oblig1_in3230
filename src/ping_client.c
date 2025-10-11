@@ -60,14 +60,16 @@ int main(int argc, char *argv[]) {
     char buf[BUF_SIZE];
     buf[0] = dest_host;
     buf[1] = ttl;
-    snprintf((char*)&buf[2], BUF_SIZE - 2, "PING:%s", message);
+    buf[2] = dest_host; 
+    snprintf((char*)&buf[3], BUF_SIZE - 3, "PING:%s", message);
 
     // Ta starttidspunkt (for RTT-måling)
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
     // Send melding til mipd
-    if (write(sock, buf, 1 + strlen((char*)&buf[2])) < 0) {
+    size_t msg_len = 2 + 1 + strlen((char*)&buf[3]); // header + 1 byte + tekst
+    if (write(sock, buf, msg_len) < 0) {
         perror("write");
         close(sock);
         return 1;
