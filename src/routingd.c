@@ -18,7 +18,7 @@ gi en route respons
 #include "routingd.h"
 #include "arp.h"
 
-iint connect_to_mipd(const char *socket_path) {
+int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) { perror("socket"); exit(EXIT_FAILURE); }
 
