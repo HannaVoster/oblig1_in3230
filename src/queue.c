@@ -201,6 +201,6 @@ void print_pending_queue(void) {
         }
     }
     if(empty){
-        printf("EMPTY PENDING QUEUE");
+        printf("EMPTY PENDING QUEUE\n");
     }
 }
