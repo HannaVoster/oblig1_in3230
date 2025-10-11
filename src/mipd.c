@@ -86,6 +86,21 @@ int main(int argc, char *argv[]) {
 
     //lager sockets
     int unix_sock = create_unix_socket(socket_path); //lytte socket
+
+    // Start routingd hvis MIP-adressen tilsvarer router-noden (for eksempel 20)
+    if (my_mip_address == 20) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            // Barneprosess: start routingd
+            execl("./bin/routingd", "./bin/routingd", socket_path, (char *)NULL);
+            perror("execl routingd");
+            exit(EXIT_FAILURE);
+        } else if (pid > 0) {
+            printf("[MIPD] Started routing daemon (PID=%d)\n", pid);
+        } else {
+            perror("fork routingd");
+        }
+    }
     int raw_sock = create_raw_socket();
 
     // oppretter en epoll instans
