@@ -63,7 +63,7 @@ void handle_route_request(int sock, uint8_t *msg, ssize_t length){
     }
 
     uint8_t my_address = msg[0];
-    uint8_t dest = msg[5];
+    //uint8_t dest = msg[5];
 
     /* Dummy next hop  */
     uint8_t next = 20;
