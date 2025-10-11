@@ -26,8 +26,6 @@ int last_unix_client_fd = -1; // siste unix klient
 int last_ping_src = -1;
 int my_mip_address = -1; // min mip addresse
 
-pending_entry pending_queue[MAX_PENDING] = {0}; // kø av meldinger
-
 
 
 #endif

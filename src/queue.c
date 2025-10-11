@@ -12,6 +12,7 @@
 #include "arp.h"
 
 route_wait route_wait_queue[MAX_ROUTE_WAIT];
+pending_entry pending_queue[MAX_PENDING];
 
 /*
 Legg melding i pending-kø dersom mottakers addresse er ukjent
