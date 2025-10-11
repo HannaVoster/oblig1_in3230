@@ -9,6 +9,7 @@
 #include "pdu.h"       
 #include "iface.h"      
 #include "queue.h"
+#include "arp.h"
 
 route_wait route_wait_queue[MAX_ROUTE_WAIT];
 
