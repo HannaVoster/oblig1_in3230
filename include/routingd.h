@@ -18,6 +18,7 @@
 void handle_route_request(int sock, uint8_t *msg, ssize_t length);
 void send_route_response(int sock, uint8_t my_address, uint8_t next);
 int connect_to_mipd(const char *socket_path);
+void wait_for_socket(const char *path);
 
 void handle_hello();
 void handle_update();

@@ -89,6 +89,8 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
+    wait_for_socket(argv[1]);
+
     int sock = connect_to_mipd(argv[1]);
     printf("[ROUTINGD] Listening for route requests...\n");
 
@@ -110,5 +112,21 @@ int main(int argc, char *argv[]){
     close(sock);
     return 0;
 }
+
+#include <sys/stat.h>
+#include <unistd.h>
+
+void wait_for_socket(const char *path) {
+    struct stat sb;
+    int tries = 0;
+    while (stat(path, &sb) != 0) {
+        if (tries++ > 50) {
+            fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
+            exit(EXIT_FAILURE);
+        }
+        usleep(100000); // 0.1 sek
+    }
+}
+
    
 
