@@ -52,7 +52,7 @@ def init_he1(self, line):
     for n in nodes.keys():
         node = net.get(n)
         sock = f"/tmp/usock{n}"
-        node.cmd(f"./bin/routingd {sock} > routingd_{n}.log 2>&1 &")
+        node.cmd(f"./bin/mipd -d {sock} {mip} > mipd_{n}.log 2>&1 &")
         print(f"Started routingd on {n}")
 
     time.sleep(3)
