@@ -119,12 +119,6 @@ def init_oblig(self, line):
 
     time.sleep(1)
 
-    print("*** Starter routingd på B")
-    B.cmd("./bin/routingd usockB > routingd.log 2>&1 &")
-
-
-    time.sleep(1)
-
     print("*** Kjører ping_client fra A → B (20)")
     print(A.cmd("./bin/ping_client usockA \"Hello IN3230\" 20"))
 
