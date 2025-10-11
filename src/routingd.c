@@ -16,6 +16,7 @@ gi en route respons
 #include <unistd.h>
 
 #include "routingd.h"
+#include "arp.h"
 
 int connect_to_mipd(const char *socket_path) {
  
