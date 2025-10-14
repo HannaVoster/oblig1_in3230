@@ -22,6 +22,9 @@ gi en route respons
 #include "arp.h"
 
 neighbor neighbors[MAX_NEIGHBORS];
+rt_entry routing_table[MAX_ROUTES];   
+uint8_t MY_MIP = 0;
+int ROUTING_SOCK = -1;
 
 int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -175,7 +178,7 @@ void wait_for_socket(const char *path) {
 }
 
 
-static uint64_t now_ms(void) {
+uint64_t now_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec/1000000;
 }
@@ -185,7 +188,7 @@ static uint64_t now_ms(void) {
 //leter etter en nabo med en gitt mip addresse, og returnerer naboens index i nabolisten
 //hvis naboen ikke finnes, sjekkes nabolisten og noden legges til som en ny entry
 //håndterer også tilfelle der tabellen er full og returnerer -1
-static int find_or_add_neighbor(uint8_t mip){
+int find_or_add_neighbor(uint8_t mip){
     for (int i = 0; i < MAX_NEIGHBORS; i++) {
         if (neighbors[i].mip == mip) {
             return i;
@@ -209,7 +212,7 @@ static int find_or_add_neighbor(uint8_t mip){
 //går igjennom routing_table og returnerer indexen til dest hvis dest finnes
 //p den måten kan deamonen sjekke at en rute er der før den sender en response om next hop
 //hvis dest ikke funnes, returneres -1 . ingen repsonse sendes
-static int get_route(uint8_t dest) {
+int get_route(uint8_t dest) {
     for (int i = 0; i < MAX_ROUTES; i++) {
         if (routing_table[i].dest == dest){
             return i;
@@ -221,7 +224,7 @@ static int get_route(uint8_t dest) {
 
 
 //metode til å oppdattere eller lage en ny rute
-static int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
+int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
     int id = get_route(dest);
     if (id > 0) { //ingen rute - lag ny
         for (int i = 0; i < MAX_ROUTES; i++){
@@ -243,7 +246,7 @@ static int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cos
 }
 
 //generisk metode til å kommuniserer med MIPD over unix socket
-static int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len) {
+int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len) {
     uint8_t buf[256];
     if (len + 2 > sizeof(buf)) return -1;
     buf[0] = dest; 
@@ -254,7 +257,7 @@ static int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t
 
 
 //metode som sender HELLO meldinger 
-static void hello(void){
+void hello(void){
     uint8_t hello = RT_MSG_HELLO;
     send_unix_message(255, 1, &hello, 1);
 }
