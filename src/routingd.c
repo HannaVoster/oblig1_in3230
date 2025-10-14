@@ -145,16 +145,19 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // Debug: vis hva som kom inn
-        printf("[ROUTINGD] Received %zd bytes: [%02X %02X %02X %02X %02X %02X]\n",
-               length, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
-
-        // Sjekk for ROUTE REQUEST
         if (length >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
+            // ROUTE REQUEST fra mipd
             printf("[ROUTINGD] Received REQUEST (dest=%u)\n", buf[5]);
             handle_route_request(ROUTING_SOCK, buf, length);
+        } 
+        else {
+            // Ellers er det en routingmelding (HELLO/UPDATE)
+            uint8_t from = buf[0];
+            uint8_t msg_type = buf[1];
+            handle_incoming_message(from, msg_type, &buf[2], length - 2);
         }
     }
+
 
     close(ROUTING_SOCK);
     printf("[ROUTINGD] Shutting down.\n");
