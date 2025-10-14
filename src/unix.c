@@ -140,7 +140,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
                     if (arp_lookup(next, mac)) {
                         //treff - addressen finnes - bygg og send pdu
                         size_t new_pdu_length;
-                        uint8_t *new_pdu = mip_build_pdu(next, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
+                        uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
                         send_pdu(raw_sock, new_pdu, new_pdu_length, mac);
                         free(new_pdu);
                         printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
