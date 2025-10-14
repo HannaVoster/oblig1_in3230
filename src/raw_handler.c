@@ -98,35 +98,64 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return;
     }
 
-    if (dest != my_mip_address && dest != 255) { //255 = broadcast
-        // ikke til meg og ikke broadcast - FORWARD PAKKEN  
-        if (ttl <= 1) {
-            if(debug_mode) printf("[DEBUG][FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
-            return;
-        }
-        //justerer ttl før den forwardes
-        uint8_t ttl_new = ttl - 1;
+    // if (dest != my_mip_address && dest != 255) { //255 = broadcast
+    //     // ikke til meg og ikke broadcast - FORWARD PAKKEN  
+    //     if (ttl <= 1) {
+    //         if(debug_mode) printf("[DEBUG][FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
+    //         return;
+    //     }
+    //     //justerer ttl før den forwardes
+    //     uint8_t ttl_new = ttl - 1;
 
-        if (debug_mode) {
-            printf("[DEBUG][RAW][FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
-               dest, src, ttl, ttl_new);
-        }
+    //     if (debug_mode) {
+    //         printf("[DEBUG][RAW][FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
+    //            dest, src, ttl, ttl_new);
+    //     }
 
-        queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
+    //     queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
 
-        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-            if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
-                send_route_request(unix_clients[i].fd, my_mip_address, dest);
-                break;
-            }
-        }
-        if(debug_mode) printf("[DEBUG][RAW][FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
-        return;
-    }
+    //     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+    //         if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+    //             send_route_request(unix_clients[i].fd, my_mip_address, dest);
+    //             break;
+    //         }
+    //     }
+    //     if(debug_mode) printf("[DEBUG][RAW][FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
+    //     return;
+    // }
 
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
         case SDU_TYPE_PING: {
+            printf("[DEBUG][PING] dest=%d my=%d ttl=%d — %s\n",
+            dest, my_mip_address, ttl,
+            (dest == my_mip_address) ? "LOCAL" : "FORWARD");
+
+            if (dest != my_mip_address && dest != 255) { //255 = broadcast
+        // ikke til meg og ikke broadcast - FORWARD PAKKEN  
+                if (ttl <= 1) {
+                    if(debug_mode) printf("[DEBUG][FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
+                    return;
+                }
+                //justerer ttl før den forwardes
+                uint8_t ttl_new = ttl - 1;
+
+                if (debug_mode) {
+                    printf("[DEBUG][RAW][FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
+                    dest, src, ttl, ttl_new);
+                }
+
+                queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
+
+                for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                    if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                        send_route_request(unix_clients[i].fd, my_mip_address, dest);
+                        break;
+                    }
+                }
+                if(debug_mode) printf("[DEBUG][RAW][FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
+                return;
+            }
            
             printf("[RAW] PING mottatt fra MIP %u\n\n", src);
 

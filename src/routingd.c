@@ -92,7 +92,7 @@ void handle_route_request(int sock, uint8_t *msg, ssize_t length){
     //uint8_t dest = msg[5];
 
     /* Dummy next hop  */
-    uint8_t next = 20;
+    uint8_t next = 30;
     send_route_response(sock, my_address, next);
 
 }
