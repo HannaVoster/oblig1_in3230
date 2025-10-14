@@ -169,7 +169,7 @@ void queue_routing_message(uint8_t ultimate_dest, uint8_t src, uint8_t ttl,
             return;
         }
     }
-    printf("[WARNING] route_wait_queue is full, dropping packet (dest=%d)\n", dest);
+    printf("[WARNING] route_wait_queue is full, dropping packet (dest=%d)\n", ultimate_dest);
 }
 
 
@@ -180,7 +180,7 @@ void print_pending_queue(void) {
         if (pending_queue[i].valid) {
             printf("  slot=%d → dest=%d len=%zu type=%d\n",
                    i,
-                   pending_queue[i].dest_mip,
+                   pending_queue[i].ultimate_dest,
                    pending_queue[i].length,
                    pending_queue[i].sdu_type);
             empty = 0;
