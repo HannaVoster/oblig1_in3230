@@ -37,14 +37,13 @@ typedef struct {
     int valid;
 } neighbor;
 
-#define MAX_ROUTES   64
 #define MAX_NEIGHBORS 16 //begrenset av størrelsen på nettet
 
-static rt_entry  routing_table[MAX_ROUTES];
-static neighbor  neighbors[MAX_NEIGHBORS];
+extern rt_entry  routing_table[MAX_ROUTES];
+extern neighbor  neighbors[MAX_NEIGHBORS];
 
-static uint8_t MY_MIP = 0;   // sett fra argv (samme som du sender i REQUEST/RESPONSE)
-static int ROUTING_SOCK = -1; // SOCK_SEQPACKET til mipd
+extern uint8_t MY_MIP = 0;   // sett fra argv (samme som du sender i REQUEST/RESPONSE)
+extern int ROUTING_SOCK = -1; // SOCK_SEQPACKET til mipd
 
 //extern routing_entry routing_table[MAX_ROUTES];
 
@@ -56,5 +55,12 @@ void wait_for_socket(const char *path);
 
 void handle_hello();
 void handle_update();
+
+static void hello(void);
+static int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len);
+static int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost);
+static int get_route(uint8_t dest);
+static int find_or_add_neighbor(uint8_t mip);
+static uint64_t now_ms(void);
 
 #endif
