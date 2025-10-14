@@ -23,8 +23,8 @@
 #include "raw_handler.h"
 
 int debug_mode = 0; // debug flagg
-int last_unix_client_fd = -1; // siste unix klient
-int last_ping_src = -1;
+//int last_unix_client_fd = -1; // siste unix klient
+//int last_ping_src = -1;
 int my_mip_address = -1; // min mip addresse
 
 /*

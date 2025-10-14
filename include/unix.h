@@ -20,7 +20,5 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address);
 void handle_ping_server_message(int client, char *buffer, int bytes_read);
 
 void handle_route_repsonse(int raw_sock, uint8_t next);
-void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str) {
-    unsigned char broadcast_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
-
+void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str);
 #endif
