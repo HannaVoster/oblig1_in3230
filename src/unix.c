@@ -111,54 +111,25 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     }
 
     if (sdu_type == SDU_TYPE_ROUTING) {
-        //sjekker om noen av pakkene i kø har samme dest og trenger neste hopp?
-        if (bytes_read >= 6 && buffer[2] == 'R' && buffer[3] == 'S' && buffer[4] == 'P') {
-            uint8_t next = buffer[5]; 
-            printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
+        uint8_t ttl = buffer[1];
+        uint8_t *payload = &buffer[2];
+        size_t len = bytes_read - 2;
 
-            //sjekker of next = 255 for da er ingen rute funnet
-            if (next == 255) {
-                printf("[ROUTING] Ingen rute funnet — dropper pakke.\n");
+        //index 0 i payload viser hvilket intern sdu type routing deamonen satt
+        uint8_t routing_type = payload[0];
+
+        switch(routing_type){
+            case 0x01:
+                send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
                 return;
-            }
 
-            //går igjennom køen av finner første pakke i kø
-            //oppgaven sier at routing deamon skal håndtere pakker i rekkefølgen de kommer i
-            //så første gyldige pakke i køen vil være den svaret gjelder for
-            for (int i = 0; i < MAX_ROUTE_WAIT; i++){
-                if (route_wait_queue[i].valid) {
-                    //lagrer verdiene for pakken som skal sendes
-                    uint8_t dest = route_wait_queue[i].ultimate_dest;
-                    uint8_t src = route_wait_queue[i].src;
-                    uint8_t ttl = route_wait_queue[i].ttl;
-                    uint8_t sdu_type = route_wait_queue[i].sdu_type;
-                    uint8_t *sdu = route_wait_queue[i].sdu;
-                    size_t sdu_len = route_wait_queue[i].sdu_len;
-                    
-                    //sjekker i arp tabellen om vi har addressen til neste
-                    unsigned char mac[6];
-                    if (arp_lookup(next, mac)) {
-                        //treff - addressen finnes - bygg og send pdu
-                        size_t new_pdu_length;
-                        uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
-                        send_pdu(raw_sock, new_pdu, new_pdu_length, mac);
-                        free(new_pdu);
-                        printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
-                           next, dest);
-                    }
-                    //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
-                    else{
-                        printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
-                        queue_message(dest, next, src, ttl, sdu_type, sdu, sdu_len);
-                        send_arp_request(raw_sock, next, my_mip_address);
-                    }
-
-                    free(route_wait_queue[i].sdu);
-                    route_wait_queue[i].valid = 0;
-                    return;
-                }
-            }
-            printf("[ROUTING] Ingen ventende pakker — ignorerer RESPONSE.\n");
+            case 0x02:
+                send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
+                return;
+            
+            case 'R':
+                uint8_t next = buffer[5];
+                handle_route_response(raw_sock, next);
         }
         return;
     }
@@ -255,3 +226,64 @@ void handle_ping_server_message(int client, char *buffer, int bytes_read) {
 
     close(client);
 }
+
+void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str) {
+    unsigned char broadcast_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
+
+    size_t pdu_len;
+    uint8_t *pdu = mip_build_pdu(255, my_mip, 1, SDU_TYPE_ROUTING, payload, len, &pdu_len);
+    send_pdu(raw_sock, pdu, pdu_len, broadcast_mac);
+
+    printf("[MIPD][ROUTING] Sendte %s broadcast (len=%zu)\n", type_str, len);
+
+    free(pdu);
+}
+
+void handle_route_repsonse(int raw_sock, uint8_t next){
+
+    printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
+    //sjekker of next = 255 for da er ingen rute funnet
+    if (next == 255) {
+        printf("[ROUTING] Ingen rute funnet — dropper pakke.\n");
+        return;
+    }
+
+    //går igjennom køen av finner første pakke i kø
+    //oppgaven sier at routing deamon skal håndtere pakker i rekkefølgen de kommer i
+    //så første gyldige pakke i køen vil være den svaret gjelder for
+    for (int i = 0; i < MAX_ROUTE_WAIT; i++){
+        if (route_wait_queue[i].valid) {
+            //lagrer verdiene for pakken som skal sendes
+            uint8_t dest = route_wait_queue[i].ultimate_dest;
+            uint8_t src = route_wait_queue[i].src;
+            uint8_t ttl = route_wait_queue[i].ttl;
+            uint8_t sdu_type = route_wait_queue[i].sdu_type;
+            uint8_t *sdu = route_wait_queue[i].sdu;
+            size_t sdu_len = route_wait_queue[i].sdu_len;
+            
+            //sjekker i arp tabellen om vi har addressen til neste
+            unsigned char mac[6];
+            if (arp_lookup(next, mac)) {
+                //treff - addressen finnes - bygg og send pdu
+                size_t new_pdu_length;
+                uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
+                send_pdu(raw_sock, new_pdu, new_pdu_length, mac);
+                free(new_pdu);
+                printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
+                    next, dest);
+            }
+            //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
+            else{
+                printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
+                queue_message(dest, next, src, ttl, sdu_type, sdu, sdu_len);
+                send_arp_request(raw_sock, next, my_mip_address);
+            }
+
+            free(route_wait_queue[i].sdu);
+            route_wait_queue[i].valid = 0;
+            return;
+        }
+    }
+    printf("[ROUTING] Ingen ventende pakker — ignorerer RESPONSE.\n");
+}
+

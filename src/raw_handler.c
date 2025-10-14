@@ -98,34 +98,50 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         return;
     }
 
-    // if (dest != my_mip_address && dest != 255) { //255 = broadcast
-    //     // ikke til meg og ikke broadcast - FORWARD PAKKEN  
-    //     if (ttl <= 1) {
-    //         if(debug_mode) printf("[DEBUG][FWD] Dropper pakke til %d (TTL utløpt)\n", dest);
-    //         return;
-    //     }
-    //     //justerer ttl før den forwardes
-    //     uint8_t ttl_new = ttl - 1;
-
-    //     if (debug_mode) {
-    //         printf("[DEBUG][RAW][FWD] Routing lookup: dest=%d, src=%d, ttl=%d→%d\n",
-    //            dest, src, ttl, ttl_new);
-    //     }
-
-    //     queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
-
-    //     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-    //         if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
-    //             send_route_request(unix_clients[i].fd, my_mip_address, dest);
-    //             break;
-    //         }
-    //     }
-    //     if(debug_mode) printf("[DEBUG][RAW][FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
-    //     return;
-    // }
 
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
+        case SDU_TYPE_ROUTING: {
+            uint8_t rt_type = sdu[0];
+
+            if (debug_mode) {
+                printf("[DEBUG][ROUTING] Mottatt SDU_TYPE_ROUTING fra %d, type=0x%02X\n", src, rt_type);
+            }
+
+            switch (rt_type) {
+            case 0x01: // HELLO
+            case 0x02: // UPDATE
+            {
+                // Bygg buffer for å sende OPP til routingd
+                uint8_t up_buf[256];
+                up_buf[0] = src; // legg inn hvem meldingen kom fra
+                memcpy(&up_buf[1], sdu, sdu_len);
+
+                // Send via UNIX til routingd (din egen routingd-prosess)
+                for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                    if (unix_clients[i].active &&
+                        unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+
+                        write(unix_clients[i].fd, up_buf, sdu_len + 1);
+                        if (debug_mode)
+                            printf("[DEBUG][ROUTING] Sendte HELLO/UPDATE opp til routingd (fra %d)\n", src);
+                        break;
+                    }
+                }
+                break;
+            }
+
+            default:
+                if (debug_mode)
+                    printf("[DEBUG][ROUTING] Ukjent routing-type 0x%02X — ignorerer\n", rt_type);
+                break;
+        
+
+             // ⚠️ VIKTIG: avslutt dette caset, slik at du IKKE faller videre ned i PING:
+            }
+            return;
+        }
+
         case SDU_TYPE_PING: {
             printf("[DEBUG][PING] dest=%d my=%d ttl=%d — %s\n",
             dest, my_mip_address, ttl,
@@ -177,6 +193,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             }
             break;
         }
+        
 
         case SDU_TYPE_PONG: {
             // Mottatt et PONG-svar fra en node vi tidligere sendte en PING til

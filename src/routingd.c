@@ -14,9 +14,14 @@ gi en route respons
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
+
 
 #include "routingd.h"
 #include "arp.h"
+
+neighbor neighbors[MAX_NEIGHBORS];
 
 int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -72,6 +77,9 @@ int connect_to_mipd(const char *socket_path) {
     return sock;
 }
 
+// int idx = find_route(50);
+// if (idx >= 0)
+//     send_route_response(sock, MY_MIP, rtable[idx].next_hop);
 
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
@@ -113,8 +121,8 @@ int main(int argc, char *argv[]) {
     wait_for_socket(socket_path);
     printf("[ROUTINGD] Socket %s er nå tilgjengelig, kobler til...\n", socket_path);
 
-    int sock = connect_to_mipd(socket_path);
-    if (sock < 0) {
+    int ROUTING_SOCK = connect_to_mipd(socket_path);
+    if (ROUTING_SOCK < 0) {
         fprintf(stderr, "[ROUTINGD] Klarte ikke å koble til %s\n", socket_path);
         exit(EXIT_FAILURE);
     }
@@ -124,7 +132,7 @@ int main(int argc, char *argv[]) {
     // Hovedløkke for å håndtere meldinger fra mipd
     while (1) {
         uint8_t buf[64];
-        ssize_t length = read(sock, buf, sizeof(buf));
+        ssize_t length = read(ROUTING_SOCK, buf, sizeof(buf));
 
         if (length < 0) {
             perror("[ROUTINGD] read");
@@ -141,11 +149,11 @@ int main(int argc, char *argv[]) {
         // Sjekk for ROUTE REQUEST
         if (length >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
             printf("[ROUTINGD] Received REQUEST (dest=%u)\n", buf[5]);
-            handle_route_request(sock, buf, length);
+            handle_route_request(ROUTING_SOCK, buf, length);
         }
     }
 
-    close(sock);
+    close(ROUTING_SOCK);
     printf("[ROUTINGD] Shutting down.\n");
     return 0;
 }
@@ -166,5 +174,88 @@ void wait_for_socket(const char *path) {
     }
 }
 
-   
+
+static uint64_t now_ms(void) {
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec/1000000;
+}
+
+
+//metode til å oppdage naboer med HELLO
+//leter etter en nabo med en gitt mip addresse, og returnerer naboens index i nabolisten
+//hvis naboen ikke finnes, sjekkes nabolisten og noden legges til som en ny entry
+//håndterer også tilfelle der tabellen er full og returnerer -1
+static int find_or_add_neighbor(uint8_t mip){
+    for (int i = 0; i < MAX_NEIGHBORS; i++) {
+        if (neighbors[i].mip == mip) {
+            return i;
+        }
+    }
+    //hvis vi kommer hit - ikke funnet - legg til på ledig plass
+    for (int i = 0; i < MAX_NEIGHBORS; i++) {
+        if(!neighbors[i].valid) {
+            neighbors[i].mip = mip;
+            neighbors[i].valid = 1;
+            neighbors[i].last_hello_ms = now_ms(); //noterer tiden naboen ble registrert
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+
+//metode til å finne en lagret rute
+//går igjennom routing_table og returnerer indexen til dest hvis dest finnes
+//p den måten kan deamonen sjekke at en rute er der før den sender en response om next hop
+//hvis dest ikke funnes, returneres -1 . ingen repsonse sendes
+static int get_route(uint8_t dest) {
+    for (int i = 0; i < MAX_ROUTES; i++) {
+        if (routing_table[i].dest == dest){
+            return i;
+        }
+    }
+    return -1; //ingen rute
+}
+
+
+
+//metode til å oppdattere eller lage en ny rute
+static int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
+    int id = get_route(dest);
+    if (id > 0) { //ingen rute - lag ny
+        for (int i = 0; i < MAX_ROUTES; i++){
+            if(!routing_table[i].valid){
+                id = i;
+                break;
+            }
+        }
+        if (id < 0) return -1; //ingen plass
+
+        routing_table[id].valid = 1;
+        routing_table[id].dest = dest;
+    }
+    //oppdatterer uansett - med neste hopp, kostnad og siste tidspunkt for oppdattering
+    routing_table[id].next_hop = next_hop;
+    routing_table[id].cost = cost;
+    routing_table[id].updated_ms = now_ms();
+    return id;
+}
+
+//generisk metode til å kommuniserer med MIPD over unix socket
+static int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len) {
+    uint8_t buf[256];
+    if (len + 2 > sizeof(buf)) return -1;
+    buf[0] = dest; 
+    buf[1] = ttl; 
+    memcpy(&buf[2], data, len);
+    return write(ROUTING_SOCK, buf, len + 2);
+}
+
+
+//metode som sender HELLO meldinger 
+static void hello(void){
+    uint8_t hello = RT_MSG_HELLO;
+    send_unix_message(255, 1, &hello, 1);
+}
 
