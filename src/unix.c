@@ -239,7 +239,7 @@ void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t 
     free(pdu);
 }
 
-void handle_route_repsonse(int raw_sock, uint8_t next){
+void handle_route_response(int raw_sock, uint8_t next){
 
     printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
     //sjekker of next = 255 for da er ingen rute funnet
