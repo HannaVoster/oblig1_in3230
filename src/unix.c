@@ -128,7 +128,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             for (int i = 0; i < MAX_ROUTE_WAIT; i++){
                 if (route_wait_queue[i].valid) {
                     //lagrer verdiene for pakken som skal sendes
-                    uint8_t dest = route_wait_queue[i].dest;
+                    uint8_t dest = route_wait_queue[i].ultimate_dest;
                     uint8_t src = route_wait_queue[i].src;
                     uint8_t ttl = route_wait_queue[i].ttl;
                     uint8_t sdu_type = route_wait_queue[i].sdu_type;
@@ -149,7 +149,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
                     //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
                     else{
                         printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
-                        queue_message(next, sdu_type, sdu, sdu_len);
+                        queue_message(dest, next, src, ttl, sdu_type, sdu, sdu_len);
                         send_arp_request(raw_sock, next, my_mip_address);
                     }
 
@@ -188,12 +188,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         send_pdu(raw_sock, pdu, pdu_len, mac);
         free(pdu);
     } else {
-             // TESTMODUS: legg inn "fake" MAC så vi kan sende direkte
-        // unsigned char fake_mac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, dest_addr};
-        // arp_update(dest_addr, fake_mac);
-
-        // printf("[DEBUG][TEST] Ingen ARP entry for MIP %d → lagt inn fake MAC\n", dest_addr);
-
         // Hent den rett etterpå som normalt
         if (arp_lookup(dest_addr, mac)) {
             size_t pdu_len;
@@ -205,8 +199,8 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
                     // Mangler ARP til destinasjon – IKKE ARP direkte til dest (det funker ikke over flere hopp)
             // 1) Legg meldingen i "route-wait"-kø
             queue_routing_message(dest_addr, my_mip_address,
-                                (ttl == 0 ? 4 : ttl), // bruk 0=default => sett en fornuftig default (4)
-                                sdu_type, (uint8_t*)payload, payload_length);
+                        (ttl == 0 ? 4 : ttl), // bruk 0 som default -> TTL=4
+                        sdu_type, (uint8_t*)payload, payload_length);
 
             // 2) Send ROUTE REQUEST til routingd for dest_addr
             int sent = 0;
