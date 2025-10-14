@@ -43,7 +43,7 @@ extern rt_entry  routing_table[MAX_ROUTES];
 extern neighbor  neighbors[MAX_NEIGHBORS];
 
 extern uint8_t MY_MIP;   // sett fra argv (samme som du sender i REQUEST/RESPONSE)
-extern int ROUTING_SOCK = -1; // SOCK_SEQPACKET til mipd
+extern int ROUTING_SOCK; // SOCK_SEQPACKET til mipd
 
 //extern routing_entry routing_table[MAX_ROUTES];
 
