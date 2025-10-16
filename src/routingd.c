@@ -249,7 +249,7 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
 }
 
 //generisk metode til å kommuniserer med MIPD over unix socket
-int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len) {
+int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len) {
     uint8_t buf[256];
     if (len + 2 > sizeof(buf)) return -1;
     buf[0] = dest; 
@@ -261,7 +261,70 @@ int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len) {
 
 //metode som sender HELLO meldinger 
 void hello(void){
-    uint8_t hello = RT_MSG_HELLO;
-    send_unix_message(255, 1, &hello, 1);
+    uint8_t msg[2];
+    msg[0] = MY_MIP;
+    msg[1] = RT_MSG_HELLO;
+   
+    send_unix_message(255, 1, msg, 2);
 }
 
+void update(void){
+    uint8_t buf[256];
+    size_t pos = 0;
+    buf[pos++] = MY_MIP;
+    buf[pos++] = RT_MSG_UPDATE;
+
+    for (int i = 0; i < MAX_ROUTES; i++) {
+        if (routing_table[i].valid) {
+            buf[pos++] = routing_table[i].dest;
+            buf[pos++] = routing_table[i].cost;
+        }
+    }
+
+    send_unix_message(255, 1, buf, pos);
+    printf("[ROUTINGD] Sendte UPDATE med %zu ruter\n", pos / 2 - 1);
+}
+
+void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payload, size_t len){
+    // lager en switch basert på meldingstype 
+    switch(msg_type) {
+        case RT_MSG_HELLO: {
+            printf("[ROUTINGD] HELLO mottatt fra %d\n", from);
+
+        // Finn nabo eller legg den til
+            int id = find_or_add_neighbor(from);
+            neighbors[id].last_hello_ms = now_ms();
+            neighbors[id].valid = 1;
+
+            // Oppdater routingtabellen: direkte nabo = cost 1
+            update_or_insert_neighbor(from, from, 1);
+            break;
+        }
+
+        case RT_MSG_UPDATE: {
+            printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
+            // Oppdater naboen slik at vi vet at den lever
+            int id = find_or_add_neighbor(from);
+            neighbors[id].last_hello_ms = now_ms();
+
+            // Parse ruter: 2 bytes per (dest, cost)
+            int num_entries = len / 2;
+            for (int i = 0; i < num_entries; i++) {
+                uint8_t dest = payload[i * 2];
+                uint8_t cost = payload[i * 2 + 1];
+
+                if (dest == MY_MIP) continue; // ignorer ruter til deg selv (poison reverse)
+
+                // Oppdater routing-tabellen
+                update_or_insert_neighbor(dest, from, cost + 1);
+            }
+
+            break;
+        }
+        default: {
+            printf("[ROUTINGD] Ukjent meldingstype 0x%02X fra %d\n", msg_type, from);
+            break;
+        }
+
+    }
+}
