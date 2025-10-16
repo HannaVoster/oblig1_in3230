@@ -26,7 +26,7 @@ rt_entry routing_table[MAX_ROUTES];
 uint8_t MY_MIP = 0;
 int ROUTING_SOCK = -1;
 
-int connect_to_mipd(const char *socket_path) {
+int connect_to_mipd() {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) { perror("socket"); exit(EXIT_FAILURE); }
 

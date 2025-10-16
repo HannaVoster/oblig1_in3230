@@ -40,7 +40,7 @@ void queue_message(uint8_t ultimate_dest, uint8_t next_hop,
                    uint8_t src, uint8_t ttl,
                    uint8_t sdu_type, uint8_t *data, size_t length_bytes);
 
-void send_pending_messages(int raw_sock, uint8_t mip_addr,unsigned char *mac, int my_mip_address);
+void send_pending_messages(int raw_sock, uint8_t mip_addr,unsigned char *mac);
 
 void send_route_request(int routing_fd, uint8_t my_addr, uint8_t dest);
 

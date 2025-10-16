@@ -70,7 +70,7 @@ tar inn raw socket for å sende i send_pdu of adresse for å vite hvem som skal 
 og hvem som sender
 */
 void send_pending_messages(int raw_sock, uint8_t next_hop,
-                           unsigned char *mac, int my_mip_address)
+                           unsigned char *mac)
 {
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid && pending_queue[i].next == next_hop) {
