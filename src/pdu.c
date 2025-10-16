@@ -110,6 +110,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
 
     // Finn interfacenavnet fra ifindex
     char ifname[IFNAMSIZ];
+    unsigned char src_mac[ETH_ALEN];
     if (!if_indextoname(ifindex, ifname)) {
         perror("if_indextoname");
         return -1;
