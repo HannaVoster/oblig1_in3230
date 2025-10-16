@@ -24,13 +24,14 @@ typedef struct __attribute__((packed)) {
 typedef struct {
     uint8_t mip_addr;
     unsigned char mac[6]; //alltid 6
+    int ifindex;
     int valid;
 } arp_entry;
 
 extern arp_entry arp_cache[MAX_ARP]; 
 
 // Funksjoner for å bruke arp tabellen/vise den
-void arp_update(int mip_addr, const unsigned char *mac);
+void arp_update(int mip_addr, const unsigned char *mac, int ifindex);
 int arp_lookup(int mip_addr, unsigned char *mac_out);
 void print_arp_cache(void);
 void arp_init_cache();

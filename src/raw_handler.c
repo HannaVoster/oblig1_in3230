@@ -255,7 +255,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 // Dette er en ARP response (0x01)
                 //oppdatterer arp med mac adresse og mip
                 printf("[RAW] ARP-RESP mottatt for MIP %d\n\n", arp->mip_addr);
-                arp_update(arp->mip_addr, eh->h_source);
+                arp_update(arp->mip_addr, eh->h_source, if_index);
 
                 if (debug_mode){
                     print_arp_cache();

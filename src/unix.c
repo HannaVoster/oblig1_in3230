@@ -126,12 +126,13 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     }
 
     unsigned char mac[6];
+    int ifindex = -1;
     // 1️Sjekk om vi allerede har MAC-adressen i ARP-cache
-    if (arp_lookup(dest_addr, mac)) {
+    if (arp_lookup(dest_addr, mac, &ifindex)) {
         size_t pdu_len;
         uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
                                      sdu_type, payload, payload_length, &pdu_len);
-        send_pdu(raw_sock, pdu, pdu_len, mac);
+        send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
         free(pdu);
     } 
     else {
@@ -183,7 +184,7 @@ void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t 
 
     size_t pdu_len;
     uint8_t *pdu = mip_build_pdu(255, my_mip, 1, SDU_TYPE_ROUTING, payload, len, &pdu_len);
-    send_pdu(raw_sock, pdu, pdu_len, broadcast_mac);
+    send_pdu(raw_sock, pdu, pdu_len, broadcast_mac, -1);
 
     printf("[MIPD][ROUTING] Sendte %s broadcast (len=%zu)\n", type_str, len);
 
@@ -214,7 +215,8 @@ void handle_route_response(int raw_sock, uint8_t next){
             
             //sjekker i arp tabellen om vi har addressen til neste
             unsigned char mac[6];
-            if (arp_lookup(next, mac)) {
+            int ifindex = -1;
+            if (arp_lookup(next, mac, &ifindex)) {
                 //treff - addressen finnes - bygg og send pdu
                 size_t new_pdu_length;
                 uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);

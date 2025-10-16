@@ -7,6 +7,7 @@
 #include "mipd.h"
 #include "pdu.h"
 #include "arp.h"
+#include "iface.c"
 
 arp_entry arp_cache[MAX_ARP] = {0};
 
@@ -19,7 +20,7 @@ void arp_init_cache() {
     }
 }
 // Oppdaterer ARP-cachen med en MIP-adresse og tilhørende MAC-adresse
-void arp_update(int mip_addr, const unsigned char *mac) {
+void arp_update(int mip_addr, const unsigned char *mac, int ifindex) {
     if (!mac) return;
 
     // Gå gjennom hele ARP-cachen for å se om entry finnes fra før
@@ -27,9 +28,11 @@ void arp_update(int mip_addr, const unsigned char *mac) {
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
             // fant en eksisterende entry, oppdater MAC-adressen
             memcpy(arp_cache[i].mac, mac, 6);
-            printf("[ARP] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+            arp_cache[i].ifindex = ifindex;
+            printf("[ARP] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X if = %d\n\n",
                    mip_addr,
-                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                   ifindex);
             return;
         }
     }
@@ -39,9 +42,11 @@ void arp_update(int mip_addr, const unsigned char *mac) {
             arp_cache[i].valid = 1;
             arp_cache[i].mip_addr = mip_addr;
             memcpy(arp_cache[i].mac, mac, 6);
-            printf("[ARP] Lagt til MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+            arp_cache[i].ifindex = ifindex;
+            printf("[ARP] Lagt til MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X if = %d\n\n",
                    mip_addr,
-                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                   ifindex);
             return;
         }
     }
@@ -50,14 +55,15 @@ void arp_update(int mip_addr, const unsigned char *mac) {
 
 // Søker i ARP-cachen etter en gitt MIP-adresse
 // unsigned char *mac_out peker til bufferet hvor mac addressen eventuellt lagres
-int arp_lookup(int mip_addr, unsigned char *mac_out) {
+int arp_lookup(int mip_addr, unsigned char *mac_out, int *ifindex_out) {
     for (int i = 0; i < MAX_ARP; i++) {
         // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
             if(debug_mode){
                 printf("[DEBUG] arp_lookup FOUND for mip=%u\n\n", mip_addr);
             }
-            memcpy(mac_out, arp_cache[i].mac, 6);
+            if (mac_out) memcpy(mac_out, arp_cache[i].mac, 6);
+            if (ifindex_out) *ifindex_out = arp_cache[i].ifindex;
             return 1;
         }
     }
@@ -87,19 +93,61 @@ void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
 
     size_t arp_len;
     uint8_t *arp_pdu = mip_build_pdu(
-        0xFF,                      // broadcast dest (MIP)
-        my_mip_address,            // source = meg
-        1,                         // TTL
-        SDU_TYPE_ARP,              // type = ARP
-        (uint8_t*)&req,
+        0xFF,               // broadcast MIP-destinasjon
+        my_mip_address,     // kilde
+        1,                  // TTL = 1
+        SDU_TYPE_ARP,       // type = ARP
+        (uint8_t *)&req,
         sizeof(req),
         &arp_len
     );
 
-    unsigned char bmac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    unsigned char broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-    // Nå håndterer send_pdu() looping over alle interfaces
-    send_pdu(raw_sock, arp_pdu, arp_len, bmac);
+    // Send ARP-REQ på alle ikke-loopback interfaces
+    for (int i = 0; i < iface_count; i++) {
+        int ifindex = iface_indices[i];
+
+        char ifname[IFNAMSIZ];
+        if_indextoname(ifindex, ifname);
+        if (strncmp(ifname, "lo", 2) == 0) continue; // hopp over loopback
+
+        // Hent MAC til dette interfacet
+        unsigned char src_mac[ETH_ALEN];
+        if (get_iface_mac(ifname, src_mac) < 0) {
+            perror("get_iface_mac");
+            continue;
+        }
+
+        // Bygg Ethernet-header (du kan også gjenbruke send_pdu her)
+        struct ethhdr eh;
+        memcpy(eh.h_dest, broadcast_mac, ETH_ALEN);
+        memcpy(eh.h_source, src_mac, ETH_ALEN);
+        eh.h_proto = htons(ETH_P_MIP);
+
+        uint8_t frame[sizeof(struct ethhdr) + arp_len];
+        memcpy(frame, &eh, sizeof(struct ethhdr));
+        memcpy(frame + sizeof(struct ethhdr), arp_pdu, arp_len);
+
+        struct sockaddr_ll device = {0};
+        device.sll_family = AF_PACKET;
+        device.sll_protocol = htons(ETH_P_MIP);
+        device.sll_ifindex = ifindex;
+        device.sll_halen = ETH_ALEN;
+        memcpy(device.sll_addr, broadcast_mac, ETH_ALEN);
+
+        // Send via dette interfacet
+        int sent = sendto(raw_sock, frame,
+                          sizeof(struct ethhdr) + arp_len, 0,
+                          (struct sockaddr *)&device, sizeof(device));
+
+        if (sent < 0) {
+            perror("sendto");
+        } else if (debug_mode) {
+            printf("[DEBUG] Sent ARP-REQ for MIP %d via %s (index=%d)\n",
+                   dest_addr, ifname, ifindex);
+        }
+    }
 
     free(arp_pdu);
 }

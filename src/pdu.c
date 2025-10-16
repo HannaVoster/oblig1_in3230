@@ -92,7 +92,7 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
     return (ssize_t)sdu_bytes;
 }
 
-int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac) {
+int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac, int ifindex) {
     if (rawsocket < 0) {
         perror("rawsocket");
         exit(1);
@@ -108,50 +108,49 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         return -1;
     }
 
+    // Finn interfacenavnet fra ifindex
+    char ifname[IFNAMSIZ];
+    if_indextoname(ifindex, ifname);
+
+    // Hent MAC-adressen til dette interfacet
+    unsigned char src_mac[ETH_ALEN];
+    if (get_iface_mac(ifname, src_mac) < 0) {
+        perror("get_iface_mac");
+        free(frame);
+        return -1;
+    }
+
+    // Bygg Ethernet-header for dette interfacet
+    struct ethhdr *eh = (struct ethhdr *)frame;
+    memcpy(eh->h_dest, dest_mac, ETH_ALEN);
+    memcpy(eh->h_source, src_mac, ETH_ALEN);
+    eh->h_proto = htons(ETH_P_MIP);
+
     // Kopier MIP-PDU inn i rammen etter headeren
     memcpy(frame + sizeof(struct ethhdr), pdu, pdu_length);
 
-    // Send ut på ALLE tilgjengelige interfaces
-    for (int i = 0; i < iface_count; i++) {
-        char ifname[IFNAMSIZ];
-        if_indextoname(iface_indices[i], ifname);
+    // Sett opp sockaddr_11
+    struct sockaddr_ll device = {0};
+    device.sll_family   = AF_PACKET;
+    device.sll_protocol = htons(ETH_P_MIP);
+    device.sll_ifindex  = ifindex;
+    device.sll_halen    = ETH_ALEN;
+    memcpy(device.sll_addr, dest_mac, ETH_ALEN);
 
-        // Hent riktig MAC for dette interfacet
-        unsigned char src_mac[ETH_ALEN];
-        if (get_iface_mac(ifname, src_mac) < 0) {
-            perror("get_iface_mac");
-            continue;
-        }
+    // Send rammen
+    int sent = sendto(rawsocket, frame, frame_len, 0,
+                        (struct sockaddr *)&device, sizeof(device));
 
-        // Bygg Ethernet-header for dette interfacet
-        struct ethhdr *eh = (struct ethhdr *)frame;
-        memcpy(eh->h_dest, dest_mac, ETH_ALEN);
-        memcpy(eh->h_source, src_mac, ETH_ALEN);
-        eh->h_proto = htons(ETH_P_MIP);
-
-        // Sett opp AF_PACKET-struktur for sendto()
-        struct sockaddr_ll device = {0};
-        device.sll_family   = AF_PACKET;
-        device.sll_protocol = htons(ETH_P_MIP);
-        device.sll_ifindex  = iface_indices[i];
-        device.sll_halen    = ETH_ALEN;
-        memcpy(device.sll_addr, dest_mac, ETH_ALEN);
-
-        // Send rammen
-        int sent = sendto(rawsocket, frame, frame_len, 0,
-                          (struct sockaddr *)&device, sizeof(device));
-
-        if (sent < 0) {
-            perror("sendto");
-        } else if (debug_mode) {
-            printf("[DEBUG] send_pdu: TX via %s (index=%d) bytes=%d\n",
-                   ifname, iface_indices[i], sent);
-        }
+    if (sent < 0) {
+        perror("sendto");
+    } else if (debug_mode) {
+        printf("[DEBUG] send_pdu: TX via %s (index=%d) bytes=%d\n",
+                ifname, iface_indices[i], sent);
     }
-
     free(frame);
-    return 0;
+    return sent;
 }
+
 
 void set_dest(mip_header_t *h, uint8_t dest) { h->dest = dest; }
 void set_src(mip_header_t *h, uint8_t src)   { h->src  = src; }

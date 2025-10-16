@@ -26,7 +26,7 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
                   uint8_t *sdu_type, const uint8_t **sdu_out);
 
-int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac);
+int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac, int ifindex);
 
 // hentefunksjoner
 uint8_t get_src(const mip_header_t *h);
