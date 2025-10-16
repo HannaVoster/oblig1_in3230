@@ -99,7 +99,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         }
         return;
     }
-    //prover
 
     // Finn hvilken SDU-type denne klienten har
     uint8_t sdu_type = 0;
@@ -109,33 +108,8 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             break;
         }
     }
-    //okei 
 
-    // if (sdu_type == SDU_TYPE_ROUTING) {
-    //     uint8_t ttl = buffer[1];
-    //     uint8_t *payload = &buffer[2];
-    //     size_t len = bytes_read - 2;
-
-    //     //index 0 i payload viser hvilket intern sdu type routing deamonen satt
-    //     uint8_t routing_type = payload[0];
-
-    //     switch(routing_type){
-    //         case 0x01:
-    //             send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
-    //             return;
-
-    //         case 0x02:
-    //             send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
-    //             return;
-            
-    //         case 'R':
-    //             uint8_t next = buffer[5];
-    //             handle_route_response(raw_sock, next);
-    //     }
-    //     return;
-    // }
-
-    // Les data etter nytt format: [dest:1][ttl:1][payload]
+    // Meldingsformat: [dest:1][ttl:1][payload]
     if (bytes_read < 2) {
         fprintf(stderr, "[UNIX] Invalid message: too short\n");
         return;
@@ -151,47 +125,23 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
                client_fd, sdu_type, dest_addr, ttl, payload_length);
     }
 
-    // Slå opp MAC i ARP-cache og send eller kølegg
     unsigned char mac[6];
+    // 1️Sjekk om vi allerede har MAC-adressen i ARP-cache
     if (arp_lookup(dest_addr, mac)) {
         size_t pdu_len;
         uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
                                      sdu_type, payload, payload_length, &pdu_len);
         send_pdu(raw_sock, pdu, pdu_len, mac);
         free(pdu);
-    } else {
-        // Hent den rett etterpå som normalt
-        if (arp_lookup(dest_addr, mac)) {
-            size_t pdu_len;
-            uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, 4, sdu_type, payload, payload_length, &pdu_len);
-            send_pdu(raw_sock, pdu, pdu_len, mac);
-            free(pdu);
-        }
-        else {
-                    // Mangler ARP til destinasjon – IKKE ARP direkte til dest (det funker ikke over flere hopp)
-            // 1) Legg meldingen i "route-wait"-kø
-            queue_routing_message(dest_addr, my_mip_address,
-                        (ttl == 0 ? 4 : ttl), // bruk 0 som default -> TTL=4
-                        sdu_type, (uint8_t*)payload, payload_length);
+    } 
+    else {
+        // 2️⃣ Ingen MAC – legg meldingen i kø og send ARP request
+        queue_message(dest_addr, dest_addr, my_mip_address, ttl,
+                      sdu_type, payload, payload_length);
+        send_arp_request(raw_sock, dest_addr, my_mip_address);
 
-            // 2) Send ROUTE REQUEST til routingd for dest_addr
-            int sent = 0;
-            for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-                if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
-                    send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
-                    if (debug_mode)
-                        printf("[UNIX][ROUTING] Sent REQUEST for dest=%u\n", dest_addr);
-                    sent = 1;
-                    break;
-                }
-            }
-            if (!sent) {
-                printf("[UNIX][ROUTING] Ingen routingd tilkoblet — kan ikke slå opp rute.\n");
-            }
-
-            // 3) Returnér. Når RSP kommer, håndterer du det allerede lenger opp
-            return;
-        }
+        if (debug_mode)
+            printf("[UNIX][ARP] La melding i kø og sendte ARP request for MIP %d\n", dest_addr);
     }
 }
 
