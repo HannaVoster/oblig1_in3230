@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(sock, &fds);
-    struct timeval tv = {3, 0}; //endret til høyere
+    struct timeval tv = {5, 0}; //endret til høyere
 
     int rv = select(sock + 1, &fds, NULL, NULL, &tv);
     if (rv == 0) {
