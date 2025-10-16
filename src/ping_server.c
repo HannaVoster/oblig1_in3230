@@ -48,31 +48,32 @@ int main(int argc, char *argv[]) {
         close(sock);
         return 1;
     }
-
+    while(1) {
     // leser meldingen fra mips, som opprinnellig kom gjennom nettverket fra ping_client
-    char buf[BUF_SIZE];
-    int n = read(sock, buf, sizeof(buf));
-    if (n <= 0) {
-        perror("read");
-        close(sock);
-        return 1;
-    }
+        char buf[BUF_SIZE];
+        int n = read(sock, buf, sizeof(buf));
+        if (n <= 0) {
+            perror("read");
+            close(sock);
+            return 1;
+        }
 
-    uint8_t src = buf[0];
-    uint8_t ttl = buf[1];
-    printf("[PING_SERVER] From MIP %u (TTL=%u): %s\n", src, ttl, &buf[2]);
+        uint8_t src = buf[0];
+        uint8_t ttl = buf[1];
+        printf("[PING_SERVER] From MIP %u (TTL=%u): %s\n", src, ttl, &buf[2]);
 
-    // Lag svar: [dest=src][ttl=4][PONG:<payload>]
-    uint8_t reply[BUF_SIZE];
-    reply[0] = src;
-    reply[1] = 4;
-    snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%.500s", (char*)&buf[2]);
+        // Lag svar: [dest=src][ttl=4][PONG:<payload>]
+        uint8_t reply[BUF_SIZE];
+        reply[0] = src;
+        reply[1] = 4;
+        snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%.500s", (char*)&buf[2]);
 
-    // Sender svaret tilbake via samme socket (til mipd → ping_client)
-    if (write(sock, reply, strlen((char*)&reply[2])) < 0) {
-        perror("write");
-    } else {
-        printf("[PING_SERVER] Sent reply: PONG:%s\n", &buf[2]);
+        // Sender svaret tilbake via samme socket (til mipd → ping_client)
+        if (write(sock, reply, strlen((char*)&reply[2])) < 0) {
+            perror("write");
+        } else {
+            printf("[PING_SERVER] Sent reply: PONG:%s\n", &buf[2]);
+        }
     }
 
     close(sock);
