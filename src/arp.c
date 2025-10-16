@@ -7,7 +7,7 @@
 #include "mipd.h"
 #include "pdu.h"
 #include "arp.h"
-#include "iface.c"
+#include "iface.h"
 
 arp_entry arp_cache[MAX_ARP] = {0};
 
