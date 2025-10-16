@@ -109,30 +109,31 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             break;
         }
     }
+    //okei 
 
-    if (sdu_type == SDU_TYPE_ROUTING) {
-        uint8_t ttl = buffer[1];
-        uint8_t *payload = &buffer[2];
-        size_t len = bytes_read - 2;
+    // if (sdu_type == SDU_TYPE_ROUTING) {
+    //     uint8_t ttl = buffer[1];
+    //     uint8_t *payload = &buffer[2];
+    //     size_t len = bytes_read - 2;
 
-        //index 0 i payload viser hvilket intern sdu type routing deamonen satt
-        uint8_t routing_type = payload[0];
+    //     //index 0 i payload viser hvilket intern sdu type routing deamonen satt
+    //     uint8_t routing_type = payload[0];
 
-        switch(routing_type){
-            case 0x01:
-                send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
-                return;
+    //     switch(routing_type){
+    //         case 0x01:
+    //             send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
+    //             return;
 
-            case 0x02:
-                send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
-                return;
+    //         case 0x02:
+    //             send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
+    //             return;
             
-            case 'R':
-                uint8_t next = buffer[5];
-                handle_route_response(raw_sock, next);
-        }
-        return;
-    }
+    //         case 'R':
+    //             uint8_t next = buffer[5];
+    //             handle_route_response(raw_sock, next);
+    //     }
+    //     return;
+    // }
 
     // Les data etter nytt format: [dest:1][ttl:1][payload]
     if (bytes_read < 2) {
