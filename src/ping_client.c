@@ -92,8 +92,8 @@ int main(int argc, char *argv[]) {
     if (n > 0) {
         reply[n] = '\0';
         gettimeofday(&end, NULL);
-        long ms = (end.tv_sec - start.tv_sec) * 1000 +
-                  (end.tv_usec - start.tv_usec) / 1000;
+        long ms = (end.tv_sec - start.tv_sec) * 1000000 +
+                  (end.tv_usec - start.tv_usec);
         uint8_t src = reply[0];
         uint8_t ttl_reply = reply[1];
 
