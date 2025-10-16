@@ -61,6 +61,7 @@ int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len);
 int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost);
 int get_route(uint8_t dest);
 int find_or_add_neighbor(uint8_t mip);
+void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payload, size_t len);
 uint64_t now_ms(void);
 
 #endif
