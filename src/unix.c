@@ -136,7 +136,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         free(pdu);
     } 
     else {
-        // 2️⃣ Ingen MAC – legg meldingen i kø og send ARP request
+        // Ingen MAC – legg meldingen i kø og send ARP request
         queue_message(dest_addr, dest_addr, my_mip_address, ttl,
                       sdu_type, payload, payload_length);
         send_arp_request(raw_sock, dest_addr, my_mip_address);
@@ -181,7 +181,7 @@ void handle_ping_server_message(int client, char *buffer, int bytes_read) {
 
 void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str) {
     unsigned char broadcast_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
-
+    //FIKS ikke -1 her
     size_t pdu_len;
     uint8_t *pdu = mip_build_pdu(255, my_mip, 1, SDU_TYPE_ROUTING, payload, len, &pdu_len);
     send_pdu(raw_sock, pdu, pdu_len, broadcast_mac, -1);
@@ -220,7 +220,7 @@ void handle_route_response(int raw_sock, uint8_t next){
                 //treff - addressen finnes - bygg og send pdu
                 size_t new_pdu_length;
                 uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
-                send_pdu(raw_sock, new_pdu, new_pdu_length, mac);
+                send_pdu(raw_sock, new_pdu, new_pdu_length, mac, ifindex);
                 free(new_pdu);
                 printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
                     next, dest);

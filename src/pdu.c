@@ -145,7 +145,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         perror("sendto");
     } else if (debug_mode) {
         printf("[DEBUG] send_pdu: TX via %s (index=%d) bytes=%d\n",
-                ifname, iface_indices[i], sent);
+                ifname, ifindex, sent);
     }
     free(frame);
     return sent;

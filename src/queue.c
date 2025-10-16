@@ -104,8 +104,8 @@ void send_pending_messages(int raw_sock, uint8_t next_hop,
                 pending_queue[i].length,
                 &pdu_len
             );
-
-            send_pdu(raw_sock, pdu, pdu_len, mac);
+            //FIKS IKKE -1 her
+            send_pdu(raw_sock, pdu, pdu_len, mac, -1);
 
             free(pdu);
             free(pending_queue[i].payload);
