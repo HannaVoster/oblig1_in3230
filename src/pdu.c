@@ -110,13 +110,13 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
 
     // Finn interfacenavnet fra ifindex
     char ifname[IFNAMSIZ];
-    if_indextoname(ifindex, ifname);
+    if (!if_indextoname(ifindex, ifname)) {
+        perror("if_indextoname");
+        return -1;
+    }
 
-    // Hent MAC-adressen til dette interfacet
-    unsigned char src_mac[ETH_ALEN];
     if (get_iface_mac(ifname, src_mac) < 0) {
         perror("get_iface_mac");
-        free(frame);
         return -1;
     }
 
