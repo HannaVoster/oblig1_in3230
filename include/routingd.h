@@ -57,7 +57,7 @@ void handle_hello();
 void handle_update();
 
 void hello(void);
-int send_unix_message(uint8_t dest, uint8_t ttl, const void* data, size_t len);
+int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len);
 int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost);
 int get_route(uint8_t dest);
 int find_or_add_neighbor(uint8_t mip);
