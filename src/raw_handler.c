@@ -175,7 +175,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
            
             printf("[RAW] PING mottatt fra MIP %u\n\n", src);
 
-            arp_update(src, eh->h_source); //lagrer avsender i ARP til senere
+            arp_update(src, eh->h_source, if_index); //lagrer avsender i ARP til senere
 
            for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
                 if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_PONG) {
@@ -248,7 +248,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                     sizeof(resp),
                     &pdu_len
                 );
-                send_pdu(raw_sock, pdu, pdu_len, eh->h_source);
+                send_pdu(raw_sock, pdu, pdu_len, eh->h_source, if_index);
                 free(pdu);
             }
             else if (arp->type == 0x01) {

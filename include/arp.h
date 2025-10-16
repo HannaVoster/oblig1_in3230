@@ -32,7 +32,7 @@ extern arp_entry arp_cache[MAX_ARP];
 
 // Funksjoner for å bruke arp tabellen/vise den
 void arp_update(int mip_addr, const unsigned char *mac, int ifindex);
-int arp_lookup(int mip_addr, unsigned char *mac_out);
+int arp_lookup(int mip_addr, unsigned char *mac_out, int *ifindex_out);
 void print_arp_cache(void);
 void arp_init_cache();
 void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address);
