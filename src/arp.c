@@ -1,8 +1,11 @@
-#include <stdio.h>        // printf
-#include <string.h>       // memcpy
-#include <stdlib.h>       // free
-#include <stdint.h>       // uint8_t
-#include <net/ethernet.h> // ETH_ALEN
+#include <stdio.h>        
+#include <string.h>       
+#include <stdlib.h>       
+#include <stdint.h>     
+#include <net/ethernet.h> 
+#include <arpa/inet.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>  
 
 #include "mipd.h"
 #include "pdu.h"
