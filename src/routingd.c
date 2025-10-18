@@ -86,6 +86,8 @@ int main(int argc, char *argv[]) {
         perror("epoll_ctl: routing_sock");
         exit(EXIT_FAILURE);
     }
+    memset(neighbors, 0, sizeof(neighbors));
+    memset(routing_table, 0, sizeof(routing_table));
 
     // Tidsstyrte meldinger
     uint64_t last_hello = now_ms();
@@ -302,7 +304,8 @@ int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len
 //metode som sender HELLO meldinger 
 void hello(void){
     uint8_t msg = RT_MSG_HELLO;
-   
+    printf("[ROUTINGD] Sending HELLO broadcast (MIP=%d)\n", MY_MIP);
+
     send_unix_message(255, 1, &msg, 1);
 }
 
@@ -386,10 +389,13 @@ void send_update_to_neighbor(uint8_t neighbor_mip) {
 }
 
 void periodic_update(void) {
+    int count = 0;
     for (int i = 0; i < MAX_NEIGHBORS; i++) {
         if (neighbors[i].valid) {
             send_update_to_neighbor(neighbors[i].mip);
+            count++;
         }
     }
-    printf("[ROUTINGD] Sent periodic UPDATE to %d neighbors\n", MAX_NEIGHBORS);
+    printf("[ROUTINGD] Sent periodic UPDATE to %d neighbors\n", count);
 }
+
