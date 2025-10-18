@@ -28,14 +28,33 @@ rt_entry routing_table[MAX_ROUTES];
 uint8_t MY_MIP = 0;
 int ROUTING_SOCK = -1;
 
-
+int debug_mode = 0;
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <unix_socket_path>\n", argv[0]);
+    // Håndterer -h og -d flagg
+    int opt;
+    while ((opt = getopt(argc, argv, "hd")) != -1) {
+        switch(opt) {
+            case 'h':
+                printf("Usage: %s [-d] <unix_socket_path>\n", argv[0]);
+                printf("Options:\n");
+                printf("  -h  print help and exit\n");
+                printf("  -d  enable debug mode\n");
+                return 0;
+            case 'd':
+                debug_mode = 1;
+                break;
+            default:
+                fprintf(stderr, "Unknown option\n");
+                return 1;
+        }
+    }
+
+    if (optind >= argc) {
+        fprintf(stderr, "Usage: %s [-d] <unix_socket_path>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    const char *socket_path = argv[1];
+    const char *socket_path = argv[optind];
     printf("[ROUTINGD] Starting with socket path: %s\n", socket_path);
     // Vent på at mipd oppretter UNIX-socketen
     wait_for_socket(socket_path);
