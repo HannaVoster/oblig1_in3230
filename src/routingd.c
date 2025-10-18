@@ -167,7 +167,7 @@ int connect_to_mipd(const char *socket_path) {
         perror("read MY_MIP from MIPd");
     }
 
-    printf("[ROUTINGD] Connected and registered to %s (SDU=0x04)\n", connected_sock);
+    printf("[ROUTINGD] Connected and registered to %s (SDU=0x04)\n", sock);
     return sock;
 }
 
