@@ -123,34 +123,36 @@ void send_arp_request(int raw_sock, uint8_t dest_addr, int my_mip_address) {
         }
 
         // Bygg Ethernet-header (du kan også gjenbruke send_pdu her)
-        struct ethhdr eh;
-        memcpy(eh.h_dest, broadcast_mac, ETH_ALEN);
-        memcpy(eh.h_source, src_mac, ETH_ALEN);
-        eh.h_proto = htons(ETH_P_MIP);
+        send_pdu(raw_sock, arp_pdu, arp_len, broadcast_mac, ifindex);
+    //     struct ethhdr eh;
+    //     memcpy(eh.h_dest, broadcast_mac, ETH_ALEN);
+    //     memcpy(eh.h_source, src_mac, ETH_ALEN);
+    //     eh.h_proto = htons(ETH_P_MIP);
 
-        uint8_t frame[sizeof(struct ethhdr) + arp_len];
-        memcpy(frame, &eh, sizeof(struct ethhdr));
-        memcpy(frame + sizeof(struct ethhdr), arp_pdu, arp_len);
+    //     uint8_t frame[sizeof(struct ethhdr) + arp_len];
+    //     memcpy(frame, &eh, sizeof(struct ethhdr));
+    //     memcpy(frame + sizeof(struct ethhdr), arp_pdu, arp_len);
 
-        struct sockaddr_ll device = {0};
-        device.sll_family = AF_PACKET;
-        device.sll_protocol = htons(ETH_P_MIP);
-        device.sll_ifindex = ifindex;
-        device.sll_halen = ETH_ALEN;
-        memcpy(device.sll_addr, broadcast_mac, ETH_ALEN);
+    //     struct sockaddr_ll device = {0};
+    //     device.sll_family = AF_PACKET;
+    //     device.sll_protocol = htons(ETH_P_MIP);
+    //     device.sll_ifindex = ifindex;
+    //     device.sll_halen = ETH_ALEN;
+    //     memcpy(device.sll_addr, broadcast_mac, ETH_ALEN);
 
-        // Send via dette interfacet
-        int sent = sendto(raw_sock, frame,
-                          sizeof(struct ethhdr) + arp_len, 0,
-                          (struct sockaddr *)&device, sizeof(device));
+    //     // Send via dette interfacet
+    //     int sent = sendto(raw_sock, frame,
+    //                       sizeof(struct ethhdr) + arp_len, 0,
+    //                       (struct sockaddr *)&device, sizeof(device));
 
-        if (sent < 0) {
-            perror("sendto");
-        } else if (debug_mode) {
-            printf("[DEBUG] Sent ARP-REQ for MIP %d via %s (index=%d)\n",
-                   dest_addr, ifname, ifindex);
-        }
-    }
+    //     if (sent < 0) {
+    //         perror("sendto");
+    //     } else if (debug_mode) {
+    //         printf("[DEBUG] Sent ARP-REQ for MIP %d via %s (index=%d)\n",
+    //                dest_addr, ifname, ifindex);
+    //     }
+    // }
 
     free(arp_pdu);
+}
 }

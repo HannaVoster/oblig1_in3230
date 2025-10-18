@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define MAX_UNIX_CLIENT 10
 
@@ -21,4 +22,5 @@ void handle_ping_server_message(int client, char *buffer, int bytes_read);
 
 void handle_route_response(int raw_sock, uint8_t next);
 void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str);
+bool is_direct_neighbor(uint8_t mip_addr);
 #endif

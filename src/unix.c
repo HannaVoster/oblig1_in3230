@@ -8,6 +8,8 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <net/ethernet.h>
+
 
 #include "mipd.h"
 #include "arp.h"
@@ -99,8 +101,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         }
         return;
     }
-
-    // Finn hvilken SDU-type denne klienten har
+    // Finn hvilken SDU-type, se hvilken app som snakker med mipd
     uint8_t sdu_type = 0;
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
@@ -108,7 +109,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             break;
         }
     }
-
     // Meldingsformat: [dest:1][ttl:1][payload]
     if (bytes_read < 2) {
         fprintf(stderr, "[UNIX] Invalid message: too short\n");
@@ -124,31 +124,57 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
                client_fd, sdu_type, dest_addr, ttl, payload_length);
     }
+    if (sdu_type == SDU_TYPE_ROUTING) {
+        uint8_t ttl = buffer[1];
+        uint8_t *payload = &buffer[2];
+        size_t len = bytes_read - 2;
 
+        //index 0 i payload viser hvilket intern sdu type routing deamonen satt
+        uint8_t routing_type = payload[0];
+
+        switch(routing_type){
+            case 0x01:
+                send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
+                return;
+
+            case 0x02:
+                send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
+                return;
+            
+            case 'R':
+                uint8_t next = buffer[5];
+                handle_route_response(raw_sock, next);
+        }
+        return;
+    }
     unsigned char mac[6];
     int ifindex = -1;
-    // 1️Sjekk om vi allerede har MAC-adressen i ARP-cache
+
     if (arp_lookup(dest_addr, mac, &ifindex)) {
         size_t pdu_len;
         uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
                                      sdu_type, payload, payload_length, &pdu_len);
         send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
         free(pdu);
+        return;
     } 
-    else {
-        // Ingen MAC – legg meldingen i kø og send ARP request
-        queue_message(dest_addr, dest_addr, my_mip_address, ttl,
-                      sdu_type, payload, payload_length);
-        send_arp_request(raw_sock, dest_addr, my_mip_address);
 
-        if (debug_mode)
-            printf("[UNIX][ARP] La melding i kø og sendte ARP request for MIP %d\n", dest_addr);
+    queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length);
+
+    // Finn routingd blant UNIX-klientene
+    for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+        if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+            send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
+            if (debug_mode)
+            printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
+            return;
+        }
     }
+    printf("[UNIX][ROUTING] Ingen routingd aktiv — kan ikke finne rute.\n");
 }
 
 
 void handle_ping_server_message(int client, char *buffer, int bytes_read) {
-
     if (bytes_read < 2){
         printf("[ERROR] unix msg too short");
         return;
@@ -184,10 +210,26 @@ void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t 
     //FIKS ikke -1 her
     size_t pdu_len;
     uint8_t *pdu = mip_build_pdu(255, my_mip, 1, SDU_TYPE_ROUTING, payload, len, &pdu_len);
-    send_pdu(raw_sock, pdu, pdu_len, broadcast_mac, -1);
 
     printf("[MIPD][ROUTING] Sendte %s broadcast (len=%zu)\n", type_str, len);
 
+    // Send ARP-REQ på alle ikke-loopback interfaces
+    for (int i = 0; i < iface_count; i++) {
+        int ifindex = iface_indices[i];
+
+        char ifname[IFNAMSIZ];
+        if_indextoname(ifindex, ifname);
+        if (strncmp(ifname, "lo", 2) == 0) continue; // hopp over loopback
+
+        // Hent MAC til dette interfacet
+        unsigned char src_mac[ETH_ALEN];
+        if (get_iface_mac(ifname, src_mac) < 0) {
+            perror("get_iface_mac");
+            continue;
+        }
+
+        send_pdu(raw_sock, pdu, pdu_len, broadcast_mac, ifindex);
+    }
     free(pdu);
 }
 

@@ -61,7 +61,7 @@ int connect_to_mipd() {
         break;
     }
     }
-
+   
 
     if (!connected) {
         fprintf(stderr, "[ROUTINGD] Could not connect to any local MIP socket\n");

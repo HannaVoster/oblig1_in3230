@@ -137,7 +137,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 break;
         
 
-             // ⚠️ VIKTIG: avslutt dette caset, slik at du IKKE faller videre ned i PING:
+             // avslutt dette caset, slik at det IKKE faller videre ned i PING:
             }
             return;
         }
