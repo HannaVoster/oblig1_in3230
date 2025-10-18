@@ -262,6 +262,12 @@ int find_or_add_neighbor(uint8_t mip){
 //hvis dest ikke funnes, returneres -1 . ingen repsonse sendes
 int get_route(uint8_t dest) {
     for (int i = 0; i < MAX_ROUTES; i++) {
+        if (routing_table[i].valid) {
+            printf("[ROUTINGD] Route entry %d: dest=%d via=%d cost=%d\n",
+                    i, routing_table[i].dest,
+                    routing_table[i].next_hop,
+                    routing_table[i].cost);
+        }
         if (routing_table[i].dest == dest){
             return i;
         }
@@ -288,6 +294,8 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
     routing_table[id].next_hop = next_hop;
     routing_table[id].cost = cost;
     routing_table[id].updated_ms = now_ms();
+    printf("[ROUTINGD] Route updated/inserted: dest=%d via=%d cost=%d (slot=%d)\n",
+        dest, next_hop, cost, id);
     return id;
 }
 
