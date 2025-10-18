@@ -16,7 +16,9 @@ gi en route respons
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
-
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/epoll.h>
 
 #include "routingd.h"
 #include "arp.h"
@@ -26,45 +28,125 @@ rt_entry routing_table[MAX_ROUTES];
 uint8_t MY_MIP = 0;
 int ROUTING_SOCK = -1;
 
-int connect_to_mipd() {
-    int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (sock < 0) { perror("socket"); exit(EXIT_FAILURE); }
 
-    // Lag unik klientadresse (ellers kolliderer routingd-prosesser)
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <unix_socket_path>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    const char *socket_path = argv[1];
+    printf("[ROUTINGD] Starting with socket path: %s\n", socket_path);
+    // Vent på at mipd oppretter UNIX-socketen
+    wait_for_socket(socket_path);
+    printf("[ROUTINGD] Socket %s er nå tilgjengelig, kobler til...\n", socket_path);
+
+    ROUTING_SOCK = connect_to_mipd(socket_path);
+    if (ROUTING_SOCK < 0) {
+        fprintf(stderr, "[ROUTINGD] Klarte ikke å koble til %s\n", socket_path);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("[ROUTINGD] epoll looop - Listening...\n");
+
+    int epollfd = epoll_create1(0);
+
+    if (epollfd < 0) {
+        perror("epoll_create1");
+        close(ROUTING_SOCK);
+        exit(EXIT_FAILURE);
+    }
+
+    struct epoll_event ev, events[MAX_EVENTS];
+    ev.events = EPOLLIN;
+    ev.data.fd = ROUTING_SOCK;
+
+    //legger til instansen i epollfd (instansen fra tidligere)
+    // EPOLL_CTL_ADD forteller instansen at socketen skal overvåkes
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, ROUTING_SOCK, &ev) == -1) {
+        perror("epoll_ctl: routing_sock");
+        exit(EXIT_FAILURE);
+    }
+
+    // Tidsstyrte meldinger
+    uint64_t last_hello = now_ms();
+    uint64_t last_update = now_ms();
+
+    // Hovedløkke for å håndtere meldinger fra mipd
+    while (1) { 
+        int n = epoll_wait(epollfd, events, MAX_EVENTS, 200); // 200 ms timeout
+
+        if (n < 0) {
+            perror("epoll_wait");
+            break;
+        }
+        // Behandle hendelser fra epoll 
+        for (int i = 0; i < n; i++) {
+            if (events[i].data.fd == ROUTING_SOCK && (events[i].events & EPOLLIN)) {
+                uint8_t buf[256];
+                ssize_t len = read(ROUTING_SOCK, buf, sizeof(buf));
+                if (len <= 0) {
+                    printf("[ROUTINGD] Disconnected from MIPd\n");
+                    goto cleanup;
+                }
+                uint8_t src = buf[0];
+                uint8_t ttl = buf[1];
+
+                if (len >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
+                    handle_route_request(ROUTING_SOCK, buf, len);
+                } else if (len >= 3) {
+                    uint8_t msg_type = buf[2];
+                    handle_incoming_message(src, msg_type, &buf[3], len - 3);
+                }
+            }
+        }
+
+        uint64_t now = now_ms();
+
+        if (now - last_hello >= HELLO_INTERVAL_MS) {
+            hello(); // broadcast HELLO
+            last_hello = now;
+        }
+
+        if (now - last_update >= UPDATE_INTERVAL_MS) {
+            periodic_update(); // send UPDATE (Poisoned Reverse)
+            last_update = now;
+        }
+    }
+    cleanup:
+        close(epollfd);
+        close(ROUTING_SOCK);
+        printf("[ROUTINGD] Shutting down.\n");
+        return 0;
+}
+
+int connect_to_mipd(const char *socket_path) {
+    int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+
+    if (sock < 0) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Lag unik lokal klientadresse (ellers kollisjon mellom routingd-prosesser)
     struct sockaddr_un client_addr = {0};
     client_addr.sun_family = AF_UNIX;
     snprintf(client_addr.sun_path, sizeof(client_addr.sun_path), "routingd_%d.sock", getpid());
     unlink(client_addr.sun_path);
-    if (bind(sock, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0) {
+
+    if (bind(sock, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
         perror("bind client");
         close(sock);
         exit(EXIT_FAILURE);
     }
 
-    // Forsøk å koble til lokal MIP-daemon (usockA–usockE)
+    // Koble til MIP-daemonens UNIX socket (f.eks. ./usockA)
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
-    const char *sockets[] = {
-    "./usockA", "./usockB", "./usockC", "./usockD", "./usockE",
-    "/tmp/usockA", "/tmp/usockB", "/tmp/usockC", "/tmp/usockD", "/tmp/usockE"
-    };
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
-    int connected = 0;
-    const char *connected_sock = NULL;
-
-    for (int i = 0; i < 10; i++) {
-    strncpy(addr.sun_path, sockets[i], sizeof(addr.sun_path) - 1);
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
-        connected = 1;
-        connected_sock = sockets[i];
-        printf("[ROUTINGD] Connected to %s\n", sockets[i]);
-        break;
-    }
-    }
-   
-
-    if (!connected) {
-        fprintf(stderr, "[ROUTINGD] Could not connect to any local MIP socket\n");
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("connect to mipd");
         close(sock);
         exit(EXIT_FAILURE);
     }
@@ -76,14 +158,18 @@ int connect_to_mipd() {
         exit(EXIT_FAILURE);
     }
 
+    // Les min MIP-adresse fra mipd
+    uint8_t my_addr;
+    if (read(sock, &my_addr, 1) == 1) {
+        MY_MIP = my_addr;
+        printf("[ROUTINGD] Received MY_MIP = %d from MIPd\n", MY_MIP);
+    } else {
+        perror("read MY_MIP from MIPd");
+    }
+
     printf("[ROUTINGD] Connected and registered to %s (SDU=0x04)\n", connected_sock);
     return sock;
 }
-
-// int idx = find_route(50);
-// if (idx >= 0)
-//     send_route_response(sock, MY_MIP, rtable[idx].next_hop);
-
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
     uint8_t rsp[6] = { my_address, 0, 'R', 'S', 'P', next }; //etter format fra oppgaven
@@ -93,80 +179,22 @@ void send_route_response(int sock, uint8_t my_address, uint8_t next){
         printf("[ROUTINGD] Sent RESPONSE: next hop =%d\n", next);    
 }
 
-void handle_route_request(int sock, uint8_t *msg, ssize_t length){
-    if(length < 6){
-        printf("[ROUTINGD] Invalid REQUEST message length: %zd\n", length);
-        return;
+void handle_route_request(int sock, uint8_t *msg, ssize_t length) {
+    if (length < 6) { 
+        fprintf(stderr, "..."); 
+        return; 
     }
 
-    uint8_t my_address = msg[0];
-    //uint8_t dest = msg[5];
+    uint8_t my_addr = msg[0];      // egen MIP (ekko fra MIPd)
+    uint8_t dest    = msg[5];      // oppslagsdestinasjon
 
-    /* Dummy next hop  */
-    uint8_t next = 20;
-    send_route_response(sock, my_address, next);
-
+    uint8_t next = 255;            // 255 = ingen rute
+    int id = get_route(dest);
+    if (id >= 0 && routing_table[id].valid) {
+        next = routing_table[id].next_hop;
+    }
+    send_route_response(sock, my_addr, next);
 }
-
-void handle_hello(){}
-void handle_update(){}
-
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <unix_socket_path>\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    const char *socket_path = argv[1];
-    printf("[ROUTINGD] Starting with socket path: %s\n", socket_path);
-
-    // Vent på at mipd oppretter UNIX-socketen
-    wait_for_socket(socket_path);
-    printf("[ROUTINGD] Socket %s er nå tilgjengelig, kobler til...\n", socket_path);
-
-    int ROUTING_SOCK = connect_to_mipd(socket_path);
-    if (ROUTING_SOCK < 0) {
-        fprintf(stderr, "[ROUTINGD] Klarte ikke å koble til %s\n", socket_path);
-        exit(EXIT_FAILURE);
-    }
-
-    printf("[ROUTINGD] Listening for route requests...\n");
-
-    // Hovedløkke for å håndtere meldinger fra mipd
-    while (1) {
-        uint8_t buf[64];
-        ssize_t length = read(ROUTING_SOCK, buf, sizeof(buf));
-
-        if (length < 0) {
-            perror("[ROUTINGD] read");
-            break;
-        } else if (length == 0) {
-            printf("[ROUTINGD] Disconnected from mipd\n");
-            break;
-        }
-
-        if (length >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
-            // ROUTE REQUEST fra mipd
-            printf("[ROUTINGD] Received REQUEST (dest=%u)\n", buf[5]);
-            handle_route_request(ROUTING_SOCK, buf, length);
-        } 
-        else {
-            // Ellers er det en routingmelding (HELLO/UPDATE)
-            uint8_t from = buf[0];
-            uint8_t msg_type = buf[1];
-            handle_incoming_message(from, msg_type, &buf[2], length - 2);
-        }
-    }
-
-
-    close(ROUTING_SOCK);
-    printf("[ROUTINGD] Shutting down.\n");
-    return 0;
-}
-
-
-#include <sys/stat.h>
-#include <unistd.h>
 
 void wait_for_socket(const char *path) {
     struct stat sb;
@@ -180,12 +208,10 @@ void wait_for_socket(const char *path) {
     }
 }
 
-
 uint64_t now_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec/1000000;
 }
-
 
 //metode til å oppdage naboer med HELLO
 //leter etter en nabo med en gitt mip addresse, og returnerer naboens index i nabolisten
@@ -209,8 +235,6 @@ int find_or_add_neighbor(uint8_t mip){
 
     return -1;
 }
-
-
 //metode til å finne en lagret rute
 //går igjennom routing_table og returnerer indexen til dest hvis dest finnes
 //p den måten kan deamonen sjekke at en rute er der før den sender en response om next hop
@@ -224,12 +248,10 @@ int get_route(uint8_t dest) {
     return -1; //ingen rute
 }
 
-
-
 //metode til å oppdattere eller lage en ny rute
 int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
     int id = get_route(dest);
-    if (id > 0) { //ingen rute - lag ny
+    if (id < 0) { //ingen rute - lag ny
         for (int i = 0; i < MAX_ROUTES; i++){
             if(!routing_table[i].valid){
                 id = i;
@@ -258,20 +280,16 @@ int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len
     return write(ROUTING_SOCK, buf, len + 2);
 }
 
-
 //metode som sender HELLO meldinger 
 void hello(void){
-    uint8_t msg[2];
-    msg[0] = MY_MIP;
-    msg[1] = RT_MSG_HELLO;
+    uint8_t msg = RT_MSG_HELLO;
    
-    send_unix_message(255, 1, msg, 2);
+    send_unix_message(255, 1, &msg, 1);
 }
 
-void update(void){
+void broadcast_update(void){
     uint8_t buf[256];
     size_t pos = 0;
-    buf[pos++] = MY_MIP;
     buf[pos++] = RT_MSG_UPDATE;
 
     for (int i = 0; i < MAX_ROUTES; i++) {
@@ -280,7 +298,6 @@ void update(void){
             buf[pos++] = routing_table[i].cost;
         }
     }
-
     send_unix_message(255, 1, buf, pos);
     printf("[ROUTINGD] Sendte UPDATE med %zu ruter\n", pos / 2 - 1);
 }
@@ -327,4 +344,33 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
         }
 
     }
+}
+void send_update_to_neighbor(uint8_t neighbor_mip) {
+    uint8_t buf[256]; 
+    size_t pos = 0;
+    buf[pos++] = RT_MSG_UPDATE;
+
+    for (int i = 0; i < MAX_ROUTES; i++) {
+        if (!routing_table[i].valid) continue;
+
+        uint8_t adv_cost = routing_table[i].cost;
+
+        if (routing_table[i].next_hop == neighbor_mip) {
+            adv_cost = INF_COST; // Poisoned Reverse
+        }
+
+        buf[pos++] = routing_table[i].dest;
+        buf[pos++] = adv_cost;
+    }
+    // send direkte til naboen (unicast), TTL=1
+    send_unix_message(neighbor_mip, 1, buf, pos);
+}
+
+void periodic_update(void) {
+    for (int i = 0; i < MAX_NEIGHBORS; i++) {
+        if (neighbors[i].valid) {
+            send_update_to_neighbor(neighbors[i].mip);
+        }
+    }
+    printf("[ROUTINGD] Sent periodic UPDATE to %d neighbors\n", MAX_NEIGHBORS);
 }

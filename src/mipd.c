@@ -155,6 +155,16 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
+                // Hvis klienten er routingd, send tilbake min MIP-adresse
+                if (sdu_type == SDU_TYPE_ROUTING) {
+                    uint8_t mip_addr = (uint8_t) my_mip_address;
+                    if (write(client_fd, &mip_addr, 1) != 1) {
+                        perror("[MIPD] failed to send my_mip_address to routingd");
+                    } else if (debug_mode) {
+                        printf("[MIPD] Sent my MIP address (%d) to routingd\n", mip_addr);
+                    }
+                }
+
                 for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
                     if (!unix_clients[i].active) {
                         unix_clients[i].fd = client_fd;
