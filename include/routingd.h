@@ -20,9 +20,6 @@
 #define RT_MSG_REQ     'Q'  // du bruker "R","E","Q" allerede
 #define RT_MSG_RSP     'P'  // du bruker "R","S","P" allerede
 
-#define INF_METRIC     255
-#define HELLO_INTERVAL_MS   1000  // send HELLO hvert sekund
-#define UPDATE_INTERVAL_MS  2000  // send UPDATE hvert 2. sekund
 #define NEIGHBOR_DEAD_MS    4000  // nabo død hvis ikke hørt på 4s
 #define ROUTE_EXPIRE_MS     12000 // rute utgår hvis ikke fornyet
 
