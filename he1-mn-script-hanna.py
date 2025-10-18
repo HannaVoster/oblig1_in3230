@@ -116,7 +116,7 @@ def init_he1(self, line):
                           cmd="./mipd -d usockE 50"))
 
     # Sleep for 3 sec. to make sure that the MIP daemons are ready
-    time.sleep(3)
+    time.sleep(1)
 
     # Routing Daemons
     terms.append(openTerm(self,
@@ -156,7 +156,7 @@ def init_he1(self, line):
     # Make sure that the MIP and Routing daemons are ready and the topology
     # has converged
 
-    time.sleep(15)
+    time.sleep(3)
 
     # (1) Launch ping_server at Node E
     terms.append(openTerm(self,
@@ -165,7 +165,7 @@ def init_he1(self, line):
                           geometry="38x20+807+583",
                           cmd="./ping_server usockE"))
 
-    time.sleep(3)
+    time.sleep(1)
 
     # (2) Ping from Node A to Node E with TTL 8
     terms.append(openTerm(self,
@@ -174,7 +174,7 @@ def init_he1(self, line):
                           geometry="38x20+555+583",
                           cmd="./ping_client usockA \"Hello from A\" 50 8"))
 
-    time.sleep(3)
+    time.sleep(1)
 
     # (3) Ping from Node C to Node E with TTL 8
     terms.append(openTerm(self,
@@ -183,7 +183,7 @@ def init_he1(self, line):
                           geometry="38x20+555+583",
                           cmd="./ping_client usockC \"Hello from C\" 50 8"))
 
-    time.sleep(3)
+    time.sleep(1)
 
     # (4) Ping from A with TTL = 1 should be discarded and generate a timeout
     terms.append(openTerm(self,
@@ -192,7 +192,7 @@ def init_he1(self, line):
                           geometry="38x20+555+583",
                           cmd="./ping_client usockA \"Hello with TTL 1\" 50 1"))
 
-    time.sleep(3)
+    time.sleep(1)
 
     # (5) Ping from C with TTL = 3 should make it
     terms.append(openTerm(self,
@@ -201,14 +201,14 @@ def init_he1(self, line):
                           geometry="38x20+555+583",
                           cmd="./ping_client usockC \"Hello with TTL 3\" 50 3"))
 
-    time.sleep(10)
+    time.sleep(1)
 
     # After 10 sec. fail the link betwen node B and D for 20 sec.
     # DVR should be able to find another shortest path and reroute the packets
     # from A to E through C
 
     net.configLinkStatus('B', 'D','down')
-    time.sleep(20)
+    time.sleep(5)
 
     # (6) Ping from A with default TTL = 8
     terms.append(openTerm(self,
@@ -220,7 +220,7 @@ def init_he1(self, line):
     # Bring the link up again. The network should converge again and use
     # A - B - D - E as the shortest path
     net.configLinkStatus('B', 'D','up')
-    time.sleep(20)
+    time.sleep(5)
 
     # (7) Ping again from A with default TTL = 8
     terms.append(openTerm(self,
