@@ -293,8 +293,10 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
     routing_table[id].next_hop = next_hop;
     routing_table[id].cost = cost;
     routing_table[id].updated_ms = now_ms();
-    printf("[ROUTINGD] Route updated/inserted: dest=%d via=%d cost=%d (slot=%d)\n",
-        dest, next_hop, cost, id);
+    if(debug_mode){
+        printf("[ROUTINGD] Route updated/inserted: dest=%d via=%d cost=%d (slot=%d)\n",
+            dest, next_hop, cost, id);
+    }
     return id;
 }
 
@@ -311,8 +313,10 @@ int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len
 //metode som sender HELLO meldinger 
 void hello(void){
     uint8_t msg = RT_MSG_HELLO;
-    printf("[ROUTINGD] Sending HELLO broadcast (MIP=%d)\n", MY_MIP);
-
+    if (debug_mode){
+        printf("[ROUTINGD] Sending HELLO broadcast (MIP=%d)\n", MY_MIP);
+    }
+    
     send_unix_message(255, 1, &msg, 1);
 }
 
@@ -328,15 +332,18 @@ void broadcast_update(void){
         }
     }
     send_unix_message(255, 1, buf, pos);
-    printf("[ROUTINGD] Sendte UPDATE med %zu ruter\n", pos / 2 - 1);
+    if (debug_mode){
+        printf("[ROUTINGD] Sendte UPDATE med %zu ruter\n", pos / 2 - 1);
+    }
 }
 
 void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payload, size_t len){
     // lager en switch basert på meldingstype 
     switch(msg_type) {
         case RT_MSG_HELLO: {
-            printf("[ROUTINGD] HELLO mottatt fra %d\n", from);
-
+            if(debug_mode){
+                printf("[ROUTINGD] HELLO mottatt fra %d\n", from);
+            }
         // Finn nabo eller legg den til
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
@@ -348,7 +355,9 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
         }
 
         case RT_MSG_UPDATE: {
-            printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
+            if (debug_mode){
+                printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
+            }
             // Oppdater naboen slik at vi vet at den lever
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
@@ -403,6 +412,5 @@ void periodic_update(void) {
             count++;
         }
     }
-    printf("[ROUTINGD] Sent periodic UPDATE to %d neighbors\n", count);
 }
 
