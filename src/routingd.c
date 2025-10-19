@@ -163,7 +163,7 @@ int connect_to_mipd(const char *socket_path) {
     // Koble til MIP-daemonens UNIX socket (f.eks. ./usockA)
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", socket_path);
 
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("connect to mipd");
