@@ -152,7 +152,7 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
         printf("[DEBUG] send_pdu: TX via %s (index=%d) bytes=%d\n",
                 ifname, ifindex, sent);
     }
-    free(frame);
+    //free(frame);
     return sent;
 }
 
