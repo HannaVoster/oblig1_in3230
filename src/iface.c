@@ -19,6 +19,24 @@
 int iface_indices[5];
 int iface_count = 0;
 
+// void find_all_ifaces() {
+//     struct ifaddrs *ifaddr, *ifa;
+//     iface_count = 0;
+//     getifaddrs(&ifaddr);
+
+//     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+//         if (!ifa->ifa_addr) continue;
+//         if (ifa->ifa_addr->sa_family == AF_PACKET &&
+//             strcmp(ifa->ifa_name, "lo") != 0) {
+//             iface_indices[iface_count++] = if_nametoindex(ifa->ifa_name);
+//             if (debug_mode)
+//                 printf("[DEBUG] Found interface %s (index=%d)\n",
+//                        ifa->ifa_name, iface_indices[iface_count-1]);
+//         }
+//     }
+//     freeifaddrs(ifaddr);
+// }
+
 void find_all_ifaces() {
     struct ifaddrs *ifaddr, *ifa;
     iface_count = 0;
@@ -28,14 +46,21 @@ void find_all_ifaces() {
         if (!ifa->ifa_addr) continue;
         if (ifa->ifa_addr->sa_family == AF_PACKET &&
             strcmp(ifa->ifa_name, "lo") != 0) {
-            iface_indices[iface_count++] = if_nametoindex(ifa->ifa_name);
+
+            int ifindex = if_nametoindex(ifa->ifa_name);
+            iface_indices[iface_count] = ifindex;
+            strncpy(iface_names[iface_count], ifa->ifa_name, IFNAMSIZ);
+
             if (debug_mode)
                 printf("[DEBUG] Found interface %s (index=%d)\n",
-                       ifa->ifa_name, iface_indices[iface_count-1]);
+                       iface_names[iface_count], iface_indices[iface_count]);
+
+            iface_count++;
         }
     }
     freeifaddrs(ifaddr);
 }
+
 
 /*
 Denne funksjonen tar inn navnet på et nettverksinterface, 

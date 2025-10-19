@@ -72,9 +72,13 @@ int main(int argc, char *argv[]) {
     find_all_ifaces();
     arp_init_cache();
 
-    //legger til ruter for å teste routing table
-    //routing_table[0].dest = 30; //ruten skal gå til mip 30
-    //routing_table[0].next = 20; //skal gå gjennom MIP 20, B, som er mellom A og C i scriptet
+    
+    printf("[DEBUG] Interfaces found at startup:\n");
+    for (int i = 0; i < iface_count; i++) {
+        printf("   iface[%d] = %s (index=%d)\n",
+               i, iface_names[i], iface_indices[i]);
+    
+    }
 
 
     if (debug_mode) {
