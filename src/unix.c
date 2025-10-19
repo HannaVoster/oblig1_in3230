@@ -211,7 +211,7 @@ void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t 
     size_t pdu_len;
     uint8_t *pdu = mip_build_pdu(255, my_mip, 1, SDU_TYPE_ROUTING, payload, len, &pdu_len);
 
-    printf("[MIPD][ROUTING] Sendte %s broadcast (len=%zu)\n", type_str, len);
+    //printf("[MIPD][ROUTING] Sendte %s broadcast (len=%zu)\n", type_str, len);
 
     // Send ARP-REQ på alle ikke-loopback interfaces
     for (int i = 0; i < iface_count; i++) {
