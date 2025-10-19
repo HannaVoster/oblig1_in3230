@@ -258,14 +258,13 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 arp_update(arp->mip_addr, eh->h_source, if_index);
                 printf("[DEBUG] Etter update: ifindex=%d for MIP=%d\n", if_index, arp->mip_addr);
 
-
                 if (debug_mode){
                     print_arp_cache();
                 }
 
                 //har fått response, så kan sjekke om det er noen pakker som venter på å bli sent
                 //og som venter på denne aaddressen
-                send_pending_messages(raw_sock, arp->mip_addr, eh->h_source);
+                send_pending_messages(raw_sock, arp->mip_addr, eh->h_source, if_index);
             }
             break;
         }

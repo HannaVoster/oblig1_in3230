@@ -70,7 +70,7 @@ tar inn raw socket for å sende i send_pdu of adresse for å vite hvem som skal 
 og hvem som sender
 */
 void send_pending_messages(int raw_sock, uint8_t next_hop,
-                           unsigned char *mac)
+                           unsigned char *mac, int if_index)
 {
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid && pending_queue[i].next == next_hop) {
@@ -104,8 +104,8 @@ void send_pending_messages(int raw_sock, uint8_t next_hop,
                 pending_queue[i].length,
                 &pdu_len
             );
-            //FIKS IKKE -1 her
-            send_pdu(raw_sock, pdu, pdu_len, mac, -1);
+          
+            send_pdu(raw_sock, pdu, pdu_len, mac, if_index);
 
             free(pdu);
             free(pending_queue[i].payload);
