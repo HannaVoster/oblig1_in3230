@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     printf("[DEBUG] Interfaces found at startup:\n");
     for (int i = 0; i < iface_count; i++) {
         printf("   iface[%d] = %s (index=%d)\n",
-               i, iface_names[i], iface_indices[i]);
+               i, iface_name[i], iface_indices[i]);
     
     }
 
