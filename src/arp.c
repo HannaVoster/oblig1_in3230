@@ -62,9 +62,9 @@ int arp_lookup(int mip_addr, unsigned char *mac_out, int *ifindex_out) {
     for (int i = 0; i < MAX_ARP; i++) {
         // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {
-            if(debug_mode){
+            
                 printf("[DEBUG] arp_lookup FOUND for mip=%u\n\n", mip_addr);
-            }
+            
             if (mac_out) memcpy(mac_out, arp_cache[i].mac, 6);
             if (ifindex_out) *ifindex_out = arp_cache[i].ifindex;
             return 1;
