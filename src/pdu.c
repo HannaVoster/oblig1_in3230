@@ -111,9 +111,12 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     // Finn interfacenavnet fra ifindex
     char ifname[IFNAMSIZ];
     unsigned char src_mac[ETH_ALEN];
-    if (!if_indextoname(ifindex, ifname)) {
+    if (if_indextoname(ifindex, ifname) == NULL) {
         perror("if_indextoname");
+        printf("  [DEBUG] could not resolve interface index %d\n", ifindex);
         return -1;
+    } else {
+        printf("  [DEBUG] using interface %s (index=%d)\n", ifname, ifindex);
     }
 
     if (get_iface_mac(ifname, src_mac) < 0) {
