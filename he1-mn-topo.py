@@ -12,7 +12,7 @@ class H1Topo(Topo):
         B = self.addHost('B')
         self.addLink(A, B, bw=10, delay='5ms')
 
-topos = {'simple': (lambda: H1Topo())}
+topos = {'he1': (lambda: H1Topo())}
 
 #     def __init__(self):
 #         "Set up our custom topo."
