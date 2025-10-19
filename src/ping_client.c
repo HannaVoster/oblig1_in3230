@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     gettimeofday(&start, NULL);
 
     // Send melding til mipd
-    if (write(sock, buf, 1 + strlen((char*)&buf[2])) < 0) {
+    if (write(sock, buf, 2 + strlen((char*)&buf[2])) < 0) {
         perror("write");
         close(sock);
         return 1;
