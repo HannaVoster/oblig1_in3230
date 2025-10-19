@@ -2,32 +2,29 @@
 
 """ mininet script to test IN3230/IN4230 HE1 assignments"""
 
+#!/usr/bin/env python
+
+"""
+Mininet-script for IN3230/IN4230 HE1
+— Oppdatert for ikke-grafisk kjøring (ingen X11/xterm)
+— Kjører alle prosesser i bakgrunnen med logging til /tmp/
+"""
+
 from mininet.topo import Topo
 from mininet.cli import CLI
-# from mininet.term import makeTerm
-from mininet.term import tunnelX11
 import os
 import signal
 import time
 
-# Usage example:
-#
-# 1. First, run the following command to start mininet with this script:
-# sudo -E mn --mac --custom he1-mn-script.py --topo he1 --link tc
-#
-# 2. Second, inside the mininet console run 'init_he1'
-#
-# 3. Third, inside the mininet console run 'EOF' to gracefully kill
-# the mininet console
 
+# ---------------------------
+#  TOPOLOGI
+# ---------------------------
 
 class HE1Topo(Topo):
     "Larger topology for home exams."
 
     def __init__(self):
-        "Set up our custom topo."
-
-        # Initialize topology
         Topo.__init__(self)
 
         # Add hosts
@@ -37,7 +34,7 @@ class HE1Topo(Topo):
         D = self.addHost('D')
         E = self.addHost('E')
 
-        # Add links. Note the packet loss of 1% (~1 out of 10 packets is discarded)
+        # Add links (1% loss)
         self.addLink(A, B, bw=10, delay='10ms', loss=1.0, use_tbf=False)
         self.addLink(B, C, bw=10, delay='10ms', loss=1.0, use_tbf=False)
         self.addLink(B, D, bw=10, delay='10ms', loss=1.0, use_tbf=False)
@@ -45,209 +42,106 @@ class HE1Topo(Topo):
         self.addLink(D, E, bw=10, delay='10ms', loss=1.0, use_tbf=False)
 
 
-terms = []
+# ---------------------------
+#  HJELPEFUNKSJONER
+# ---------------------------
+
+HE1_DIR = os.getcwd()  # hvor dine ./mipd, ./routingd osv ligger
 
 
-def openTerm(self, node, title, geometry, cmd="bash"):
-    """Open xterm if possible, otherwise run command in background."""
-    try:
-        display, tunnel = tunnelX11(node)
-        if display:
-            # Prøv å starte grafisk xterm
-            return node.popen([
-                "xterm",
-                "-hold",
-                "-title", title,
-                "-geometry", geometry,
-                "-display", display,
-                "-e", cmd
-            ])
-        else:
-            print(f"[WARN] No X11 display detected, running '{title}' in background.")
-            return node.popen(cmd, shell=True)
-    except Exception as e:
-        print(f"[WARN] Falling back: could not open xterm for '{title}': {e}")
-        return node.popen(cmd, shell=True)
+def run_in_bg(node, title, cmd):
+    """
+    Kjør kommando i bakgrunnen på gitt node.
+    Logger stdout/stderr til /tmp/<title>.log
+    """
+    log_path = f"/tmp/{title.replace(' ', '_')}.log"
+    full_cmd = f"cd {HE1_DIR} && {cmd} > {log_path} 2>&1 &"
+    node.cmd(full_cmd)
+    print(f"[INFO] Started {title} on {node.name}, logging to {log_path}")
 
 
+# ---------------------------
+#  INIT-HE1 KOMMANDO
+# ---------------------------
 
 def init_he1(self, line):
-    "init is an example command to extend the Mininet CLI"
+    "Starter MIP- og routing-daemoner og ping-testene."
     net = self.mn
-    A = net.get('A')
-    B = net.get('B')
-    C = net.get('C')
-    D = net.get('D')
-    E = net.get('E')
+    A, B, C, D, E = [net.get(x) for x in ('A', 'B', 'C', 'D', 'E')]
 
-    # MIP Daemons
-    terms.append(openTerm(self,
-                          node=A,
-                          title="MIP A",
-                          geometry="80x14+0+0",
-                          cmd="./mipd -d usockA 10"))
-    time.sleep(1)
+    # --- MIP Daemons ---
+    run_in_bg(A, "mipd_A", "./mipd -d usockA 10")
+    run_in_bg(B, "mipd_B", "./mipd -d usockB 20")
+    run_in_bg(C, "mipd_C", "./mipd -d usockC 30")
+    run_in_bg(D, "mipd_D", "./mipd -d usockD 40")
+    run_in_bg(E, "mipd_E", "./mipd -d usockE 50")
 
-    terms.append(openTerm(self,
-                          node=B,
-                          title="MIP B",
-                          geometry="80x14+0+450",
-                          cmd="./mipd -d usockB 20"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=C,
-                          title="MIP C",
-                          geometry="80x14+555+0",
-                          cmd="./mipd -d usockC 30"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=D,
-                          title="MIP D",
-                          geometry="80x14+1110+450",
-                          cmd="./mipd -d usockD 40"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=E,
-                          title="MIP E",
-                          geometry="80x14+1110+0",
-                          cmd="./mipd -d usockE 50"))
-
-    # Sleep for 3 sec. to make sure that the MIP daemons are ready
-    time.sleep(1)
-
-    # Routing Daemons
-    terms.append(openTerm(self,
-                          node=A,
-                          title="ROUTING A",
-                          geometry="80x14+0+210",
-                          cmd="./routingd -d usockA"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=B,
-                          title="ROUTING B",
-                          geometry="80x14+0+660",
-                          cmd="./routingd -d usockB"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=C,
-                          title="ROUTING C",
-                          geometry="80x14+555+210",
-                          cmd="./routingd -d usockC"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=D,
-                          title="ROUTING D",
-                          geometry="80x14+1110+660",
-                          cmd="./routingd -d usockD"))
-    time.sleep(1)
-
-    terms.append(openTerm(self,
-                          node=E,
-                          title="ROUTING E",
-                          geometry="80x14+1110+210",
-                          cmd="./routingd -d usockE"))
-
-    # Make sure that the MIP and Routing daemons are ready and the topology
-    # has converged
-
+    print("[INFO] Waiting for MIP daemons to stabilize...")
     time.sleep(3)
 
-    # (1) Launch ping_server at Node E
-    terms.append(openTerm(self,
-                          node=E,
-                          title="SERVER [E]",
-                          geometry="38x20+807+583",
-                          cmd="./ping_server usockE"))
+    # --- Routing Daemons ---
+    run_in_bg(A, "routingd_A", "./routingd -d usockA")
+    run_in_bg(B, "routingd_B", "./routingd -d usockB")
+    run_in_bg(C, "routingd_C", "./routingd -d usockC")
+    run_in_bg(D, "routingd_D", "./routingd -d usockD")
+    run_in_bg(E, "routingd_E", "./routingd -d usockE")
 
-    time.sleep(1)
-
-    # (2) Ping from Node A to Node E with TTL 8
-    terms.append(openTerm(self,
-                          node=A,
-                          title="CLIENT [A]",
-                          geometry="38x20+555+583",
-                          cmd="./ping_client usockA \"Hello from A\" 50 8"))
-
-    time.sleep(1)
-
-    # (3) Ping from Node C to Node E with TTL 8
-    terms.append(openTerm(self,
-                          node=C,
-                          title="CLIENT [C]",
-                          geometry="38x20+555+583",
-                          cmd="./ping_client usockC \"Hello from C\" 50 8"))
-
-    time.sleep(1)
-
-    # (4) Ping from A with TTL = 1 should be discarded and generate a timeout
-    terms.append(openTerm(self,
-                          node=A,
-                          title="CLIENT [A]",
-                          geometry="38x20+555+583",
-                          cmd="./ping_client usockA \"Hello with TTL 1\" 50 1"))
-
-    time.sleep(1)
-
-    # (5) Ping from C with TTL = 3 should make it
-    terms.append(openTerm(self,
-                          node=C,
-                          title="CLIENT [C]",
-                          geometry="38x20+555+583",
-                          cmd="./ping_client usockC \"Hello with TTL 3\" 50 3"))
-
-    time.sleep(1)
-
-    # After 10 sec. fail the link betwen node B and D for 20 sec.
-    # DVR should be able to find another shortest path and reroute the packets
-    # from A to E through C
-
-    net.configLinkStatus('B', 'D','down')
+    print("[INFO] Waiting for routing to converge...")
     time.sleep(5)
 
-    # (6) Ping from A with default TTL = 8
-    terms.append(openTerm(self,
-                          node=A,
-                          title="CLIENT [A]",
-                          geometry="38x20+555+583",
-                          cmd="./ping_client usockA \"Hello from A\" 50 8"))
+    # --- Server ---
+    run_in_bg(E, "ping_server_E", "./ping_server usockE")
+    time.sleep(2)
 
-    # Bring the link up again. The network should converge again and use
-    # A - B - D - E as the shortest path
-    net.configLinkStatus('B', 'D','up')
+    # --- Clients (flere tester) ---
+    run_in_bg(A, "ping_client_A_TTL8", './ping_client usockA "Hello from A" 50 8')
+    run_in_bg(C, "ping_client_C_TTL8", './ping_client usockC "Hello from C" 50 8')
+    run_in_bg(A, "ping_client_A_TTL1", './ping_client usockA "Hello with TTL 1" 50 1')
+    run_in_bg(C, "ping_client_C_TTL3", './ping_client usockC "Hello with TTL 3" 50 3')
+
+    # --- Link-failure test ---
+    print("[INFO] Simulating link failure B-D for 20 seconds...")
+    net.configLinkStatus('B', 'D', 'down')
+    time.sleep(10)
+
+    run_in_bg(A, "ping_client_A_after_fail", './ping_client usockA "After fail" 50 8')
+
+    net.configLinkStatus('B', 'D', 'up')
+    print("[INFO] Link B-D restored, waiting for reconvergence...")
     time.sleep(5)
 
-    # (7) Ping again from A with default TTL = 8
-    terms.append(openTerm(self,
-                          node=A,
-                          title="CLIENT [A]",
-                          geometry="38x20+555+583",
-                          cmd="./ping_client usockA \"Hello from A\" 50 8"))
+    run_in_bg(A, "ping_client_A_after_recover", './ping_client usockA "After recover" 50 8')
+
+    print("[INFO] All background processes started. Check /tmp/*.log for output.")
 
 
-# Mininet Callbacks
+# ---------------------------
+#  MININET CLI-KOMMANDOER
+# ---------------------------
 
-# Inside mininet console run `init_he1`
 CLI.do_init_he1 = init_he1
 
-# Inside mininet console run 'EOF' to gracefully kill the mininet console
 orig_EOF = CLI.do_EOF
 
 
-# Kill mininet console
 def do_EOF(self, line):
-    for t in terms:
-        os.kill(t.pid, signal.SIGKILL)
+    """Kill all running daemons when exiting Mininet."""
+    net = self.mn
+    for name in ('A', 'B', 'C', 'D', 'E'):
+        h = net.get(name)
+        h.cmd("pkill -f mipd || true")
+        h.cmd("pkill -f routingd || true")
+        h.cmd("pkill -f ping_server || true")
+        h.cmd("pkill -f ping_client || true")
+    print("[INFO] All background processes terminated.")
     return orig_EOF(self, line)
+
 
 CLI.do_EOF = do_EOF
 
-# Topologies
-topos = {
-    'he1': (lambda: HE1Topo())
-}
+
+# ---------------------------
+#  TOPOLOGI-REGISTER
+# ---------------------------
+
+topos = {'he1': (lambda: HE1Topo())}
