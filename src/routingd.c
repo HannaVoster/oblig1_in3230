@@ -261,12 +261,12 @@ int find_or_add_neighbor(uint8_t mip){
 //hvis dest ikke funnes, returneres -1 . ingen repsonse sendes
 int get_route(uint8_t dest) {
     for (int i = 0; i < MAX_ROUTES; i++) {
-        if (routing_table[i].valid) {
-            printf("[ROUTINGD] Route entry %d: dest=%d via=%d cost=%d\n",
-                    i, routing_table[i].dest,
-                    routing_table[i].next_hop,
-                    routing_table[i].cost);
-        }
+        // if (routing_table[i].valid) {
+        //     printf("[ROUTINGD] Route entry %d: dest=%d via=%d cost=%d\n",
+        //             i, routing_table[i].dest,
+        //             routing_table[i].next_hop,
+        //             routing_table[i].cost);
+        // }
         if (routing_table[i].dest == dest){
             return i;
         }
