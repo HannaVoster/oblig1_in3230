@@ -111,13 +111,12 @@ int main(int argc, char *argv[]) {
                     goto cleanup;
                 }
                 uint8_t src = buf[0];
-                uint8_t ttl = buf[1];
+                uint8_t msg_type = buf[1]; // for HELLO/UPDATE - ellers ttl, men brukes ikke videre
 
                 if (len >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
                     handle_route_request(ROUTING_SOCK, buf, len);
                 } else if (len >= 3) {
-                    uint8_t msg_type = buf[2];
-                    handle_incoming_message(src, msg_type, &buf[3], len - 3);
+                    handle_incoming_message(src, msg_type, &buf[2], len - 2);
                 }
             }
         }
