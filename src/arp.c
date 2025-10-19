@@ -32,7 +32,7 @@ void arp_update(int mip_addr, const unsigned char *mac, int ifindex) {
             // fant en eksisterende entry, oppdater MAC-adressen
             memcpy(arp_cache[i].mac, mac, 6);
             arp_cache[i].ifindex = ifindex;
-            printf("[ARP] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X if = %d\n\n",
+            printf("[DEBUG][ARP_UPDATE] Oppdatert MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X if = %d\n\n",
                    mip_addr,
                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
                    ifindex);
@@ -46,7 +46,7 @@ void arp_update(int mip_addr, const unsigned char *mac, int ifindex) {
             arp_cache[i].mip_addr = mip_addr;
             memcpy(arp_cache[i].mac, mac, 6);
             arp_cache[i].ifindex = ifindex;
-            printf("[ARP] Lagt til MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X if = %d\n\n",
+            printf("[DEBUG][ARP_UPDATE]  Lagt til MIP %d -> %02X:%02X:%02X:%02X:%02X:%02X if = %d\n\n",
                    mip_addr,
                    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
                    ifindex);
@@ -59,6 +59,8 @@ void arp_update(int mip_addr, const unsigned char *mac, int ifindex) {
 // Søker i ARP-cachen etter en gitt MIP-adresse
 // unsigned char *mac_out peker til bufferet hvor mac addressen eventuellt lagres
 int arp_lookup(int mip_addr, unsigned char *mac_out, int *ifindex_out) {
+    printf("[DEBUG][ARP_LOOKUP] Søker etter MIP=%d\n", mip_addr);
+
     for (int i = 0; i < MAX_ARP; i++) {
         // Sjekk om entry er gyldig og har riktig MIP-adresse
         if (arp_cache[i].valid && arp_cache[i].mip_addr == mip_addr) {

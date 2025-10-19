@@ -141,12 +141,13 @@ int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest
     device.sll_halen    = ETH_ALEN;
     memcpy(device.sll_addr, dest_mac, ETH_ALEN);
 
+    printf("[DEBUG][send_pdu] Starter send via ifindex=%d\n", ifindex);
     // Send rammen
     int sent = sendto(rawsocket, frame, frame_len, 0,
                         (struct sockaddr *)&device, sizeof(device));
 
     if (sent < 0) {
-        perror("sendto");
+        perror("[send_pdu] sendto");
     } else if (debug_mode) {
         printf("[DEBUG] send_pdu: TX via %s (index=%d) bytes=%d\n",
                 ifname, ifindex, sent);

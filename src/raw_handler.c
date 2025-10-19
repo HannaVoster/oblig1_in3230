@@ -48,7 +48,10 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     // msghdr brukes av recvmsg() for å motta både data og metadata
     struct msghdr msg = { .msg_name = &src_addr, .msg_namelen = sizeof(src_addr),
                           .msg_iov = &iov, .msg_iovlen = 1 };
+
+    printf("[DEBUG][RAW] Venter på pakke...\n");
     int len = recvmsg(raw_sock, &msg, 0);
+    printf("[DEBUG][RAW] Mottok %d bytes på ifindex=%d\n", len, src_addr.sll_ifindex);
 
     if(debug_mode){
         printf("[DEBUG][RAW] handle_raw_packet CALLED, len=%d\n", len);

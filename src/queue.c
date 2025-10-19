@@ -105,7 +105,10 @@ void send_pending_messages(int raw_sock, uint8_t next_hop,
                 &pdu_len
             );
           
-            send_pdu(raw_sock, pdu, pdu_len, mac, if_index);
+            printf("[DEBUG][QUEUE] Sender pending → next_hop=%d via if_index=%d\n", next_hop, if_index);
+            int sent = send_pdu(raw_sock, pdu, pdu_len, mac, if_index);
+            printf("[DEBUG][QUEUE] send_pdu returnerte %d\n", sent);
+
 
             free(pdu);
             free(pending_queue[i].payload);
