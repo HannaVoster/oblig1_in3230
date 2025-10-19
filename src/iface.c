@@ -49,11 +49,11 @@ void find_all_ifaces() {
 
             int ifindex = if_nametoindex(ifa->ifa_name);
             iface_indices[iface_count] = ifindex;
-            strncpy(iface_names[iface_count], ifa->ifa_name, IFNAMSIZ);
+            strncpy(iface_name[iface_count], ifa->ifa_name, IFNAMSIZ);
 
             if (debug_mode)
                 printf("[DEBUG] Found interface %s (index=%d)\n",
-                       iface_names[iface_count], iface_indices[iface_count]);
+                       iface_name[iface_count], iface_indices[iface_count]);
 
             iface_count++;
         }
