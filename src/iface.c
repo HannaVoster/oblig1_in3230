@@ -18,6 +18,7 @@
 
 int iface_indices[5];
 int iface_count = 0;
+char iface_name[MAX_IFACES][IFNAMSIZ];
 
 // void find_all_ifaces() {
 //     struct ifaddrs *ifaddr, *ifa;
