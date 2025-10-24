@@ -267,7 +267,7 @@ int get_route(uint8_t dest) {
         //             routing_table[i].next_hop,
         //             routing_table[i].cost);
         // }
-        if (routing_table[i].dest == dest){
+        if (routing_table[i].valid && routing_table[i].dest == dest){
             return i;
         }
     }
