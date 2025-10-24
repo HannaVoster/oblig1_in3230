@@ -300,6 +300,7 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
         routing_table[id].dest = dest;
     }
     //oppdatterer uansett - med neste hopp, kostnad og siste tidspunkt for oppdattering
+    routing_table[id].valid = 1;
     routing_table[id].next_hop = next_hop;
     routing_table[id].cost = cost;
     routing_table[id].updated_ms = now_ms();
