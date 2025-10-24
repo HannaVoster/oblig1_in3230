@@ -195,6 +195,7 @@ int connect_to_mipd(const char *socket_path) {
 }
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
+    
     uint8_t rsp[6] = { my_address, 0, 'R', 'S', 'P', next }; //etter format fra oppgaven
     if (write(sock, rsp, sizeof(rsp)) != sizeof(rsp))
         perror("write response");
@@ -223,6 +224,13 @@ void handle_route_request(int sock, uint8_t *msg, ssize_t length) {
     if (id >= 0 && routing_table[id].valid) {
         next = routing_table[id].next_hop;
     }
+
+    printf("[ROUTINGD] handle_route_request: my=%d dest=%d -> id=%d valid=%d next=%d cost=%d\n",
+       my_addr, dest, id,
+       (id >= 0 ? routing_table[id].valid : -1),
+       (id >= 0 ? routing_table[id].next_hop : -1),
+       (id >= 0 ? routing_table[id].cost : -1));
+
     send_route_response(sock, my_addr, next);
 }
 
