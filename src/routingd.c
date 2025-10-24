@@ -195,6 +195,8 @@ int connect_to_mipd(const char *socket_path) {
 }
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
+    printf("[ROUTINGD] Sent RESPONSE: my=%d next_hop=%d (dest was %d)\n",
+       my_address, next, ???);
     
     uint8_t rsp[6] = { my_address, 0, 'R', 'S', 'P', next }; //etter format fra oppgaven
     if (write(sock, rsp, sizeof(rsp)) != sizeof(rsp))
