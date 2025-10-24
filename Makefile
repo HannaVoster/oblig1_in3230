@@ -11,7 +11,7 @@ TARGETS = $(BIN_DIR)/mipd $(BIN_DIR)/ping_client $(BIN_DIR)/ping_server $(BIN_DI
 
 
 # Standardregel
-all: $(TARGETS)
+all: $(TARGETS) deploy
 
 # Lag bin/ hvis den ikke finnes
 $(BIN_DIR):
@@ -42,3 +42,9 @@ $(BIN_DIR)/routingd: $(SRC_DIR)/routingd.c
 # Rydd opp
 clean:
 	rm -rf $(BIN_DIR) $(SRC_DIR)/*.o
+
+DEPLOY_DIR = $(PWD)
+
+deploy:
+	cp $(BIN_DIR)/* $(DEPLOY_DIR)/
+	@echo "Deploy fullført: Binærfiler kopiert til $(DEPLOY_DIR)"
