@@ -201,15 +201,22 @@ void send_route_response(int sock, uint8_t my_address, uint8_t next){
 
 void handle_route_request(int sock, uint8_t *msg, ssize_t length) {
     if (length < 6) { 
-        fprintf(stderr, "..."); 
+        fprintf(stderr, "[ROUTINGD] Ugyldig REQUEST (for kort)\n");
         return; 
     }
 
     uint8_t my_addr = msg[0];      // egen MIP (ekko fra MIPd)
     uint8_t dest    = msg[5];      // oppslagsdestinasjon
+    printf("[ROUTINGD] handle_route_request: my=%d dest=%d\n", my_addr, dest);
 
     uint8_t next = 255;            // 255 = ingen rute
     int id = get_route(dest);
+    if (id >= 0 && routing_table[id].valid) {
+        printf("[ROUTINGD] Found route: dest=%d via=%d\n",
+               routing_table[id].dest, routing_table[id].next_hop);
+    } else {
+        printf("[ROUTINGD] No route found for dest=%d\n", dest);
+    }
     if (id >= 0 && routing_table[id].valid) {
         next = routing_table[id].next_hop;
     }
