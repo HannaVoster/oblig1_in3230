@@ -55,7 +55,7 @@ void queue_message(uint8_t ultimate_dest, uint8_t next_hop,
         }
     }
 
-    printf("[QUEUE] Kø full – kunne ikke legge til melding for dest=%d\n", ultimate_dest);
+    printf("[QUEUE] Kø full kunne ikke legge til melding for dest=%d\n", ultimate_dest);
 }
 
 
@@ -72,6 +72,8 @@ og hvem som sender
 void send_pending_messages(int raw_sock, uint8_t next_hop,
                            unsigned char *mac, int if_index)
 {
+    printf("[DEBUG][QUEUE] send_pending_messages(next_hop=%d)\n", next_hop);
+
     for (int i = 0; i < MAX_PENDING; i++) {
         if (pending_queue[i].valid && pending_queue[i].next == next_hop) {
 

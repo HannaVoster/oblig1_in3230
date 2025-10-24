@@ -270,6 +270,8 @@ void handle_route_response(int raw_sock, uint8_t next){
             //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
             else{
                 printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
+                printf("[DEBUG][ROUTING] queue_message kalles: dest=%d next=%d src=%d ttl=%d type=%d len=%zu\n",
+                 dest, next, src, ttl, sdu_type, sdu_len);
                 queue_message(dest, next, src, ttl, sdu_type, sdu, sdu_len);
                 send_arp_request(raw_sock, next, my_mip_address);
             }

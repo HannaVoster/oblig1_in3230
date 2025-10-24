@@ -260,7 +260,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
                 printf("[RAW] ARP-RESP mottatt for MIP %d\n\n", arp->mip_addr);
                 arp_update(arp->mip_addr, eh->h_source, if_index);
                 printf("[DEBUG] Etter update: ifindex=%d for MIP=%d\n", if_index, arp->mip_addr);
-                usleep(100000);
+            
                 if (debug_mode){
                     print_arp_cache();
                 }
