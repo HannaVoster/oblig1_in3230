@@ -221,7 +221,7 @@ void handle_route_request(int sock, uint8_t *msg, ssize_t length) {
         printf("[ROUTINGD] Found route: dest=%d via=%d\n",
                routing_table[id].dest, routing_table[id].next_hop);
     } else {
-        printf("[ROUTINGD] No route found for dest=%d\n", dest);
+        printf("[ROUTINGD] No route found for dest=%d\n id = %d, routing_table[id].valid = %d ", dest, id, routing_table[id].valid);
     }
     if (id >= 0 && routing_table[id].valid) {
         next = routing_table[id].next_hop;
