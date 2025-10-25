@@ -430,6 +430,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
             if (debug_mode){
                 printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
             }
+
             // Oppdater naboen slik at vi vet at den lever
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
@@ -449,6 +450,12 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
 
                 if (dest == 0 || dest > 254) continue;
                 if (dest == MY_MIP) continue; // ignorer ruter til deg selv (poison reverse)
+                if (cost == 255) {
+                    // Dette er en poisoned reverse / ugyldig rute, ikke legg den inn
+                    if (debug_mode)
+                        printf("[ROUTINGD] Ignorerer poisoned reverse for dest=%d fra %d\n", dest, from);
+                    continue;
+                }
 
                 // unngå overflow og for lav kostnad
                 uint8_t new_cost = (cost >= 254) ? 255 : (uint8_t)(cost + 1);
