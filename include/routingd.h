@@ -10,8 +10,8 @@
 
 #define MAX_ROUTES 12
 #define MAX_EVENTS 10 // epoll
-#define HELLO_INTERVAL_MS 10000
-#define UPDATE_INTERVAL_MS 50000
+#define HELLO_INTERVAL_MS 1000
+#define UPDATE_INTERVAL_MS 3000
 #define INF_COST 255
 
 // SDU-type er fortsatt 0x04 (routing). Interne msg-typer:
