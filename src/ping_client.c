@@ -56,6 +56,7 @@ int main(int argc, char *argv[]) {
         close(sock);
         return 1;
     }
+    sleep(1);
     // Lag melding: [dest_host][ttl][PING:<message>]
     char buf[BUF_SIZE];
     buf[0] = dest_host;
