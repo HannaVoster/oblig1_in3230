@@ -74,34 +74,39 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Sett timeout på 1 sekund (venter på svar fra server)
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(sock, &fds);
-    struct timeval tv = {1, 0}; //endret til høyere
+    // Vent på svar i opptil 10 sekunder, prøver hvert sekund
+    int total_wait = 10;
+    int got_reply = 0;
 
-    int rv = select(sock + 1, &fds, NULL, NULL, &tv);
-    if (rv == 0) {
-        printf("timeout\n");
-        close(sock);
-        return 0;
+    for (int i = 0; i < total_wait; i++) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(sock, &fds);
+        struct timeval tv = {1, 0}; // vent 1 sekund per runde
+
+        int rv = select(sock + 1, &fds, NULL, NULL, &tv);
+        if (rv > 0 && FD_ISSET(sock, &fds)) {
+            // fått svar
+            char reply[BUF_SIZE];
+            int n = read(sock, reply, sizeof(reply) - 1);
+            if (n > 0) {
+                reply[n] = '\0';
+                gettimeofday(&end, NULL);
+                long ms = (end.tv_sec - start.tv_sec) * 1000 +
+                        (end.tv_usec - start.tv_usec) / 1000;
+                uint8_t src = reply[0];
+                uint8_t ttl_reply = reply[1];
+                printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
+                    src, ttl_reply, &reply[2], ms);
+                got_reply = 1;
+                break;
+            }
+        }
+        // hvis ikke fått svar ennå, vent litt og prøv igjen
+        usleep(500000); // 0.5 sek
     }
-
-    //henter var hvis det er data å lese
-    char reply[BUF_SIZE];
-    int n = read(sock, reply, sizeof(reply) - 1);
-    if (n > 0) {
-        reply[n] = '\0';
-        gettimeofday(&end, NULL);
-        long ms = (end.tv_sec - start.tv_sec) * 1000000 +
-                  (end.tv_usec - start.tv_usec);
-        uint8_t src = reply[0];
-        uint8_t ttl_reply = reply[1];
-
-        printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
-               src, ttl_reply, &reply[2], ms);
-    } else {
-        printf("client timeout\n");
+    if (!got_reply) {
+        printf("timeout (no reply after %d seconds)\n", total_wait);
     }
 
     close(sock);
