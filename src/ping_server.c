@@ -84,12 +84,18 @@ int main(int argc, char *argv[]) {
         snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%.500s", (char*)&buf[2]);
 
         // Sender svaret tilbake via samme socket (til mipd → ping_client)
-        if (write(sock, reply, 2 + strlen((char*)&reply[2])) < 0)  {
-            perror("write");
-        } else {
-            printf("[PING_SERVER] Sent reply: PONG:%s\n", &buf[2]);
-            fflush(stdout);
+        ssize_t total_len = 2 + strlen((char*)&reply[2]);
+        ssize_t sent = 0;
+        while (sent < total_len) {
+            ssize_t n = write(sock, reply + sent, total_len - sent);
+            if (n < 0) {
+                perror("write");
+                break;
+            }
+            sent += n;
         }
+        printf("[PING_SERVER] Sent reply (%zd bytes): PONG:%s\n", sent, &buf[2]);
+        fflush(stdout);
     }
 
     close(sock);
