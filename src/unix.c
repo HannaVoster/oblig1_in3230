@@ -35,35 +35,44 @@ int create_unix_socket(const char *path) {
     int sock;
     struct sockaddr_un addr;
 
-    //lager en unix socket, stopper programmet hvis en feil skjer
+    // Lag UNIX socket
     if ((sock = socket(AF_UNIX, SOCK_SEQPACKET, 0)) == -1) {
         perror("unix socket");
         exit(EXIT_FAILURE);
     }
 
-    //nullstiller struct for adressen til socketen
+    // Nullstill adressestruktur
     memset(&addr, 0, sizeof(addr));
-    //socket type: UNIX
     addr.sun_family = AF_UNIX;
 
-    //kopierer UNIX_PATH som adressen
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
+    // Bygg full sti (plasser socketen i /tmp/)
+    char full_path[108];
+    if (path[0] != '/') {
+        snprintf(full_path, sizeof(full_path), "/tmp/%s", path);
+    } else {
+        strncpy(full_path, path, sizeof(full_path) - 1);
+        full_path[sizeof(full_path) - 1] = '\0';
+    }
 
-    //sletter eventuel gammel fil med samme navn fra tidligere kjøring
-    unlink(path); 
+    if (debug_mode) {
+        fprintf(stderr, "[MIPD] Binding UNIX socket at: %s\n", full_path);
+        fflush(stderr);
+    }
 
-    if(debug_mode) printf("[MIPD] Binding UNIX socket at: %s\n", path);
-    fflush(stdout);
+    // Fjern gammel socket-fil om den finnes
+    unlink(full_path);
 
+    // Sett socket path
+    strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
-    //kobler socketen til adddressen i addr, slik at klientet kan koble seg på den gjemnnom filbanen
-    //typecaster (struct sockaddr*)&addr så bind() skjønner at det sendes en generisk socket addresse
-    if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+    // Bind socket
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
         perror("bind unix");
         exit(EXIT_FAILURE);
     }
 
-    //setter socketen i lyttemodus, klar til å ta imot klienter (maks 5 i kø)
+    // Lytt på socket
     if (listen(sock, 5) == -1) {
         perror("listen unix");
         exit(EXIT_FAILURE);
@@ -71,6 +80,7 @@ int create_unix_socket(const char *path) {
 
     return sock;
 }
+
 
 
 /*
