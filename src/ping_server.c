@@ -16,7 +16,7 @@
 #define BUF_SIZE 512 //økt etter warning
 
 int main(int argc, char *argv[]) {
-    setvbuf(stdout, NULL, _IOLBF, 0);
+    //setvbuf(stdout, NULL, _IOLBF, 0);
 
     // Sjekker at bruker har gitt et socket_path eller ber om hjelp
     if (argc < 2 || strcmp(argv[1], "-h") == 0) {
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
             perror("write");
         } else {
             printf("[PING_SERVER] Sent reply: PONG:%s\n", &buf[2]);
-            fflush(stdout);
+            //fflush(stdout);
         }
     }
 
