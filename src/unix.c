@@ -53,6 +53,7 @@ int create_unix_socket(const char *path) {
     unlink(path); 
 
     if(debug_mode) printf("[MIPD] Binding UNIX socket at: %s\n", path);
+    fflush(stdout);
 
 
     //kobler socketen til adddressen i addr, slik at klientet kan koble seg på den gjemnnom filbanen
