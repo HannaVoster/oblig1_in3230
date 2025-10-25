@@ -151,16 +151,17 @@ int main(int argc, char *argv[]) {
 
 int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-
     if (sock < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
-    // Lag unik lokal klientadresse (ellers kollisjon mellom routingd-prosesser)
-    struct sockaddr_un client_addr = {0};
+    // Lag unik lokal UNIX-socket for routingd selv (så flere prosesser ikke kolliderer)
+    struct sockaddr_un client_addr;
+    memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sun_family = AF_UNIX;
-    snprintf(client_addr.sun_path, sizeof(client_addr.sun_path), "routingd_%d.sock", getpid());
+    snprintf(client_addr.sun_path, sizeof(client_addr.sun_path),
+             "/tmp/routingd_%d.sock", getpid());  // legg den i /tmp/
     unlink(client_addr.sun_path);
 
     if (bind(sock, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
@@ -169,21 +170,34 @@ int connect_to_mipd(const char *socket_path) {
         exit(EXIT_FAILURE);
     }
 
-    // Koble til MIP-daemonens UNIX socket (f.eks. ./usockA)
-    struct sockaddr_un addr = {0};
-    char full_path[108];
+    // --- Bygg full sti til MIP-daemonens UNIX-socket ---
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+
+    char full_path[sizeof(addr.sun_path)];
     if (socket_path[0] != '/') {
         snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
     } else {
         strncpy(full_path, socket_path, sizeof(full_path) - 1);
+        full_path[sizeof(full_path) - 1] = '\0';
     }
-    strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
 
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    // Kopier inn i addr.sun_path
+    strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
+
+    fprintf(stderr, "[ROUTINGD] Connecting to MIP daemon socket: %s\n", addr.sun_path);
+    fflush(stderr);
+
+    // --- Koble til MIP-daemonen ---
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
         perror("connect to mipd");
+        close(sock);
         exit(EXIT_FAILURE);
     }
 
+    // Registrer routingd som SDU-type 0x04
     uint8_t sdu_type = SDU_TYPE_ROUTING;
     if (write(sock, &sdu_type, 1) != 1) {
         perror("register sdu_type");
@@ -191,18 +205,24 @@ int connect_to_mipd(const char *socket_path) {
         exit(EXIT_FAILURE);
     }
 
-    // Les min MIP-adresse fra mipd
+    // Les min MIP-adresse fra MIP-daemonen
     uint8_t my_addr;
-    if (read(sock, &my_addr, 1) == 1) {
+    ssize_t n = read(sock, &my_addr, 1);
+    if (n == 1) {
         MY_MIP = my_addr;
-        printf("[ROUTINGD] Received MY_MIP = %d from MIPd\n", MY_MIP);
+        fprintf(stderr, "[ROUTINGD] Received MY_MIP = %d from MIPd\n", MY_MIP);
+    } else if (n == 0) {
+        fprintf(stderr, "[ROUTINGD] Warning: MIP daemon closed socket unexpectedly!\n");
     } else {
         perror("read MY_MIP from MIPd");
     }
 
-    printf("[ROUTINGD] Connected and registered to socket fd=%d (SDU=0x04)\n", sock);
+    fprintf(stderr, "[ROUTINGD] Connected and registered to socket fd=%d (SDU=0x04)\n", sock);
+    fflush(stderr);
+
     return sock;
 }
+
 
 void send_route_response(int sock, uint8_t my_address, uint8_t next){
     printf("[ROUTINGD] Sent RESPONSE: my=%d next_hop=%d)\n",
