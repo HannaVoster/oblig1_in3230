@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
+    setbuf(stdout, NULL);
     //sjekker at argumentene gis riktig, avslutter hvis det ikke finnes mindt 2
     if (optind + 2 > argc) {
         fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
