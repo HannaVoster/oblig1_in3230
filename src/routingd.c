@@ -434,16 +434,27 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
 
+            // Len må være partall (dest,cost)
+            if (len < 2) break;
+            if (len % 2 != 0) {
+                if (debug_mode) printf("[ROUTINGD] WARNING: Odd UPDATE len=%zu, justerer ned.\n", len);
+                len--; // ignorér siste byte hvis det er padding
+            }
+
             // Parse ruter: 2 bytes per (dest, cost)
             int num_entries = len / 2;
             for (int i = 0; i < num_entries; i++) {
                 uint8_t dest = payload[i * 2];
                 uint8_t cost = payload[i * 2 + 1];
 
+                if (dest == 0 || dest > 254) continue;
                 if (dest == MY_MIP) continue; // ignorer ruter til deg selv (poison reverse)
 
+                // unngå overflow og for lav kostnad
+                uint8_t new_cost = (cost >= 254) ? 255 : (uint8_t)(cost + 1);
+                if (new_cost == 0) new_cost = 1;
                 // Oppdater routing-tabellen
-                update_or_insert_neighbor(dest, from, cost + 1);
+                update_or_insert_neighbor(dest, from, new_cost);
             }
 
             break;
