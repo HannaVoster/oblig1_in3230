@@ -52,7 +52,7 @@ int create_unix_socket(const char *path) {
     //sletter eventuel gammel fil med samme navn fra tidligere kjøring
     unlink(path); 
 
-    printf("[MIPD] Binding UNIX socket at: %s\n", socket_path);
+    printf("[MIPD] Binding UNIX socket at: %s\n", path);
 
 
     //kobler socketen til adddressen i addr, slik at klientet kan koble seg på den gjemnnom filbanen
