@@ -40,7 +40,18 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+    char full_path[108];
+    if (socket_path[0] != '/') {
+        snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
+    } else {
+        strncpy(full_path, socket_path, sizeof(full_path) - 1);
+    }
+    strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
+
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("connect");
+        exit(EXIT_FAILURE);
+    }
 
     
     // Koble til mipd via UNIX-socketen

@@ -171,12 +171,16 @@ int connect_to_mipd(const char *socket_path) {
 
     // Koble til MIP-daemonens UNIX socket (f.eks. ./usockA)
     struct sockaddr_un addr = {0};
-    addr.sun_family = AF_UNIX;
-    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", socket_path);
+    char full_path[108];
+    if (socket_path[0] != '/') {
+        snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
+    } else {
+        strncpy(full_path, socket_path, sizeof(full_path) - 1);
+    }
+    strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
 
-    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("connect to mipd");
-        close(sock);
         exit(EXIT_FAILURE);
     }
 
