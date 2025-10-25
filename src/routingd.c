@@ -326,6 +326,24 @@ int get_route(uint8_t dest) {
 
 //metode til å oppdattere eller lage en ny rute
 int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
+    if (dest == MY_MIP) {
+        // Ikke rør ruten til deg selv etter init
+        routing_table[MY_MIP].valid = 1;
+        routing_table[MY_MIP].dest = MY_MIP;
+        routing_table[MY_MIP].next_hop = MY_MIP;
+        routing_table[MY_MIP].cost = 0;
+        if (debug_mode)
+            printf("[ROUTINGD] Route self: dest=%d via=%d cost=%d\n",
+                   MY_MIP, MY_MIP, 0);
+        return MY_MIP;
+    }
+
+    if (cost == 0) {
+        cost = 1;
+        if (debug_mode)
+            printf("[ROUTINGD] justerne 0 cost -> 1 for dest=%d via=%d\n",
+                   dest, next_hop);
+    }
     int id = get_route(dest);
     if (id < 0) { //ingen rute - lag ny
         for (int i = 0; i < MAX_ROUTES; i++){
