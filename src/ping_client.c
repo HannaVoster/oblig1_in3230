@@ -38,24 +38,28 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_un addr = {0};
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    char full_path[108];
+
+    // Bygg full sti – alltid i /tmp/
+    char full_path[sizeof(addr.sun_path)];
     if (socket_path[0] != '/') {
         snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
     } else {
         strncpy(full_path, socket_path, sizeof(full_path) - 1);
+        full_path[sizeof(full_path) - 1] = '\0';
     }
+
+    // Kopier inn i addr.sun_path og sørg for null-terminering
     strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("connect");
-        exit(EXIT_FAILURE);
-    }
+    fprintf(stderr, "[PING_CLIENT] Connecting to %s\n", addr.sun_path);
+    fflush(stderr);
 
-    
-    // Koble til mipd via UNIX-socketen
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    // Koble til MIP-daemonen
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
         perror("connect");
         exit(EXIT_FAILURE);
     }
