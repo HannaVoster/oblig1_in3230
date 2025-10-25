@@ -32,13 +32,26 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Setter opp adresse-strukturen for å koble til socketen
-    struct sockaddr_un addr = {0};
+    // Sett opp adresse-strukturen for å koble til socketen
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+
+    char full_path[sizeof(addr.sun_path)];
+    if (socket_path[0] != '/') {
+        snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
+    } else {
+        strncpy(full_path, socket_path, sizeof(full_path) - 1);
+        full_path[sizeof(full_path) - 1] = '\0';
+    }
+    strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
+
+    fprintf(stderr, "[PING_SERVER] Connecting to %s\n", addr.sun_path);
+    fflush(stderr);
 
     // Kobler til mipd sin socket
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_un)) < 0) {
         perror("connect");
         exit(EXIT_FAILURE);
     }
@@ -51,7 +64,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     while(1) {
-    // leser meldingen fra mips, som opprinnellig kom gjennom nettverket fra ping_client
+    // leser meldingen fra mipd, som opprinnellig kom gjennom nettverket fra ping_client
         char buf[BUF_SIZE];
         int n = read(sock, buf, sizeof(buf));
         if (n <= 0) {
