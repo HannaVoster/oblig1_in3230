@@ -89,7 +89,11 @@ int main(int argc, char *argv[]) {
     memset(neighbors, 0, sizeof(neighbors));
     memset(routing_table, 0, sizeof(routing_table));
 
-    update_or_insert_neighbor(MY_MIP, MY_MIP, 0);
+    for (int i = 0; i < MAX_ROUTES; i++) {
+        routing_table[i].valid = 0;
+        routing_table[i].cost = 255;   // INF_COST
+    }
+    update_or_insert_neighbor(MY_MIP, MY_MIP, 0); // rute til seg selv
 
     // Tidsstyrte meldinger
     uint64_t last_hello = now_ms();
