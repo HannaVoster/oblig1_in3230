@@ -138,6 +138,32 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
                client_fd, sdu_type, dest_addr, ttl, payload_length);
     }
+    // Håndter PING (0x02) og PONG (0x03) likt
+    if (sdu_type == SDU_TYPE_PING || sdu_type == SDU_TYPE_PONG) {
+        unsigned char mac[6];
+        int ifindex = -1;
+
+        if (arp_lookup(dest_addr, mac, &ifindex)) {
+            size_t pdu_len;
+            uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
+                                        sdu_type, payload, payload_length, &pdu_len);
+            send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
+            free(pdu);
+        } else {
+            queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type,
+                                payload, payload_length);
+            for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                    send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
+                    if (debug_mode)
+                        printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
+                    break;
+                }
+            }
+        }
+        return;  //  så den ikke fortsetter videre i routing-blokken
+    }
+
     if (sdu_type == SDU_TYPE_ROUTING) {
         uint8_t ttl = buffer[1];
         uint8_t *payload = &buffer[2];
