@@ -16,6 +16,8 @@
 #define BUF_SIZE 512 //økt etter warning
 
 int main(int argc, char *argv[]) {
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     // Sjekker at bruker har gitt et socket_path eller ber om hjelp
     if (argc < 2 || strcmp(argv[1], "-h") == 0) {
         printf("Usage: %s <socket_lower>\n", argv[0]);
@@ -62,10 +64,10 @@ int main(int argc, char *argv[]) {
         uint8_t ttl = buf[1];
         printf("[PING_SERVER] From MIP %u (TTL=%u): %s\n", src, ttl, &buf[2]);
 
-        // Lag svar: [dest=src][ttl=4][PONG:<payload>]
+        // Lag svar: [dest=src][ttl=8][PONG:<payload>]
         uint8_t reply[BUF_SIZE];
         reply[0] = src;
-        reply[1] = 4;
+        reply[1] = 8;
         snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%.500s", (char*)&buf[2]);
 
         // Sender svaret tilbake via samme socket (til mipd → ping_client)
@@ -73,6 +75,7 @@ int main(int argc, char *argv[]) {
             perror("write");
         } else {
             printf("[PING_SERVER] Sent reply: PONG:%s\n", &buf[2]);
+            fflush(stdout);
         }
     }
 
