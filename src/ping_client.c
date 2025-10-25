@@ -21,7 +21,7 @@ Program som sender en melding via MIP-daemonen (mipd), selve brukerprogrammet so
 
 int main(int argc, char *argv[]) {
     //sjekker at riktige argumenter er gitt
-    if (argc < 4 || strcmp(argv[1], "-h") == 0) {
+    if (argc < 5 || strcmp(argv[1], "-h") == 0) {
         printf("Usage: %s <socket_lower> <message> <destination_host>\n", argv[0]);
         return 0;
     }
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     const char *socket_path = argv[1];
     const char *message = argv[2];
     uint8_t dest_host = atoi(argv[3]);
-    uint8_t ttl = 4; //standard default TTL
+    uint8_t ttl = atoi(argv[4]);
 
     //unix socket
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
