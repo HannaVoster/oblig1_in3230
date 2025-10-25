@@ -52,6 +52,9 @@ int create_unix_socket(const char *path) {
     //sletter eventuel gammel fil med samme navn fra tidligere kjøring
     unlink(path); 
 
+    printf("[MIPD] Binding UNIX socket at: %s\n", socket_path);
+
+
     //kobler socketen til adddressen i addr, slik at klientet kan koble seg på den gjemnnom filbanen
     //typecaster (struct sockaddr*)&addr så bind() skjønner at det sendes en generisk socket addresse
     if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
