@@ -89,6 +89,8 @@ int main(int argc, char *argv[]) {
     memset(neighbors, 0, sizeof(neighbors));
     memset(routing_table, 0, sizeof(routing_table));
 
+    update_or_insert_neighbor(MY_MIP, MY_MIP, 0);
+
     // Tidsstyrte meldinger
     uint64_t last_hello = now_ms();
     uint64_t last_update = now_ms();
@@ -411,6 +413,9 @@ void send_update_to_neighbor(uint8_t neighbor_mip) {
 
     for (int i = 0; i < MAX_ROUTES; i++) {
         if (!routing_table[i].valid) continue;
+
+        if (routing_table[i].cost == 0 && routing_table[i].dest != MY_MIP)
+            continue;  // unngår falske nullkostnader
 
         uint8_t adv_cost = routing_table[i].cost;
 
