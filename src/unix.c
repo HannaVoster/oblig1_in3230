@@ -102,6 +102,13 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     char buffer[256];
     int bytes_read = read(client_fd, buffer, sizeof(buffer));
 
+    printf("[DEBUG][UNIX_REQ] read %d bytes from fd=%d\n", bytes_read, client_fd);
+    for (int j = 0; j < bytes_read; j++) {
+        printf("%02X ", (unsigned char)buffer[j]);
+    }
+    printf("\n");
+    fflush(stdout);
+
     if (bytes_read <= 0) {
         // Klienten koblet fra
         for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
