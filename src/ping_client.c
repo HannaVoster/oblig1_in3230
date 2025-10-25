@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Vent på svar i opptil 10 sekunder, prøver hvert sekund
-    int total_wait = 10;
+    int total_wait = 30;
     int got_reply = 0;
 
     for (int i = 0; i < total_wait; i++) {
