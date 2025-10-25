@@ -85,15 +85,8 @@ int main(int argc, char *argv[]) {
 
         // Sender svaret tilbake via samme socket (til mipd → ping_client)
         ssize_t total_len = 2 + strlen((char*)&reply[2]);
-        ssize_t sent = 0;
-        while (sent < total_len) {
-            ssize_t n = write(sock, reply + sent, total_len - sent);
-            if (n < 0) {
-                perror("write");
-                break;
-            }
-            sent += n;
-        }
+        ssize_t sent = write(sock, reply, total_len); 
+        if (sent < 0) perror("write");
         printf("[PING_SERVER] Sent reply (%zd bytes): PONG:%s\n", sent, &buf[2]);
         fflush(stdout);
     }
