@@ -397,9 +397,7 @@ void broadcast_update(void) {
         if (!neighbors[n].valid) continue;
 
         uint8_t buf[256];
-        size_t pos = 0;
-        buf[pos++] = RT_MSG_UPDATE;
-
+        size_t pos = 1; // reserver plass til RT_MSG_UPDATE
         uint8_t neighbor_addr = neighbors[n].mip;
 
         for (int i = 0; i < MAX_ROUTES; i++) {
@@ -408,25 +406,26 @@ void broadcast_update(void) {
             buf[pos++] = routing_table[i].dest;
 
             if (routing_table[i].next_hop == neighbor_addr) {
-                // Poisoned reverse — annonser som utilgjengelig
-                buf[pos++] = 255;
-                if (debug_mode) {
+                buf[pos++] = 255; // poisoned reverse
+                if (debug_mode)
                     printf("[ROUTINGD] Poisoned reverse: dest=%d via=%d\n",
                            routing_table[i].dest, neighbor_addr);
-                }
             } else {
                 buf[pos++] = routing_table[i].cost;
             }
         }
-        // Send til denne naboen
+
+        buf[0] = RT_MSG_UPDATE; // legg inn type helt til slutt
+
         send_unix_message(neighbor_addr, 1, buf, pos);
 
         if (debug_mode) {
             printf("[ROUTINGD] Sent UPDATE to %d with %zu routes\n",
-                   neighbor_addr, (pos / 2) - 1);
+                   neighbor_addr, (pos - 1) / 2);
         }
     }
 }
+
 
 
 void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payload, size_t len){
