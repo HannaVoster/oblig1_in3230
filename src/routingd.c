@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
     // Tidsstyrte meldinger
     uint64_t last_hello = now_ms();
     uint64_t last_update = now_ms();
+    uint64_t last_print= now_ms();
 
     // Hovedløkke for å håndtere meldinger fra mipd
     while (1) { 
@@ -140,6 +141,11 @@ int main(int argc, char *argv[]) {
         if (now - last_update >= UPDATE_INTERVAL_MS) {
             broadcast_update(); // send UPDATE (Poisoned Reverse)
             last_update = now;
+        }
+
+        if (now_ms() - last_print > 10000) {
+            print_routing_table();
+            last_print = now_ms();
         }
     }
     cleanup:
@@ -637,3 +643,16 @@ void periodic_update(void) {
     }
 }
 
+void print_routing_table(void) {
+    printf("=== ROUTING TABLE for MIP %d ===\n", MY_MIP);
+    for (int i = 0; i < MAX_ROUTES; i++) {
+        if (routing_table[i].valid) {
+            printf("  dest=%d via=%d cost=%d (slot=%d)\n",
+                   routing_table[i].dest,
+                   routing_table[i].next_hop,
+                   routing_table[i].cost,
+                   i);
+        }
+    }
+    printf("===============================\n");
+}
