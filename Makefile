@@ -35,7 +35,12 @@ $(BIN_DIR)/ping_client: $(SRC_DIR)/ping_client.c | $(BIN_DIR)
 $(BIN_DIR)/ping_server: $(SRC_DIR)/ping_server.c | $(BIN_DIR)
 	$(CC) $(CFLAGS) -o $@ $^
 
-$(BIN_DIR)/routingd: $(SRC_DIR)/routingd.c
+# Bygg routingd
+$(BIN_DIR)/routingd: \
+	$(SRC_DIR)/routingd.c \
+	$(SRC_DIR)/routing_socket.c \
+	$(SRC_DIR)/routing_table.c \
+	$(SRC_DIR)/routing_protocol.c 
 	$(CC) $(CFLAGS) -o $@ $^
 
 

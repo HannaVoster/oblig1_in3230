@@ -19,8 +19,6 @@
 #include "routingd.h"
 #include "unix.h"
 
-//#define MAX_PING_PAYLOAD 512
-
 unix_client unix_clients[MAX_UNIX_CLIENT];
 
 /*
@@ -77,11 +75,8 @@ int create_unix_socket(const char *path) {
         perror("listen unix");
         exit(EXIT_FAILURE);
     }
-
     return sock;
 }
-
-
 
 /*
 - handle_unix_request
@@ -241,37 +236,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     printf("[UNIX][ROUTING] Ingen routingd aktiv — kan ikke finne rute.\n");
 }
 
-
-void handle_ping_server_message(int client, char *buffer, int bytes_read) {
-    if (bytes_read < 2){
-        printf("[ERROR] unix msg too short");
-        return;
-    }
-
-    uint8_t src = buffer[0];
-    uint8_t ttl = buffer[1];
-    uint8_t *payload = (uint8_t *)&buffer[2];
-    size_t payload_length = bytes_read - 2;
-
-    uint8_t reply[256];
-    //bygger UNIX melding, src, ttl, payload
-    reply[0] = src;
-    reply[1] = ttl;
-    memcpy(&reply[2], payload, payload_length);
-
-    size_t total_len = payload_length + 2;
-
-    if (write(client, reply, total_len) < 0) {
-        perror("[ERROR] write to ping_server failed");
-    }
-
-    if (debug_mode) {
-        printf("[DEBUG] Sent PING to server app (src=%u ttl=%u, len=%zu)\n",
-               src, ttl, payload_length);
-    }
-
-    close(client);
-}
 
 void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str) {
     unsigned char broadcast_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};

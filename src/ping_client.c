@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
         full_path[sizeof(full_path) - 1] = '\0';
     }
 
-    // Kopier inn i addr.sun_path og sørg for null-terminering
+    // Kopier inn i addr.sun_path og sørger for null-terminering
     strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
     addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Vent på svar i opptil 10 sekunder, prøver hvert sekund
+    // Vent på svar i opptil 30 sekunder, prøver hvert sekund
     int total_wait = 30;
     int got_reply = 0;
 
@@ -127,15 +127,12 @@ int main(int argc, char *argv[]) {
         usleep(200000); // 0.2 sek
         }
     }
-    printf("[PING_CLIENT] Received %d replies in total (timeout=%ds)\n",
-       got_reply, total_wait);
     if (!got_reply) {
-        printf("timeout (no reply after %d seconds)\n", total_wait);
+        printf("[PING_CLIENT] timeout (no reply after %d seconds)\n", total_wait);
     }
     else {
-    printf("[PING_CLIENT] Received %d replies in total\n", got_reply);
+        printf("[PING_CLIENT] Received %d replies in total\n", got_reply);
     }
-
     close(sock);
     return 0;
 }
