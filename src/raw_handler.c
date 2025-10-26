@@ -359,12 +359,13 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         case SDU_TYPE_PONG: {
-           handle_pong_message(raw_sock, my_mip_address, dest, src, ttl, sdu, sdu_len, eh, src_addr.sll_ifindex);
+           handle_pong_message(raw_sock, my_mip_address, dest, src, ttl, sdu, sdu_len);
             break;
         }
 
         case SDU_TYPE_ARP: {
-            handle_arp_message(raw_sock, my_mip_address, src, sdu, sdu_len, eh, src_addr.sll_ifindex);
+            handle_arp_message(raw_sock, my_mip_address, sdu, sdu_len, eh, src_addr.sll_ifindex, src);
+
             break;
         }
            
