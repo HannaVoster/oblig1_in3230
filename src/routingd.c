@@ -491,14 +491,14 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                         printf("[ROUTINGD] New route: dest=%d via=%d cost=%d\n", dest, from, new_cost);
                 } else {
                     rt_entry *entry = &routing_table[idx];
-                    if (from == entry->via || new_cost < entry->cost) {
+                    if (from == entry->next_hop || new_cost < entry->cost) {
                         update_or_insert_neighbor(dest, from, new_cost);
                         if (debug_mode)
                             printf("[ROUTINGD] Updated route: dest=%d via=%d cost=%d\n", dest, from, new_cost);
                     } else {
                         if (debug_mode)
                             printf("[ROUTINGD] Ignored worse route for dest=%d: via=%d cost=%d (existing via=%d cost=%d)\n",
-                                dest, from, new_cost, entry->via, entry->cost);
+                                dest, from, new_cost, entry->next_hop, entry->cost);
                     }
             }
 
