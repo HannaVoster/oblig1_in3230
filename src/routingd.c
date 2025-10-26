@@ -394,13 +394,13 @@ void hello(void){
 
 void broadcast_update(void) {
     for (int n = 0; n < MAX_NEIGHBORS; n++) {
-        if (!neighbors[n].active) continue;
+        if (!neighbors[n].valid) continue;
 
         uint8_t buf[256];
         size_t pos = 0;
         buf[pos++] = RT_MSG_UPDATE;
 
-        uint8_t neighbor_addr = neighbors[n].mip_addr;
+        uint8_t neighbor_addr = neighbors[n].mip;
 
         for (int i = 0; i < MAX_ROUTES; i++) {
             if (!routing_table[i].valid) continue;
@@ -483,14 +483,14 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                 // Oppdater routing-tabellen
 
                 // Finn eksisterende rute hvis den finnes
-                int idx = find_route_index(dest);
+                int idx = get_route(dest);
                 if (idx == -1) {
                     // ny rute
                     update_or_insert_neighbor(dest, from, new_cost);
                     if (debug_mode)
                         printf("[ROUTINGD] New route: dest=%d via=%d cost=%d\n", dest, from, new_cost);
                 } else {
-                    route_entry *entry = &routing_table[idx];
+                    rt_entry *entry = &routing_table[idx];
                     if (from == entry->via || new_cost < entry->cost) {
                         update_or_insert_neighbor(dest, from, new_cost);
                         if (debug_mode)
