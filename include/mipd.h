@@ -21,7 +21,7 @@ extern size_t last_ping_payload_len;
 extern int ping_waiting;
 
 
-#define MAX_EVENTS 50 // epoll
+#define MAX_EVENTS 10 // epoll
 
 extern int debug_mode; // debug flagg
 extern int last_unix_client_fd; // siste unix klient
