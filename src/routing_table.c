@@ -4,7 +4,6 @@
 
 #include "routing_table.h"
 #include "routingd.h"
-#include "utils.h"
 
 
 //metode til å oppdattere eller lage en ny rute

@@ -9,6 +9,7 @@
 
 #include "routing_socket.h"
 #include "routingd.h"
+#include "arp.h"
 
 int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
