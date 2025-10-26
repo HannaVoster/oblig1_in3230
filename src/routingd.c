@@ -572,17 +572,12 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                     continue;
                 }
 
+                uint8_t new_cost = (cost >= 254) ? 255 : cost + 1;
+                update_or_insert_neighbor(dest, from, new_cost);
                 if (debug_mode) {
                     printf("[TRACE] Calling update_or_insert_neighbor(dest=%d, via=%d, cost=%d)\n",
                         dest, from, new_cost);
                 }
-
-                uint8_t new_cost = (cost >= 254) ? 255 : cost + 1;
-                update_or_insert_neighbor(dest, from, new_cost);
-
-                if (debug_mode)
-                    printf("[ROUTINGD] Oppdatert/innsatt rute: dest=%d via=%d cost=%d\n",
-                        dest, from, new_cost);
             }
             break;
         }
