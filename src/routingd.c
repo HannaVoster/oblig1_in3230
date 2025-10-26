@@ -584,11 +584,14 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
             for (int i = 0; i < num_entries; i++) {
                 uint8_t dest = payload[i * 2];
                 uint8_t cost = payload[i * 2 + 1];
-                if (debug_mode) {
+
+                if (debug_mode)
                     printf("[TRACE] UPDATE entry %d: dest=%d cost=%d\n", i, dest, cost);
-                }
-                if (dest == 0 || dest > 254) continue;
-                if (dest == MY_MIP) continue;
+
+                if (dest == 0 || dest > 254 || dest == MY_MIP)
+                    continue;
+
+                // Ignorer poisoned reverse
                 if (cost == 255) {
                     if (debug_mode)
                         printf("[ROUTINGD] Ignorerer poisoned reverse for dest=%d fra %d\n",
@@ -596,13 +599,23 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                     continue;
                 }
 
+                // Kostnaden via denne naboen (1 ekstra hopp)
                 uint8_t new_cost = (cost >= 254) ? 255 : cost + 1;
-                update_or_insert_neighbor(dest, from, new_cost);
-                if (debug_mode) {
-                    printf("[TRACE] Calling update_or_insert_neighbor(dest=%d, via=%d, cost=%d)\n",
-                        dest, from, new_cost);
+
+                // Finn eksisterende rute
+                int id = get_route(dest);
+
+                // Hvis vi ikke har rute, eller denne nye veien er bedre — oppdater
+                if (id < 0 || new_cost < routing_table[id].cost || routing_table[id].next_hop == from) {
+                    if (debug_mode)
+                        printf("[TRACE] Oppdaterer rute: dest=%d via=%d cost=%d\n",
+                            dest, from, new_cost);
+                    update_or_insert_neighbor(dest, from, new_cost);
+                } else if (debug_mode) {
+                    printf("[TRACE] Beholder eksisterende rute til dest=%d (bedre eller lik)\n", dest);
                 }
             }
+
             break;
         }
 
