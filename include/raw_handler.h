@@ -18,4 +18,6 @@ void handle_arp_message(int raw_sock, int my_mip_address,
 void handle_pong_message(int raw_sock, int my_mip_address,
                          uint8_t dest, uint8_t src, uint8_t ttl,
                          const uint8_t *sdu, ssize_t sdu_len);
+
+void handle_routing_message(int raw_sock, uint8_t src, const uint8_t *sdu, ssize_t sdu_len);
 #endif
