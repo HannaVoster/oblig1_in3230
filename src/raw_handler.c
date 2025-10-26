@@ -349,7 +349,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     //setter opp en switch som håndterer de ulike sdu typene
     switch (sdu_type) {
         case SDU_TYPE_ROUTING: {
-            handle_routing_message(raw_sock, src, sdu, sdu_len);
+            handle_routing_message(src, sdu, sdu_len);
             break;
         }
 
@@ -377,7 +377,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
 // Håndterer routing-meldinger (HELLO og UPDATE) som kommer inn fra nettverket
 // Sender dem videre til routing-daemonen via UNIX-socket
-void handle_routing_message(int raw_sock, uint8_t src, const uint8_t *sdu, ssize_t sdu_len){
+void handle_routing_message(uint8_t src, const uint8_t *sdu, ssize_t sdu_len){
      uint8_t rt_type = sdu[0]; // Første byte i payload angir routingmeldingen (HELLO eller UPDATE)
 
     if (debug_mode) {
@@ -554,7 +554,7 @@ void handle_arp_message(int raw_sock, int my_mip_address,
 // Returnerer 1 hvis pakken ble forwarded (lagt i kø),
 // 0 hvis pakken var til en selv eller broadcast,
 // -1 hvis pakken ble droppet (f.eks. TTL utløpt)
-int forward_packet(int raw_sock, int my_mip_address,
+int forward_packet(int my_mip_address,
                    uint8_t dest, uint8_t src, uint8_t ttl,
                    uint8_t sdu_type, const uint8_t *sdu, ssize_t sdu_len)
 {
