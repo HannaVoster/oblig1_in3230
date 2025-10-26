@@ -458,43 +458,58 @@ void hello(void){
 }
 
 void broadcast_update(void) {
-
-   
+    // Tell antall gyldige naboer først
+    int neighbor_count = 0;
+    for (int n = 0; n < MAX_NEIGHBORS; n++) {
+        if (neighbors[n].valid)
+            neighbor_count++;
+    }
 
     for (int n = 0; n < MAX_NEIGHBORS; n++) {
-        if (debug_mode)
-        printf("[ROUTINGD] Sender update til nabo %d (valid=%d)\n",
-            neighbors[n].mip, neighbors[n].valid);
         if (!neighbors[n].valid) continue;
-        uint8_t buf[256];
-        size_t pos = 1; // reserver plass til RT_MSG_UPDATE
+
         uint8_t neighbor_addr = neighbors[n].mip;
+
+        uint8_t buf[256];
+        size_t pos = 1; // reserver plass til RT_MSG_UPDATE først
 
         for (int i = 0; i < MAX_ROUTES; i++) {
             if (!routing_table[i].valid) continue;
 
             buf[pos++] = routing_table[i].dest;
 
-            if (routing_table[i].next_hop == neighbor_addr) {
-                buf[pos++] = 255; // poisoned reverse
-                if (debug_mode)
+            // Bruk poisoned reverse KUN hvis vi har flere naboer
+            // og ruten ble lært via denne naboen.
+            uint8_t advertised_cost = routing_table[i].cost;
+            if (neighbor_count > 1 &&
+                routing_table[i].next_hop == neighbor_addr &&
+                routing_table[i].dest != neighbor_addr) {
+
+                advertised_cost = 255; // poison
+                if (debug_mode) {
                     printf("[ROUTINGD] Poisoned reverse: dest=%d via=%d\n",
                            routing_table[i].dest, neighbor_addr);
-            } else {
-                buf[pos++] = routing_table[i].cost;
+                }
             }
+
+            buf[pos++] = advertised_cost;
         }
 
-        buf[0] = RT_MSG_UPDATE; // legg inn type helt til slutt
+        // Legg inn meldingstypen (RT_MSG_UPDATE) først
+        buf[0] = RT_MSG_UPDATE;
 
+        // Send unicast til denne naboen
         send_unix_message(neighbor_addr, 1, buf, pos);
 
         if (debug_mode) {
-            printf("[ROUTINGD] Sent UPDATE to %d with %zu routes\n",
-                   neighbor_addr, (pos - 1) / 2);
+            printf("[ROUTINGD] Sent UPDATE to %d with %zu routes (%s)\n",
+                   neighbor_addr,
+                   (pos - 1) / 2,
+                   (neighbor_count > 1 ? "poisoned reverse enabled" : "single neighbor, no poison"));
         }
     }
 }
+
 
 
 
