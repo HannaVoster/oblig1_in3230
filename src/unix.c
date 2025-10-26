@@ -130,6 +130,10 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             break;
         }
     }
+    if (debug_mode) {
+        printf("[DEBUG][UNIX_REQ] Detected sdu_type=0x%02X for fd=%d\n", sdu_type, client_fd);
+        fflush(stdout);
+    }
     // Meldingsformat: [dest:1][ttl:1][payload]
     if (bytes_read < 2) {
         fprintf(stderr, "[UNIX] Invalid message: too short\n");
