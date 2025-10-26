@@ -101,26 +101,34 @@ int main(int argc, char *argv[]) {
 
         int rv = select(sock + 1, &fds, NULL, NULL, &tv);
         if (rv > 0 && FD_ISSET(sock, &fds)) {
-            // fått svar
             char reply[BUF_SIZE];
             int n = read(sock, reply, sizeof(reply) - 1);
-            if (n > 0) {
-                reply[n] = '\0';
-                gettimeofday(&end, NULL);
-                long ms = (end.tv_sec - start.tv_sec) * 1000 +
-                        (end.tv_usec - start.tv_usec) / 1000;
-                uint8_t src = reply[0];
-                uint8_t ttl_reply = reply[1];
-                printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
-                    src, ttl_reply, &reply[2], ms);
-                got_reply++;
+            if (n == 0) {
+                printf("[PING_CLIENT] Socket closed by mipd.\n");
+                break;
+            } else if (n < 0) {
+                perror("read");
+                break;
             }
+            reply[n] = '\0';
+
+            gettimeofday(&end, NULL);
+            long ms = (end.tv_sec - start.tv_sec) * 1000 +
+                    (end.tv_usec - start.tv_usec) / 1000;
+            uint8_t src = reply[0];
+            uint8_t ttl_reply = reply[1];
+            printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
+                src, ttl_reply, &reply[2], ms);
+            fflush(stdout);
+            got_reply++;
         }
         else{
         // hvis ikke fått svar ennå, vent litt og prøv igjen
-        usleep(500000); // 0.5 sek
+        usleep(200000); // 0.2 sek
         }
     }
+    printf("[PING_CLIENT] Received %d replies in total (timeout=%ds)\n",
+       got_reply, total_wait);
     if (!got_reply) {
         printf("timeout (no reply after %d seconds)\n", total_wait);
     }
