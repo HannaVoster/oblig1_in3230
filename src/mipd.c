@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
     }
     setvbuf(stdout, NULL, _IOLBF, 0);
     setvbuf(stderr, NULL, _IOLBF, 0);
+    dup2(fileno(stdout), fileno(stderr));
     //sjekker at argumentene gis riktig, avslutter hvis det ikke finnes mindt 2
     if (optind + 2 > argc) {
         fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
