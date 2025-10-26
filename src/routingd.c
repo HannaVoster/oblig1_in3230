@@ -447,6 +447,8 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
         }
 
         case RT_MSG_UPDATE: {
+            payload++;
+            len--;
             if (debug_mode){
                 printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
             }
@@ -455,8 +457,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
 
-            payload++;
-            len--;
+            
             // Len må være partall (dest,cost)
             if (len < 2) break;
             if (len % 2 != 0) {
