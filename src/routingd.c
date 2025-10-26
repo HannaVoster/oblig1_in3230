@@ -21,8 +21,10 @@ gi en route respons
 #include <sys/epoll.h>
 
 #include "routingd.h"
-#include "arp.h"
+
 #include "routing_socket.h"
+#include "routing_table.h"
+#include "routing_protocol.h"
 
 neighbor neighbors[MAX_NEIGHBORS];
 rt_entry routing_table[MAX_ROUTES];   
@@ -137,12 +139,10 @@ int main(int argc, char *argv[]) {
             hello(); // broadcast HELLO
             last_hello = now;
         }
-
         if (now - last_update >= UPDATE_INTERVAL_MS) {
             broadcast_update(); // send UPDATE (Poisoned Reverse)
             last_update = now;
         }
-
         if (now_ms() - last_print > 10000) {
             print_routing_table();
             last_print = now_ms();

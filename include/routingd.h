@@ -34,6 +34,7 @@ extern neighbor neighbors[MAX_NEIGHBORS];
 
 extern uint8_t MY_MIP;   // sett fra argv 
 extern int ROUTING_SOCK; // SOCK_SEQPACKET til mipd
+extern int debug_mode;
 
 uint64_t now_ms(void);
 
