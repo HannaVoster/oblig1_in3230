@@ -101,11 +101,11 @@ hit - har riktig mac, kan sende PING
 void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     fprintf(stderr, "[TRACE] handle_unix_request() called for fd=%d\n", client_fd);
     fflush(stderr);
-    
+
     char buffer[256];
     int bytes_read = read(client_fd, buffer, sizeof(buffer));
 
-    printf("[DEBUG][UNIX_REQ] read %d bytes from fd=%d\n", bytes_read, client_fd);
+    fprintf(stderr,"[DEBUG][UNIX_REQ] read %d bytes from fd=%d\n", bytes_read, client_fd);
     for (int j = 0; j < bytes_read; j++) {
         printf("%02X ", (unsigned char)buffer[j]);
     }
@@ -134,12 +134,13 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         }
     }
     if (debug_mode) {
-        printf("[DEBUG][UNIX_REQ] Detected sdu_type=0x%02X for fd=%d\n", sdu_type, client_fd);
+        fprintf(stderr,"[DEBUG][UNIX_REQ] Detected sdu_type=0x%02X for fd=%d\n", sdu_type, client_fd);
         fflush(stdout);
     }
     // Meldingsformat: [dest:1][ttl:1][payload]
     if (bytes_read < 2) {
         fprintf(stderr, "[UNIX] Invalid message: too short\n");
+        fflush(stdout);
         return;
     }
 
@@ -154,7 +155,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     }
     // Håndter PING (0x02) og PONG (0x03) likt
     if (sdu_type == SDU_TYPE_PING || sdu_type == SDU_TYPE_PONG) {
-        printf("[DEBUG][UNIX_REQ] Got %s from UNIX app (dest=%d len=%zu)\n",
+        fprintf(stderr,"[DEBUG][UNIX_REQ] Got %s from UNIX app (dest=%d len=%zu)\n",
            sdu_type == SDU_TYPE_PING ? "PING" : "PONG", dest_addr, payload_length);
         fflush(stdout);
 
@@ -162,7 +163,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         int ifindex = -1;
 
         if (arp_lookup(dest_addr, mac, &ifindex)) {
-            printf("[DEBUG][UNIX_REQ] ARP found for %d → sending directly via ifindex=%d\n",
+            fprintf(stderr,"[DEBUG][UNIX_REQ] ARP found for %d → sending directly via ifindex=%d\n",
                dest_addr, ifindex);
             fflush(stdout);
 
@@ -171,11 +172,11 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
                                         sdu_type, payload, payload_length, &pdu_len);
             send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
             free(pdu);
-            printf("[DEBUG][UNIX_REQ] Sent %s out on raw socket (%zu bytes)\n",
+            fprintf(stderr,"[DEBUG][UNIX_REQ] Sent %s out on raw socket (%zu bytes)\n",
                sdu_type == SDU_TYPE_PING ? "PING" : "PONG", payload_length);
             fflush(stdout);
         } else {
-            printf("[DEBUG][UNIX_REQ] No ARP for %d → queueing message and asking routingd\n", dest_addr);
+            fprintf(stderr,"[DEBUG][UNIX_REQ] No ARP for %d → queueing message and asking routingd\n", dest_addr);
             fflush(stdout);
             queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type,
                                 payload, payload_length);
