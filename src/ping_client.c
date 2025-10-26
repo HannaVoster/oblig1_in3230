@@ -113,15 +113,19 @@ int main(int argc, char *argv[]) {
                 uint8_t ttl_reply = reply[1];
                 printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
                     src, ttl_reply, &reply[2], ms);
-                got_reply = 1;
-                break;
+                got_reply++;
             }
         }
+        else{
         // hvis ikke fått svar ennå, vent litt og prøv igjen
         usleep(500000); // 0.5 sek
+        }
     }
     if (!got_reply) {
         printf("timeout (no reply after %d seconds)\n", total_wait);
+    }
+    else {
+    printf("[PING_CLIENT] Received %d replies in total\n", got_reply);
     }
 
     close(sock);
