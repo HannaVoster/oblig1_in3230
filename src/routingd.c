@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (now - last_update >= UPDATE_INTERVAL_MS) {
-            periodic_update(); // send UPDATE (Poisoned Reverse)
+            broadcast_update(); // send UPDATE (Poisoned Reverse)
             last_update = now;
         }
     }
@@ -393,6 +393,11 @@ void hello(void){
 }
 
 void broadcast_update(void) {
+
+    if (debug_mode)
+    printf("[ROUTINGD] Sender update til nabo %d (valid=%d)\n",
+           neighbors[n].mip, neighbors[n].valid);
+
     for (int n = 0; n < MAX_NEIGHBORS; n++) {
         if (!neighbors[n].valid) continue;
 
