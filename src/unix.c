@@ -99,6 +99,9 @@ miss - bygg pakke, legg i kø og send broadcast arp req for å finne mottaker
 hit - har riktig mac, kan sende PING
 */
 void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
+    fprintf(stderr, "[TRACE] handle_unix_request() called for fd=%d\n", client_fd);
+    fflush(stderr);
+    
     char buffer[256];
     int bytes_read = read(client_fd, buffer, sizeof(buffer));
 
