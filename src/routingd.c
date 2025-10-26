@@ -394,13 +394,13 @@ void hello(void){
 
 void broadcast_update(void) {
 
-    if (debug_mode)
-    printf("[ROUTINGD] Sender update til nabo %d (valid=%d)\n",
-           neighbors[n].mip, neighbors[n].valid);
+   
 
     for (int n = 0; n < MAX_NEIGHBORS; n++) {
+        if (debug_mode)
+        printf("[ROUTINGD] Sender update til nabo %d (valid=%d)\n",
+            neighbors[n].mip, neighbors[n].valid);
         if (!neighbors[n].valid) continue;
-
         uint8_t buf[256];
         size_t pos = 1; // reserver plass til RT_MSG_UPDATE
         uint8_t neighbor_addr = neighbors[n].mip;
