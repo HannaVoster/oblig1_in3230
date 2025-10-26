@@ -455,6 +455,8 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
 
+            payload++;
+            len--;
             // Len må være partall (dest,cost)
             if (len < 2) break;
             if (len % 2 != 0) {
@@ -462,6 +464,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                 len--; // ignorér siste byte hvis det er padding
             }
 
+            
             // Parse ruter: 2 bytes per (dest, cost)
             int num_entries = len / 2;
             for (int i = 0; i < num_entries; i++) {
