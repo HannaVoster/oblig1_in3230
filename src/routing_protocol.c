@@ -8,35 +8,46 @@
 #include "routing_socket.h"
 #include "routingd.h"
 
-
+// Håndterer en ROUTE REQUEST melding fra MIP-daemon
+// Mottar forespørsel om rute til en gitt destinasjon og svarer med neste hopp (hvis veien er kjent)
 void handle_route_request(int sock, uint8_t *msg, ssize_t length) {
+
+    //avslutter hvis meldingen er for kort for formatet
     if (length < 6) { 
         fprintf(stderr, "[ROUTINGD] Ugyldig REQUEST (for kort)\n");
         return; 
     }
 
-    uint8_t my_addr = msg[0];      // egen MIP (ekko fra MIPd)
-    uint8_t dest    = msg[5];      // oppslagsdestinasjon
-    printf("[ROUTINGD] handle_route_request: my=%d dest=%d\n", my_addr, dest);
+    uint8_t my_addr = msg[0]; // egen MIP
+    uint8_t dest    = msg[5]; // destinasjonsadressen som skal slås opp
 
-    uint8_t next = 255;            // 255 = ingen rute
+    if(debug_mode)("[ROUTINGD] handle_route_request: my=%d dest=%d\n", my_addr, dest);
+
+    //standardverdi for ingen rute funnet, 255
+    uint8_t next = INF_COST; 
+
     int id = get_route(dest);
-    if (id >= 0 && routing_table[id].valid) {
-        printf("[ROUTINGD] Found route: dest=%d via=%d\n",
-               routing_table[id].dest, routing_table[id].next_hop);
-    } else {
-        printf("[ROUTINGD] No route found for dest=%d\n id = %d, routing_table[id].valid = %d ", dest, id, routing_table[id].valid);
-    }
+
+    // // Hvis det finnes en gyldig rute, skriv ut info om den
+    // if (id >= 0 && routing_table[id].valid) {
+    //     printf("[ROUTINGD] Found route: dest=%d via=%d\n",
+    //            routing_table[id].dest, routing_table[id].next_hop);
+    // } else {
+    //     printf("[ROUTINGD] No route found for dest=%d\n id = %d, routing_table[id].valid = %d ", dest, id, routing_table[id].valid);
+    // }
+
+    // Hvis gyldig rute ble funnet, hent ut neste hopp
     if (id >= 0 && routing_table[id].valid) {
         next = routing_table[id].next_hop;
     }
 
-    printf("[ROUTINGD] handle_route_request: my=%d dest=%d -> id=%d valid=%d next=%d cost=%d\n",
-       my_addr, dest, id,
-       (id >= 0 ? routing_table[id].valid : -1),
-       (id >= 0 ? routing_table[id].next_hop : -1),
-       (id >= 0 ? routing_table[id].cost : -1));
+    // printf("[ROUTINGD] handle_route_request: my=%d dest=%d -> id=%d valid=%d next=%d cost=%d\n",
+    //    my_addr, dest, id,
+    //    (id >= 0 ? routing_table[id].valid : -1),
+    //    (id >= 0 ? routing_table[id].next_hop : -1),
+    //    (id >= 0 ? routing_table[id].cost : -1));
 
+    // Sender ROUTE RESPONSE tilbake til MIP-daemonen med resultatet
     send_route_response(sock, my_addr, next);
 }
 
@@ -99,7 +110,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                     continue;
 
                 // Ignorer poisoned reverse
-                if (cost == 255) {
+                if (cost == INF_COST) {
                     if (debug_mode)
                         printf("[ROUTINGD] Ignorerer poisoned reverse for dest=%d fra %d\n",
                             dest, from);
@@ -107,7 +118,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                 }
 
                 // Kostnaden via denne naboen (1 ekstra hopp)
-                uint8_t new_cost = (cost >= 254) ? 255 : cost + 1;
+                uint8_t new_cost = (cost >= 254) ? INF_COST : cost + 1;
 
                 // Finn eksisterende rute
                 int id = get_route(dest);
@@ -162,9 +173,9 @@ void broadcast_update(void) {
             if (neighbor_count > 1 &&
                 routing_table[i].next_hop == neighbor_addr &&
                 routing_table[i].dest != neighbor_addr &&
-                routing_table[i].cost < 255) {
+                routing_table[i].cost < INF_COST) {
 
-                advertised_cost = 255;  // poison reverse
+                advertised_cost = INF_COST;  // poison reverse
             if (debug_mode) {
                 printf("[ROUTINGD] Poisoned reverse: dest=%d via=%d (cost=%d -> 255)\n",
                     routing_table[i].dest, neighbor_addr, routing_table[i].cost);
@@ -193,7 +204,7 @@ void hello(void){
         printf("[ROUTINGD] Sending HELLO broadcast (MIP=%d)\n", MY_MIP);
     }
     
-    send_unix_message(255, 1, &msg, 1);
+    send_unix_message(INF_COST, 1, &msg, 1);
 }
 
 

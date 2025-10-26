@@ -9,8 +9,12 @@
 
 #include "routing_socket.h"
 #include "routingd.h"
-#include "arp.h"
 
+/*
+Kobler routingd til MIP-daemonen via en UNIX socket
+Lager først sin egen lokale socket, og kobler deretter til MIP-daemonens socket i /tmp/
+Etter tilkobling registreres routingd med SDU-type 0x04 og mottar sin MIP-adresse
+*/
 int connect_to_mipd(const char *socket_path) {
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) {
@@ -18,12 +22,13 @@ int connect_to_mipd(const char *socket_path) {
         exit(EXIT_FAILURE);
     }
 
-    // Lag unik lokal UNIX-socket for routingd selv (så flere prosesser ikke kolliderer)
+    // Lager unik lokal UNIX-socket for routingd selv (så flere prosesser ikke kolliderer)
     struct sockaddr_un client_addr;
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sun_family = AF_UNIX;
     snprintf(client_addr.sun_path, sizeof(client_addr.sun_path),
              "/tmp/routingd_%d.sock", getpid());  // legg den i /tmp/
+
     unlink(client_addr.sun_path);
 
     if (bind(sock, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
@@ -32,27 +37,28 @@ int connect_to_mipd(const char *socket_path) {
         exit(EXIT_FAILURE);
     }
 
-    // --- Bygg full sti til MIP-daemonens UNIX-socket ---
+    // Bygger full sti til MIP-daemonens UNIX-socket (legg til /tmp/ hvis ikke absolutt sti)
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
 
     char full_path[sizeof(addr.sun_path)];
+
+    // Sjekker om brukeren oppga bare et navn (eg. "usockA") eller en full sti (eg. "/tmp/usockA").
+    // Hvis det bare var et navn, legges "/tmp/" foran, siden alle socket-filer ligger der
     if (socket_path[0] != '/') {
         snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
     } else {
         strncpy(full_path, socket_path, sizeof(full_path) - 1);
         full_path[sizeof(full_path) - 1] = '\0';
     }
-
     // Kopier inn i addr.sun_path
     strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
     addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
     fprintf(stderr, "[ROUTINGD] Connecting to MIP daemon socket: %s\n", addr.sun_path);
-    fflush(stderr);
 
-    // --- Koble til MIP-daemonen ---
+    // Kobler til MIP-daemonen socket
     if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
         perror("connect to mipd");
         close(sock);
@@ -74,21 +80,23 @@ int connect_to_mipd(const char *socket_path) {
         MY_MIP = my_addr;
         fprintf(stderr, "[ROUTINGD] Received MY_MIP = %d from MIPd\n", MY_MIP);
     } else if (n == 0) {
-        fprintf(stderr, "[ROUTINGD] Warning: MIP daemon closed socket unexpectedly!\n");
+        fprintf(stderr, "[ROUTINGD] Warning: MIP daemon closed socket unexpectedly\n");
     } else {
         perror("read MY_MIP from MIPd");
     }
 
     fprintf(stderr, "[ROUTINGD] Connected and registered to socket fd=%d (SDU=0x04)\n", sock);
-    fflush(stderr);
 
     return sock;
 }
 
-
+// Venter på at MIP-daemonens UNIX-socket-fil skal dukke opp før routing deamon prøver å koble til
+// Brukes for å unngå at routingd starter før MIPd faktisk har laget socketen
 void wait_for_socket(const char *path) {
-    struct stat sb;
+    struct stat sb; // en struktur som lagrer filinfo, bruket den til å sjekke om path finnes
     int tries = 0;
+
+    // Sjekker gjentatte ganger om socket-filen finnes
     while (stat(path, &sb) != 0) {
         if (tries++ > 50) {
             fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
@@ -98,12 +106,20 @@ void wait_for_socket(const char *path) {
     }
 }
 
-//generisk metode til å kommuniserer med MIPD over unix socket
+// Generisk metode til å kommuniserer med MIPD over unix socket
+// Pakker destinasjon, TTL og payload inn i en buffer og skriver den ut på ROUTING_SOCK
 int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len) {
     uint8_t buf[256];
+
+    //ikke send dersom meldingen er for stor for bufferen
     if (len + 2 > sizeof(buf)) return -1;
+
     buf[0] = dest; 
     buf[1] = ttl; 
+
+    // Kopierer inn selve dataen
     memcpy(&buf[2], data, len);
+
+    // Skriver alt til MIP-daemonens socket
     return write(ROUTING_SOCK, buf, len + 2);
 }
