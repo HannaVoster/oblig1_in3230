@@ -446,9 +446,6 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
         }
 
         case RT_MSG_UPDATE: {
-            payload++;  // hopp over type-byte (første byte)
-            len--;      // juster ned for type-byte, ikke mer
-
             if (debug_mode){
                 printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
             }
@@ -458,11 +455,12 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
 
             if (len < 2) break;
             if (len % 2 != 0) {
-                if (debug_mode) printf("[ROUTINGD] WARNING: Odd UPDATE len=%zu, justerer ned.\n", len);
-                len--;
+                if (debug_mode)
+                    printf("[ROUTINGD] WARNING: Odd UPDATE len=%zu, justerer ned.\n", len);
+                len--; // dropp siste byte hvis den er ujevn
             }
 
-            int num_entries = len / 2;
+            int num_entries = len / 2; // fordi payload = [dest, cost, dest, cost, ...]
             for (int i = 0; i < num_entries; i++) {
                 uint8_t dest = payload[i * 2];
                 uint8_t cost = payload[i * 2 + 1];
@@ -476,30 +474,16 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                     continue;
                 }
 
-                uint8_t new_cost = (cost >= 254) ? 255 : (uint8_t)(cost + 1);
-                if (new_cost == 0) new_cost = 1;
+                uint8_t new_cost = (cost >= 254) ? 255 : cost + 1;
+                update_or_insert_neighbor(dest, from, new_cost);
 
-                int idx = get_route(dest);
-                if (idx == -1) {
-                    update_or_insert_neighbor(dest, from, new_cost);
-                    if (debug_mode)
-                        printf("[ROUTINGD] New route: dest=%d via=%d cost=%d\n",
-                            dest, from, new_cost);
-                } else {
-                    rt_entry *entry = &routing_table[idx];
-                    if (from == entry->next_hop || new_cost < entry->cost) {
-                        update_or_insert_neighbor(dest, from, new_cost);
-                        if (debug_mode)
-                            printf("[ROUTINGD] Updated route: dest=%d via=%d cost=%d\n",
-                                dest, from, new_cost);
-                    } else if (debug_mode) {
-                        printf("[ROUTINGD] Ignored worse route for dest=%d: via=%d cost=%d (existing via=%d cost=%d)\n",
-                            dest, from, new_cost, entry->next_hop, entry->cost);
-                    }
-                }
-            } 
+                if (debug_mode)
+                    printf("[ROUTINGD] Oppdatert/innsatt rute: dest=%d via=%d cost=%d\n",
+                        dest, from, new_cost);
+            }
             break;
         }
+
 
         default: {
             printf("[ROUTINGD] Ukjent meldingstype 0x%02X fra %d\n", msg_type, from);
