@@ -354,12 +354,12 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         case SDU_TYPE_PING: {
-            handle_ping_message(raw_sock, my_mip_address, dest, src, ttl, sdu, sdu_len, eh, src_addr.sll_ifindex);
+            handle_ping_message(my_mip_address, dest, src, ttl, sdu, sdu_len, eh, src_addr.sll_ifindex);
             break;
         }
 
         case SDU_TYPE_PONG: {
-           handle_pong_message(raw_sock, my_mip_address, dest, src, ttl, sdu, sdu_len);
+           handle_pong_message(my_mip_address, dest, src, ttl, sdu, sdu_len);
             break;
         }
 
@@ -418,11 +418,11 @@ void handle_routing_message(uint8_t src, const uint8_t *sdu, ssize_t sdu_len){
 // Håndterer innkommende PING-meldinger
 // Prøver først å forwarde hvis pakken ikke er til en selv
 // Hvis den er til seg selv, leverer PING-en opp til UNIX-klienten
-void handle_ping_message(int raw_sock, int my_mip_address, uint8_t dest, uint8_t src, uint8_t ttl,
+void handle_ping_message(int my_mip_address, uint8_t dest, uint8_t src, uint8_t ttl,
                          const uint8_t *sdu, ssize_t sdu_len,
                          struct ethhdr *eh, int if_index)
 {
-    int fwd_result = forward_packet(raw_sock, my_mip_address, dest, src, ttl, SDU_TYPE_PING, sdu, sdu_len);
+    int fwd_result = forward_packet(my_mip_address, dest, src, ttl, SDU_TYPE_PING, sdu, sdu_len);
 
     if (fwd_result != 0) {
         // 1 = forwarded, -1 = droppet
@@ -452,12 +452,12 @@ void handle_ping_message(int raw_sock, int my_mip_address, uint8_t dest, uint8_t
 // Håndterer mottatte PONG-meldinger.
 // Forsøker først å forwarde pakken hvis den ikke er til meg eller broadcast.
 // Hvis den er til meg, leveres den opp til UNIX-klienten (ping_client).
-void handle_pong_message(int raw_sock, int my_mip_address,
+void handle_pong_message(int my_mip_address,
                          uint8_t dest, uint8_t src, uint8_t ttl,
                          const uint8_t *sdu, ssize_t sdu_len)
 {
     // Forsøk å forwarde pakken (bruker samme hjelpefunksjon som PING)
-    int fwd_result = forward_packet(raw_sock, my_mip_address,
+    int fwd_result = forward_packet(my_mip_address,
                                     dest, src, ttl,
                                     SDU_TYPE_PONG, sdu, sdu_len);
 
