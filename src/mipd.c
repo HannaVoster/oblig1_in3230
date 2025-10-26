@@ -22,7 +22,7 @@
 #include "unix.h"
 #include "raw_handler.h"
 
-int debug_mode = 0; // debug flagg
+debug_mode = 0; // debug flagg
 //int last_unix_client_fd = -1; // siste unix klient
 //int last_ping_src = -1;
 int my_mip_address = -1; // min mip addresse
@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-    setbuf(stdout, NULL);
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    setvbuf(stderr, NULL, _IOLBF, 0);
     //sjekker at argumentene gis riktig, avslutter hvis det ikke finnes mindt 2
     if (optind + 2 > argc) {
         fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
