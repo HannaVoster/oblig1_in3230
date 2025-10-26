@@ -147,16 +147,29 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     }
     // Håndter PING (0x02) og PONG (0x03) likt
     if (sdu_type == SDU_TYPE_PING || sdu_type == SDU_TYPE_PONG) {
+        printf("[DEBUG][UNIX_REQ] Got %s from UNIX app (dest=%d len=%zu)\n",
+           sdu_type == SDU_TYPE_PING ? "PING" : "PONG", dest_addr, payload_length);
+        fflush(stdout);
+
         unsigned char mac[6];
         int ifindex = -1;
 
         if (arp_lookup(dest_addr, mac, &ifindex)) {
+            printf("[DEBUG][UNIX_REQ] ARP found for %d → sending directly via ifindex=%d\n",
+               dest_addr, ifindex);
+            fflush(stdout);
+
             size_t pdu_len;
             uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
                                         sdu_type, payload, payload_length, &pdu_len);
             send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
             free(pdu);
+            printf("[DEBUG][UNIX_REQ] Sent %s out on raw socket (%zu bytes)\n",
+               sdu_type == SDU_TYPE_PING ? "PING" : "PONG", payload_length);
+            fflush(stdout);
         } else {
+            printf("[DEBUG][UNIX_REQ] No ARP for %d → queueing message and asking routingd\n", dest_addr);
+            fflush(stdout);
             queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type,
                                 payload, payload_length);
             for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
