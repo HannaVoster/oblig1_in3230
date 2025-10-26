@@ -1,5 +1,4 @@
-//mottar meldinger som mipd leverer
-//trenger bare socket path til å lytte og ta imot
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,12 +37,14 @@ int main(int argc, char *argv[]) {
     addr.sun_family = AF_UNIX;
 
     char full_path[sizeof(addr.sun_path)];
+
     if (socket_path[0] != '/') {
         snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
     } else {
         strncpy(full_path, socket_path, sizeof(full_path) - 1);
         full_path[sizeof(full_path) - 1] = '\0';
     }
+
     strncpy(addr.sun_path, full_path, sizeof(addr.sun_path) - 1);
     addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
@@ -58,6 +59,7 @@ int main(int argc, char *argv[]) {
 
     // Registrer SDU-type, PONG = 0x03
     uint8_t sdu_type = 0x03;
+
     if (write(sock, &sdu_type, 1) != 1) {
         perror("write sdu_type");
         close(sock);
@@ -86,9 +88,12 @@ int main(int argc, char *argv[]) {
         // Sender svaret tilbake via samme socket (til mipd → ping_client)
         ssize_t total_len = 2 + strlen((char*)&reply[2]);
         ssize_t sent = write(sock, reply, total_len); 
+
         printf("[PING_SERVER] write() returned %zd (expected %zd)\n", sent, total_len);
         fflush(stdout);
+
         if (sent < 0) perror("write");
+
         printf("[PING_SERVER] Sent reply (%zd bytes): PONG:%s\n", sent, &buf[2]);
         fflush(stdout);
     }

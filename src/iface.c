@@ -20,23 +20,6 @@ int iface_indices[5];
 int iface_count = 0;
 char iface_name[MAX_IFACES][IFNAMSIZ];
 
-// void find_all_ifaces() {
-//     struct ifaddrs *ifaddr, *ifa;
-//     iface_count = 0;
-//     getifaddrs(&ifaddr);
-
-//     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
-//         if (!ifa->ifa_addr) continue;
-//         if (ifa->ifa_addr->sa_family == AF_PACKET &&
-//             strcmp(ifa->ifa_name, "lo") != 0) {
-//             iface_indices[iface_count++] = if_nametoindex(ifa->ifa_name);
-//             if (debug_mode)
-//                 printf("[DEBUG] Found interface %s (index=%d)\n",
-//                        ifa->ifa_name, iface_indices[iface_count-1]);
-//         }
-//     }
-//     freeifaddrs(ifaddr);
-// }
 
 void find_all_ifaces() {
     struct ifaddrs *ifaddr, *ifa;
