@@ -89,11 +89,11 @@ int main(int argc, char *argv[]) {
         // Lag svar: [dest=src][ttl=8][PONG:<payload>] format fra oppgaven
         uint8_t reply[BUF_SIZE];
         reply[0] = src;
-        reply[1] = ttl; // ny ttl
+        reply[1] = 8; // ny ttl
 
         snprintf((char*)&reply[2], BUF_SIZE - 2, "PONG:%.500s", (char*)&buf[2]);
 
-        // Sender svaret tilbake via samme socket (til mipd → ping_client)
+        // Send svaret tilbake til mipd (som sender det videre til ping_client)
         ssize_t total_len = 2 + strlen((char*)&reply[2]);
         ssize_t sent = write(sock, reply, total_len); 
 
