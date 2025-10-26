@@ -326,6 +326,13 @@ int get_route(uint8_t dest) {
 
 //metode til å oppdattere eller lage en ny rute
 int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
+
+    if (debug_mode) {
+    printf("[TRACE] update_or_insert_neighbor() CALLED: dest=%d via=%d cost=%d (MY_MIP=%d)\n",
+           dest, next_hop, cost, MY_MIP);
+    fflush(stdout);
+    }
+
     if (dest == MY_MIP) {
         // Ikke rør ruten til deg selv etter init
         routing_table[MY_MIP].valid = 1;
@@ -546,10 +553,16 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
             }
 
             int num_entries = len / 2; // fordi payload = [dest, cost, dest, cost, ...]
+
+            if (debug_mode) {
+                printf("[TRACE] Parsing %d entries in UPDATE fra %d\n", num_entries, from);
+            }
             for (int i = 0; i < num_entries; i++) {
                 uint8_t dest = payload[i * 2];
                 uint8_t cost = payload[i * 2 + 1];
-
+                if (debug_mode) {
+                    printf("[TRACE] UPDATE entry %d: dest=%d cost=%d\n", i, dest, cost);
+                }
                 if (dest == 0 || dest > 254) continue;
                 if (dest == MY_MIP) continue;
                 if (cost == 255) {
@@ -557,6 +570,11 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                         printf("[ROUTINGD] Ignorerer poisoned reverse for dest=%d fra %d\n",
                             dest, from);
                     continue;
+                }
+
+                if (debug_mode) {
+                    printf("[TRACE] Calling update_or_insert_neighbor(dest=%d, via=%d, cost=%d)\n",
+                        dest, from, new_cost);
                 }
 
                 uint8_t new_cost = (cost >= 254) ? 255 : cost + 1;
