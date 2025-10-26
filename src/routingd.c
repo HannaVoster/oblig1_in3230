@@ -506,16 +506,22 @@ void broadcast_update(void) {
             // Bruk poisoned reverse KUN hvis vi har flere naboer
             // og ruten ble lært via denne naboen.
             uint8_t advertised_cost = routing_table[i].cost;
+            // Bare bruk Poison Reverse hvis:
+            //  - vi har mer enn én nabo (ellers vil single-link nett stoppe)
+            //  - ruten ble lært VIA denne naboen
+            //  - destinasjonen ikke ER naboen selv
+            //  - ruten faktisk har en gyldig kost (ikke INF)
             if (neighbor_count > 1 &&
                 routing_table[i].next_hop == neighbor_addr &&
-                routing_table[i].dest != neighbor_addr) {
+                routing_table[i].dest != neighbor_addr &&
+                routing_table[i].cost < 255) {
 
-                advertised_cost = 255; // poison
-                if (debug_mode) {
-                    printf("[ROUTINGD] Poisoned reverse: dest=%d via=%d\n",
-                           routing_table[i].dest, neighbor_addr);
-                }
+                advertised_cost = 255;  // poison reverse
+            if (debug_mode) {
+                printf("[ROUTINGD] Poisoned reverse: dest=%d via=%d (cost=%d -> 255)\n",
+                    routing_table[i].dest, neighbor_addr, routing_table[i].cost);
             }
+        }
 
             buf[pos++] = advertised_cost;
         }
