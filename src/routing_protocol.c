@@ -1,3 +1,19 @@
+/*
+Denne filen inneholder funksjonene som håndterer selve routing-protokollen (DVR)
+Her behandles meldinger som kommer fra MIP-daemonen, og oppdateringer sendes ut til naboer
+
+Funksjonene gjør dette:
+handle_route_request(): mottar ruteforespørsler (REQ) fra MIPd og finner riktig next hop
+
+send_route_response(): sender ruteinformasjon (RSP) tilbake til MIPd
+
+handle_incoming_message(): håndterer meldinger mellom routing-daemoner (HELLO og UPDATE)
+
+broadcast_update(): sender hele routing-tabellen til alle naboer, med poison reverse
+
+hello(): sender HELLO-meldinger for å oppdage naboer
+*/
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>

@@ -1,4 +1,12 @@
+/*
+ROUTING DAEMON
+Filen ineholder routing deamon sin main og en hjelpemetode for å få tiden
 
+Main kobler til mipd over UNIX-socket, registrerer SDU-type 0x04,
+og håndterer rutingmeldinger via epoll-loop.
+
+Globale variabler settes også her
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -13,11 +21,6 @@
 #include "routing_socket.h"
 #include "routing_table.h"
 #include "routing_protocol.h"
-
-
-// ROUTING DAEMON
-// Kobler til mipd over UNIX-socket, registrerer SDU-type 0x04,
-// og håndterer rutingmeldinger via epoll-loop.
 
 neighbor neighbors[MAX_NEIGHBORS];
 rt_entry routing_table[MAX_ROUTES];   
