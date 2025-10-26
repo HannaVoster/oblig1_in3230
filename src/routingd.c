@@ -446,67 +446,61 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
         }
 
         case RT_MSG_UPDATE: {
-            payload++;
-            len--;
+            payload++;  // hopp over type-byte (første byte)
+            len--;      // juster ned for type-byte, ikke mer
+
             if (debug_mode){
                 printf("[ROUTINGD] UPDATE mottatt fra %d (len=%zu)\n", from, len);
             }
 
-            // Oppdater naboen slik at vi vet at den lever
             int id = find_or_add_neighbor(from);
             neighbors[id].last_hello_ms = now_ms();
 
-            
-            // Len må være partall (dest,cost)
             if (len < 2) break;
             if (len % 2 != 0) {
                 if (debug_mode) printf("[ROUTINGD] WARNING: Odd UPDATE len=%zu, justerer ned.\n", len);
-                len--; // ignorér siste byte hvis det er padding
+                len--;
             }
 
-            
-            // Parse ruter: 2 bytes per (dest, cost)
             int num_entries = len / 2;
             for (int i = 0; i < num_entries; i++) {
                 uint8_t dest = payload[i * 2];
                 uint8_t cost = payload[i * 2 + 1];
 
                 if (dest == 0 || dest > 254) continue;
-                if (dest == MY_MIP) continue; // ignorer ruter til deg selv (poison reverse)
+                if (dest == MY_MIP) continue;
                 if (cost == 255) {
-                    // Dette er en poisoned reverse / ugyldig rute, ikke legg den inn
                     if (debug_mode)
-                        printf("[ROUTINGD] Ignorerer poisoned reverse for dest=%d fra %d\n", dest, from);
+                        printf("[ROUTINGD] Ignorerer poisoned reverse for dest=%d fra %d\n",
+                            dest, from);
                     continue;
                 }
 
-                // unngå overflow og for lav kostnad
                 uint8_t new_cost = (cost >= 254) ? 255 : (uint8_t)(cost + 1);
                 if (new_cost == 0) new_cost = 1;
-                // Oppdater routing-tabellen
 
-                // Finn eksisterende rute hvis den finnes
                 int idx = get_route(dest);
                 if (idx == -1) {
-                    // ny rute
                     update_or_insert_neighbor(dest, from, new_cost);
                     if (debug_mode)
-                        printf("[ROUTINGD] New route: dest=%d via=%d cost=%d\n", dest, from, new_cost);
+                        printf("[ROUTINGD] New route: dest=%d via=%d cost=%d\n",
+                            dest, from, new_cost);
                 } else {
                     rt_entry *entry = &routing_table[idx];
                     if (from == entry->next_hop || new_cost < entry->cost) {
                         update_or_insert_neighbor(dest, from, new_cost);
                         if (debug_mode)
-                            printf("[ROUTINGD] Updated route: dest=%d via=%d cost=%d\n", dest, from, new_cost);
-                    } else {
-                        if (debug_mode)
-                            printf("[ROUTINGD] Ignored worse route for dest=%d: via=%d cost=%d (existing via=%d cost=%d)\n",
-                                dest, from, new_cost, entry->next_hop, entry->cost);
+                            printf("[ROUTINGD] Updated route: dest=%d via=%d cost=%d\n",
+                                dest, from, new_cost);
+                    } else if (debug_mode) {
+                        printf("[ROUTINGD] Ignored worse route for dest=%d: via=%d cost=%d (existing via=%d cost=%d)\n",
+                            dest, from, new_cost, entry->next_hop, entry->cost);
                     }
-            }
-
+                }
+            } 
             break;
         }
+
         default: {
             printf("[ROUTINGD] Ukjent meldingstype 0x%02X fra %d\n", msg_type, from);
             break;
@@ -514,7 +508,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
 
     }
 }
-}
+
 void send_update_to_neighbor(uint8_t neighbor_mip) {
     uint8_t buf[256]; 
     size_t pos = 0;
