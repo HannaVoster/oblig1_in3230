@@ -196,22 +196,47 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             }
             break;
         }
-        
-
         case SDU_TYPE_PONG: {
-            // Mottatt et PONG-svar fra en node vi tidligere sendte en PING til
-            printf("[RAW] PONG mottatt fra MIP %u: %.*s\n\n",
-                   src, (int)sdu_len, (char*)sdu);
+            // Hvis ikke til meg (og ikke broadcast), forward som vanlig
+            if (dest != my_mip_address && dest != 255) {
+                if (ttl <= 1) {
+                    if (debug_mode) printf("[DEBUG][FWD] Dropper PONG til %d (TTL utløpt)\n", dest);
+                    return;
+                }
+                uint8_t ttl_new = ttl - 1;
 
-            // Skriver svaret (payloaden) tilbake til UNIX-klienten som startet forespørselen
-            // må finne hvilken unix klient
+                if (debug_mode) {
+                    printf("[DEBUG][RAW][FWD] Routing lookup (PONG): dest=%d, src=%d, ttl=%d→%d\n",
+                        dest, src, ttl, ttl_new);
+                }
+
+                // legg i kø til routing lookup og spør routingd
+                queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
+                for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                    if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                        send_route_request(unix_clients[i].fd, my_mip_address, dest);
+                        break;
+                    }
+                }
+                if (debug_mode) printf("[DEBUG][RAW][FWD] Route request sendt (PONG), pakke lagret midlertidig.\n");
+                return;
+            }
+
+            // Til meg: lever opp til ping-klienten (SDU_TYPE_PING)
+            printf("[RAW] PONG mottatt fra MIP %u: %.*s\n\n",
+                src, (int)sdu_len, (char*)sdu);
+
             for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
                 if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_PING) {
                     uint8_t reply[256];
-                    reply[0] = src;   // hvem meldingen kom fra
+                    reply[0] = src;
                     reply[1] = ttl;
                     memcpy(&reply[2], sdu, sdu_len);
                     write(unix_clients[i].fd, reply, 2 + sdu_len);
+                    if (debug_mode) {
+                        printf("[DEBUG] Sent PONG to UNIX app (src=%u ttl=%u len=%zd)\n",
+                            src, ttl, sdu_len);
+                    }
                     break;
                 }
             }
