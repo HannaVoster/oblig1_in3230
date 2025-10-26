@@ -65,5 +65,6 @@ void broadcast_update(void);
 void send_update_to_neighbor(uint8_t neighbor_mip);
 uint64_t now_ms(void);
 void periodic_update(void);
+void print_routing_table(void);
 
 #endif
