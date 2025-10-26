@@ -1,39 +1,32 @@
 
-//ROUTING DEAMON
-/*
-skal koble seg til mipd gjennom UNIX socket,
-registrere seg som en klient
-ha sdu type 0x04
-gi en route respons
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <sys/epoll.h>
 
 #include "routingd.h"
-
 #include "routing_socket.h"
 #include "routing_table.h"
 #include "routing_protocol.h"
+
+
+// ROUTING DAEMON
+// Kobler til mipd over UNIX-socket, registrerer SDU-type 0x04,
+// og håndterer rutingmeldinger via epoll-loop.
 
 neighbor neighbors[MAX_NEIGHBORS];
 rt_entry routing_table[MAX_ROUTES];   
 uint8_t MY_MIP = 0;
 int ROUTING_SOCK = -1;
-
 int debug_mode = 0;
+
 int main(int argc, char *argv[]) {
-    // Håndterer -h og -d flagg
+    // Leser kommandolinjeflagg (-h for hjelp, -d for debug)
     int opt;
     while ((opt = getopt(argc, argv, "hd")) != -1) {
         switch(opt) {
@@ -51,6 +44,7 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
+    // Sjekker at socket-path er oppgitt
     if (optind >= argc) {
         fprintf(stderr, "Usage: %s [-d] <unix_socket_path>\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -58,10 +52,12 @@ int main(int argc, char *argv[]) {
 
     const char *socket_path = argv[optind];
     printf("[ROUTINGD] Starting with socket path: %s\n", socket_path);
-    // Vent på at mipd oppretter UNIX-socketen
+
+    // Venter til mipd har opprettet UNIX-socketen
     wait_for_socket(socket_path);
     printf("[ROUTINGD] Socket %s er nå tilgjengelig, kobler til...\n", socket_path);
 
+    // Koble til MIP-daemonen
     ROUTING_SOCK = connect_to_mipd(socket_path);
     if (ROUTING_SOCK < 0) {
         fprintf(stderr, "[ROUTINGD] Klarte ikke å koble til %s\n", socket_path);
@@ -70,8 +66,8 @@ int main(int argc, char *argv[]) {
 
     printf("[ROUTINGD] epoll looop - Listening...\n");
 
+    // Opprett epoll-instans for å håndtere innkommende meldinger
     int epollfd = epoll_create1(0);
-
     if (epollfd < 0) {
         perror("epoll_create1");
         close(ROUTING_SOCK);
@@ -82,35 +78,40 @@ int main(int argc, char *argv[]) {
     ev.events = EPOLLIN;
     ev.data.fd = ROUTING_SOCK;
 
-    //legger til instansen i epollfd (instansen fra tidligere)
+    // Registrerer MIP-socketen i epoll
     // EPOLL_CTL_ADD forteller instansen at socketen skal overvåkes
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, ROUTING_SOCK, &ev) == -1) {
         perror("epoll_ctl: routing_sock");
         exit(EXIT_FAILURE);
     }
+
+    // Nullstiller naboliste og rutetabell
     memset(neighbors, 0, sizeof(neighbors));
     memset(routing_table, 0, sizeof(routing_table));
 
+    // Alle ruter starter som "ikke gyldige" med kostnad 255 (uendelig)
     for (int i = 0; i < MAX_ROUTES; i++) {
         routing_table[i].valid = 0;
-        routing_table[i].cost = 255;   // INF_COST
+        routing_table[i].cost = 255; // INF_COST
     }
-    update_or_insert_neighbor(MY_MIP, MY_MIP, 0); // rute til seg selv
+    // Legger inn en rute til seg selv (kost = 0)
+    update_or_insert_neighbor(MY_MIP, MY_MIP, 0); 
 
-    // Tidsstyrte meldinger
+    // Klokker for HELLO, UPDATE og tabellutskrift
     uint64_t last_hello = now_ms();
     uint64_t last_update = now_ms();
     uint64_t last_print= now_ms();
 
-    // Hovedløkke for å håndtere meldinger fra mipd
+    // Hovedløkke for å håndtere meldinger fra mipd og tidsstyrte oppgaver
     while (1) { 
-        int n = epoll_wait(epollfd, events, MAX_EVENTS, 200); // 200 ms timeout
+        // Venter på hendelser med 200 ms timeout
+        int n = epoll_wait(epollfd, events, MAX_EVENTS, 200); 
 
         if (n < 0) {
             perror("epoll_wait");
             break;
         }
-        // Behandle hendelser fra epoll 
+        // Går gjennom alle hendelser som kom inn
         for (int i = 0; i < n; i++) {
             if (events[i].data.fd == ROUTING_SOCK && (events[i].events & EPOLLIN)) {
                 uint8_t buf[256];
@@ -125,6 +126,7 @@ int main(int argc, char *argv[]) {
                 uint8_t src = buf[0];
                 uint8_t msg_type = buf[1]; // for HELLO/UPDATE - ellers ttl, men brukes ikke videre
 
+                // Skiller mellom vanlige protokollmeldinger og ROUTE REQUEST
                 if (len >= 6 && buf[2] == 'R' && buf[3] == 'E' && buf[4] == 'Q') {
                     handle_route_request(ROUTING_SOCK, buf, len);
                 } else if (len >= 3) {
@@ -132,18 +134,20 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-
         uint64_t now = now_ms();
 
+        // Sender HELLO-meldinger jevnlig (oppdaterer naboer)
         if (now - last_hello >= HELLO_INTERVAL_MS) {
             hello(); // broadcast HELLO
             last_hello = now;
         }
+        // Sender oppdatering av rutetabell
         if (now - last_update >= UPDATE_INTERVAL_MS) {
-            broadcast_update(); // send UPDATE (Poisoned Reverse)
+            broadcast_update(); 
             last_update = now;
         }
-        if (now_ms() - last_print > 10000) {
+        // Skriver ut rutetabellen hvert 15. sekund (for debugging)
+        if (now_ms() - last_print > 15000) {
             print_routing_table();
             last_print = now_ms();
         }

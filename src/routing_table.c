@@ -1,22 +1,20 @@
+// ROUTING TABLE HANDLER
+// Håndterer oppdatering, oppslag og utskrift av rutetabellen og naboer.
+
 #include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "routing_table.h"
 #include "routingd.h"
 
-
-//metode til å oppdattere eller lage en ny rute
+// Oppdaterer en eksisterende rute, eller legger den til hvis den ikke finnes
+// Brukes både når nye naboer oppdages og når det mottas oppdateringer fra andre noder
 int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
 
-    if (debug_mode) {
-    printf("[TRACE] update_or_insert_neighbor() CALLED: dest=%d via=%d cost=%d (MY_MIP=%d)\n",
-           dest, next_hop, cost, MY_MIP);
-    fflush(stdout);
-    }
-
+    // Hvis destinasjonen er meg selv, lag en "egen rute" med kost 0
     if (dest == MY_MIP) {
         int id = get_route(dest);
+        // Finn en ledig plass hvis den ikke allerede finnes
         if (id < 0) {
             for (int i = 0; i < MAX_ROUTES; i++) {
                 if (!routing_table[i].valid) {
@@ -25,6 +23,7 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
                 }
             }
         }
+        // Opprett eller oppdater selv-ruten
         if (id >= 0) {
             routing_table[id].valid = 1;
             routing_table[id].dest = MY_MIP;
@@ -38,13 +37,13 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
         }
         return id;
     }
-
-    if (cost == 0) {
-        cost = 1;
-        if (debug_mode)
-            printf("[ROUTINGD] Justerte 0-cost → 1 for dest=%d via=%d\n",
-                   dest, next_hop);
-    }
+    // // Kostnad 0 gir ingen mening, justerer til 1
+    // if (cost == 0) {
+    //     cost = 1;
+    //     if (debug_mode)
+    //         printf("[ROUTINGD] Justerte 0-cost til 1 for dest=%d via=%d\n",
+    //                dest, next_hop);
+    // }
 
     int id = get_route(dest);
     if (id < 0) { // ingen rute – lag ny
@@ -68,7 +67,6 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
 
         return id;
     }
-
     // sjekk om verdier faktisk endres
     uint8_t old_next_hop = routing_table[id].next_hop;
     uint8_t old_cost = routing_table[id].cost;
