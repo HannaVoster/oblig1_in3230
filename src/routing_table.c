@@ -7,6 +7,7 @@
 #include "routing_table.h"
 #include "routingd.h"
 
+
 /*
 Oppdaterer en eksisterende rute, eller legger den til hvis den ikke finnes
 Brukes både når nye naboer oppdages og når det mottas oppdateringer fra andre noder

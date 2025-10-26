@@ -8,7 +8,7 @@
 #define HELLO_INTERVAL_MS 4000
 #define UPDATE_INTERVAL_MS 6000
 #define INF_COST 255
-
+#define SDU_TYPE_ROUTING 0x04
 // SDU-type er fortsatt 0x04 (routing). Interne msg-typer:
 #define RT_MSG_HELLO   0x01 //payload 
 #define RT_MSG_UPDATE  0x02 
