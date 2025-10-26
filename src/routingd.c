@@ -325,7 +325,7 @@ int get_route(uint8_t dest) {
 }
 
 //metode til å oppdattere eller lage en ny rute
-int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
+int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
     if (dest == MY_MIP) {
         // Ikke rør ruten til deg selv etter init
         routing_table[MY_MIP].valid = 1;
@@ -341,36 +341,101 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
     if (cost == 0) {
         cost = 1;
         if (debug_mode)
-            printf("[ROUTINGD] justerne 0 cost -> 1 for dest=%d via=%d\n",
+            printf("[ROUTINGD] Justerte 0-cost → 1 for dest=%d via=%d\n",
                    dest, next_hop);
     }
+
     int id = get_route(dest);
-    if (id < 0) { //ingen rute - lag ny
-        for (int i = 0; i < MAX_ROUTES; i++){
-            if(!routing_table[i].valid){
+    if (id < 0) { // ingen rute – lag ny
+        for (int i = 0; i < MAX_ROUTES; i++) {
+            if (!routing_table[i].valid) {
                 id = i;
                 break;
             }
         }
-        if (id < 0) return -1; //ingen plass
+        if (id < 0) return -1; // ingen plass
 
         routing_table[id].valid = 1;
         routing_table[id].dest = dest;
+        routing_table[id].next_hop = next_hop;
+        routing_table[id].cost = cost;
+        routing_table[id].updated_ms = now_ms();
+
+        if (debug_mode)
+            printf("[ROUTINGD] NEW route: dest=%d via=%d cost=%d (slot=%d)\n",
+                   dest, next_hop, cost, id);
+
+        return id;
     }
-    //oppdatterer uansett - med neste hopp, kostnad og siste tidspunkt for oppdattering
-    routing_table[id].valid = 1;
-    if (routing_table[id].next_hop != next_hop || routing_table[id].cost != cost) {
+
+    // sjekk om verdier faktisk endres
+    uint8_t old_next_hop = routing_table[id].next_hop;
+    uint8_t old_cost = routing_table[id].cost;
+
+    if (old_next_hop != next_hop || old_cost != cost) {
         routing_table[id].next_hop = next_hop;
         routing_table[id].cost = cost;
         routing_table[id].updated_ms = now_ms();
 
         if (debug_mode) {
-            printf("[ROUTINGD] Route updated/inserted: dest=%d via=%d cost=%d (slot=%d)\n",
-                dest, next_hop, cost, id);
+            printf("[ROUTINGD] UPDATED route: dest=%d via=%d→%d cost=%d→%d (slot=%d)\n",
+                   dest, old_next_hop, next_hop, old_cost, cost, id);
             fflush(stdout);
         }
+    } else {
+        // Bare oppdater timestamp (naboen lever, men ingen endring)
+        routing_table[id].updated_ms = now_ms();
     }
+
+    return id;
 }
+
+// int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost){
+//     if (dest == MY_MIP) {
+//         // Ikke rør ruten til deg selv etter init
+//         routing_table[MY_MIP].valid = 1;
+//         routing_table[MY_MIP].dest = MY_MIP;
+//         routing_table[MY_MIP].next_hop = MY_MIP;
+//         routing_table[MY_MIP].cost = 0;
+//         if (debug_mode)
+//             printf("[ROUTINGD] Route self: dest=%d via=%d cost=%d\n",
+//                    MY_MIP, MY_MIP, 0);
+//         return MY_MIP;
+//     }
+
+//     if (cost == 0) {
+//         cost = 1;
+//         if (debug_mode)
+//             printf("[ROUTINGD] justerne 0 cost -> 1 for dest=%d via=%d\n",
+//                    dest, next_hop);
+//     }
+//     int id = get_route(dest);
+//     if (id < 0) { //ingen rute - lag ny
+//         for (int i = 0; i < MAX_ROUTES; i++){
+//             if(!routing_table[i].valid){
+//                 id = i;
+//                 break;
+//             }
+//         }
+//         if (id < 0) return -1; //ingen plass
+
+//         routing_table[id].valid = 1;
+//         routing_table[id].dest = dest;
+//     }
+//     //oppdatterer uansett - med neste hopp, kostnad og siste tidspunkt for oppdattering
+//     routing_table[id].valid = 1;
+//     if (routing_table[id].next_hop != next_hop || routing_table[id].cost != cost) {
+//         routing_table[id].next_hop = next_hop;
+//         routing_table[id].cost = cost;
+//         routing_table[id].updated_ms = now_ms();
+
+//         if (debug_mode) {
+//             printf("[ROUTINGD] Route updated/inserted: dest=%d via=%d cost=%d (slot=%d)\n",
+//                 dest, next_hop, cost, id);
+//             fflush(stdout);
+//         }
+//     }
+// }
 
 //generisk metode til å kommuniserer med MIPD over unix socket
 int send_unix_message(uint8_t dest, uint8_t ttl, const uint8_t* data, size_t len) {
