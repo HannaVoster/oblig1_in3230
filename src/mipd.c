@@ -197,6 +197,16 @@ int main(int argc, char *argv[]) {
             }
 
             else {
+                for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+                    if (unix_clients[i].active && unix_clients[i].fd == fd) {
+                        if (debug_mode) {
+                            printf("[DEBUG][EPOLL] Activity on fd=%d (type=0x%02X)\n",
+                                fd, unix_clients[i].sdu_type);
+                            fflush(stdout);
+                        }
+                        break;
+                    }
+                }
                 handle_unix_request(fd, raw_sock, my_mip_address);
             }
         }
