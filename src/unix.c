@@ -79,183 +79,24 @@ int create_unix_socket(const char *path) {
 }
 
 /*
-- handle_unix_request
-Håndterer forespørsler som kommer fra klient programmer (ping_client).
-tar inn unic_sock som er fildeskriptor for socketen
-raw_sock som er fildeskriptor for raw socket som brukes til å for sende 
-pakker på nettverket (send_pdu)
-og my_mip_address som er adressen til noden
+Håndterer meldinger som kommer fra UNIX-klienter (som ping_client, ping_server, routingd)
+Leser meldingen fra socketen, finner ut hvilken type SDU (meldingstype) det er, og sender
+den videre via nettverket (raw socket) eller til routingd om nødvendig
 
-Leser melding fra klienten, første byte er dest_addr og resten payload
-dest_addr sjekkes opp mot arp cashe, og pakken håndteres ulikt avhengig av om mac er lagret
-
-miss - bygg pakke, legg i kø og send broadcast arp req for å finne mottaker
-
-hit - har riktig mac, kan sende PING
+Kalles av main i mipd.c til å håndtere klient meldinger som kommer over UNIX socket
 */
-// void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
-//     fprintf(stderr, "[TRACE] handle_unix_request() called for fd=%d\n", client_fd);
-//     fflush(stderr);
-
-//     char buffer[256];
-//     int bytes_read = read(client_fd, buffer, sizeof(buffer));
-
-//     fprintf(stderr,"[DEBUG][UNIX_REQ] read %d bytes from fd=%d\n", bytes_read, client_fd);
-//     for (int j = 0; j < bytes_read; j++) {
-//         printf("%02X ", (unsigned char)buffer[j]);
-//     }
-//     printf("\n");
-//     fflush(stdout);
-
-//     if (bytes_read <= 0) {
-//         // Klienten koblet fra
-//         for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-//             if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
-//                 unix_clients[i].active = 0;
-//                 close(client_fd);
-//                 if (debug_mode)
-//                     printf("[UNIX] Client fd=%d disconnected\n", client_fd);
-//                 break;
-//             }
-//         }
-//         return;
-//     }
-//     // Finn hvilken SDU-type, se hvilken app som snakker med mipd
-//     uint8_t sdu_type = 0;
-//     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-//         if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
-//             sdu_type = unix_clients[i].sdu_type;
-//             break;
-//         }
-//     }
-//     if (debug_mode) {
-//         fprintf(stderr,"[DEBUG][UNIX_REQ] Detected sdu_type=0x%02X for fd=%d\n", sdu_type, client_fd);
-//         fflush(stdout);
-//     }
-//     // Meldingsformat: [dest:1][ttl:1][payload]
-//     if (bytes_read < 2) {
-//         fprintf(stderr, "[UNIX] Invalid message: too short\n");
-//         fflush(stdout);
-//         return;
-//     }
-
-//     uint8_t dest_addr = buffer[0];
-//     uint8_t ttl = buffer[1];
-//     uint8_t *payload = (uint8_t *)&buffer[2];
-//     size_t payload_length = bytes_read - 2;
-
-//     if (debug_mode) {
-//         printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
-//                client_fd, sdu_type, dest_addr, ttl, payload_length);
-//     }
-//     // Håndter PING (0x02) og PONG (0x03) likt
-//     if (sdu_type == SDU_TYPE_PING || sdu_type == SDU_TYPE_PONG) {
-//         fprintf(stderr,"[DEBUG][UNIX_REQ] Got %s from UNIX app (dest=%d len=%zu)\n",
-//            sdu_type == SDU_TYPE_PING ? "PING" : "PONG", dest_addr, payload_length);
-//         fflush(stdout);
-
-//         unsigned char mac[6];
-//         int ifindex = -1;
-
-//         if (arp_lookup(dest_addr, mac, &ifindex)) {
-//             fprintf(stderr,"[DEBUG][UNIX_REQ] ARP found for %d → sending directly via ifindex=%d\n",
-//                dest_addr, ifindex);
-//             fflush(stdout);
-
-//             size_t pdu_len;
-//             uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
-//                                         sdu_type, payload, payload_length, &pdu_len);
-//             send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
-//             free(pdu);
-//             fprintf(stderr,"[DEBUG][UNIX_REQ] Sent %s out on raw socket (%zu bytes)\n",
-//                sdu_type == SDU_TYPE_PING ? "PING" : "PONG", payload_length);
-//             fflush(stdout);
-//         } else {
-//             fprintf(stderr,"[DEBUG][UNIX_REQ] No ARP for %d → queueing message and asking routingd\n", dest_addr);
-//             fflush(stdout);
-//             queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type,
-//                                 payload, payload_length);
-//             for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-//                 if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
-//                     send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
-//                     if (debug_mode)
-//                         printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
-//                     break;
-//                 }
-//             }
-//         }
-//         return;  //  så den ikke fortsetter videre i routing-blokken
-//     }
-
-//     if (sdu_type == SDU_TYPE_ROUTING) {
-//         uint8_t ttl = buffer[1];
-//         uint8_t *payload = &buffer[2];
-//         size_t len = bytes_read - 2;
-
-//         //index 0 i payload viser hvilket intern sdu type routing deamonen satt
-//         uint8_t routing_type = payload[0];
-
-//         switch(routing_type){
-//             case 0x01:
-//                 send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
-//                 return;
-
-//             case 0x02:
-//                 send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
-//                 return;
-            
-//             case 'R':
-//                 uint8_t next = buffer[5];
-//                 handle_route_response(raw_sock, next);
-//         }
-//         return;
-//     }
-//     unsigned char mac[6];
-//     int ifindex = -1;
-
-//     if (arp_lookup(dest_addr, mac, &ifindex)) {
-//         size_t pdu_len;
-//         uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl,
-//                                      sdu_type, payload, payload_length, &pdu_len);
-//         send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
-//         free(pdu);
-//         return;
-//     } 
-
-//     queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length);
-
-//     // Finn routingd blant UNIX-klientene
-//     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-//         if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
-//             send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
-//             if (debug_mode)
-//             printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
-//             return;
-//         }
-//     }
-//     printf("[UNIX][ROUTING] Ingen routingd aktiv — kan ikke finne rute.\n");
-// }
 
 void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
-    fprintf(stderr, "[TRACE] handle_unix_request() called for fd=%d\n", client_fd);
-    fflush(stderr);
 
     char buffer[256];
-    int bytes_read = read(client_fd, buffer, sizeof(buffer));
-
-    fprintf(stderr,"[DEBUG][UNIX_REQ] read %d bytes from fd=%d\n", bytes_read, client_fd);
-    for (int j = 0; j < bytes_read; j++) {
-        printf("%02X ", (unsigned char)buffer[j]);
-    }
-    printf("\n");
-    fflush(stdout);
+    int bytes_read = read(client_fd, buffer, sizeof(buffer)); // leser data fra UNIX-klienten
 
     if (bytes_read <= 0) {
         // Klienten koblet fra
         for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
             if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
                 unix_clients[i].active = 0;
-                close(client_fd);
+                close(client_fd); // lukk socketen
                 if (debug_mode)
                     printf("[UNIX] Client fd=%d disconnected\n", client_fd);
                 break;
@@ -263,7 +104,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         }
         return;
     }
-    // Finn hvilken SDU-type, se hvilken app som snakker med mipd
+    // Finn hvilken SDU-type, hvilken app som snakker med mipd
     uint8_t sdu_type = 0;
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active && unix_clients[i].fd == client_fd) {
@@ -271,49 +112,45 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
             break;
         }
     }
-    if (debug_mode) {
-        fprintf(stderr,"[DEBUG][UNIX_REQ] Detected sdu_type=0x%02X for fd=%d\n", sdu_type, client_fd);
-        fflush(stdout);
-    }
-    // Meldingsformat: [dest:1][ttl:1][payload]
-    if (bytes_read < 2) {
+   
+    // Meldingsformat: [dest:1][ttl:1][payload], gitt av oppgaven, kompatibel med appene
+    if (bytes_read < 2) { //for kort melding
         fprintf(stderr, "[UNIX] Invalid message: too short\n");
         fflush(stdout);
         return;
     }
 
-    uint8_t dest_addr = buffer[0];
-    uint8_t ttl = buffer[1];
-    uint8_t *payload = (uint8_t *)&buffer[2];
-    size_t payload_length = bytes_read - 2;
+    // Pakker ut feltene fra meldingen
+    uint8_t dest_addr = buffer[0]; //dest MIP addresse
+    uint8_t ttl = buffer[1]; 
+    uint8_t *payload = (uint8_t *)&buffer[2]; // resten av meldingen, selve dataen
+    size_t payload_length = bytes_read - 2; 
 
     if (debug_mode) {
         printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
                client_fd, sdu_type, dest_addr, ttl, payload_length);
     }
-    // Håndter PING (0x02) og PONG (0x03) likt
+    // Håndter PING (0x02) og PONG (0x03), behandles likt
     if (sdu_type == SDU_TYPE_PING || sdu_type == SDU_TYPE_PONG) {
-        process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length);
+        process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length, my_mip_address);
         return;
     }
 
+    // Håndter meldinger fra routing-daemonen
     if (sdu_type == SDU_TYPE_ROUTING) {
         uint8_t ttl = buffer[1];
         uint8_t *payload = &buffer[2];
         size_t len = bytes_read - 2;
 
-        //index 0 i payload viser hvilket intern sdu type routing deamonen satt
+        //index 0 i payload viser hvilket intern sdu type routing deamonen satt (hello, update evt 'R' fra 'R''E''Q')
         uint8_t routing_type = payload[0];
 
         switch(routing_type){
             case 0x01:
-                send_routing_packet(raw_sock, my_mip_address, payload, len, "HELLO");
+            case 0x02:
+                send_routing_packet(raw_sock, my_mip_address, payload, len);
                 return;
 
-            case 0x02:
-                send_routing_packet(raw_sock, my_mip_address, payload, len, "UPDATE");
-                return;
-            
             case 'R':
                 uint8_t next = buffer[5];
                 handle_route_response(raw_sock, next);
@@ -323,27 +160,48 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     unsigned char mac[6];
     int ifindex = -1;
 
-    process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length);
+    // Alle andre meldinger håndteres likt (sendes videre eller legges i køen)
+    process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length, my_mip_address);
     return;
 }
 
+/*
+Brukes av handle_unix_message() til å prossessere unix meldinger
 
+  Hvis man allerede vet MAC-adressen til mottakeren (fra ARP-cache),
+  sendes meldingen direkte over nettverket via RAW-socket - send_pdu()
+ 
+  Hvis man ikke kjenner MAC-adressen, legges meldingen i kø - queue_routing_message()
+  og det sendes en forespørsel til routing-daemonen for å finne ruten videre - send_route_request()
+
+*/
 void process_unix_message(int raw_sock, uint8_t dest_addr, uint8_t ttl,
-                          uint8_t sdu_type, uint8_t *payload, size_t payload_length) {
+                          uint8_t sdu_type, uint8_t *payload, size_t payload_length, int my_mip_address) {
     unsigned char mac[6];
     int ifindex = -1;
 
+    // Sjekker om man allerede vet MAC-adressen til destinasjonen (fra ARP-cache)
     if (arp_lookup(dest_addr, mac, &ifindex)) {
+        //treff
         size_t pdu_len;
         uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length, &pdu_len);
+        
+        // Sendes via RAW-socket til riktig interface og MAC
         send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
-        free(pdu);
+        free(pdu); 
+
     } else {
+        // Ingen ARP-treff - vet ikke hvordan man skal nå destinasjonen
+
+        // Legger meldingen i kø til man får en rute
         queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length);
-            
+        
+        // Finn routing-daemonen blant UNIX-klientene
+        // sender en route request så routing deamonen kan svare med riktig rute (next_hop)
         for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
             if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
                 send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
+
                 if (debug_mode)
                 printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
                 return;
@@ -353,16 +211,17 @@ void process_unix_message(int raw_sock, uint8_t dest_addr, uint8_t ttl,
 }
 
 
-
-void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str) {
+// Hjelpemetode som brukes til å sende routing pakker (enten hello eller update) ut på nettverket
+// så andre noder i nettverket får oppdattert rutetabellene (update) sine og oppdaget naboer (hello)
+void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len) {
     unsigned char broadcast_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
-    //FIKS ikke -1 her
+
     size_t pdu_len;
+    // Bygg MIP-PDU for routing-pakken
+    // dest = 255 (broadcast MIP-adresse)
     uint8_t *pdu = mip_build_pdu(255, my_mip, 1, SDU_TYPE_ROUTING, payload, len, &pdu_len);
 
-    //printf("[MIPD][ROUTING] Sendte %s broadcast (len=%zu)\n", type_str, len);
-
-    // Send ARP-REQ på alle ikke-loopback interfaces
+    // Sender pakken ut på alle grensesnitt
     for (int i = 0; i < iface_count; i++) {
         int ifindex = iface_indices[i];
 
