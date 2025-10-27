@@ -91,12 +91,12 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     size_t mip_len = len - sizeof(struct ethhdr);
 
     uint8_t dest, src, ttl, sdu_type;
-    const uint8_t *sdu;
+    const uint8_t *payload;
 
     // Pakk ut og tolk MIP-headeren
-    ssize_t sdu_len = mip_parse(mip_start, mip_len, &dest, &src, &ttl, &sdu_type, &sdu);
+    ssize_t length = mip_parse(mip_start, mip_len, &dest, &src, &ttl, &sdu_type, &payload);
 
-    if (sdu_len < 0) {
+    if (length < 0) {
         printf("[ERROR][RAW] ugyldig MIP PDU (len=%d)\n", len);
         return;
     }
@@ -105,25 +105,25 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     switch (sdu_type) {
         case SDU_TYPE_ROUTING: {
             // Routingmeldinger (HELLO / UPDATE) sendes opp til routingd
-            handle_routing_message(src, sdu, sdu_len);
+            handle_routing_message(src, payload, length);
             break;
         }
 
         case SDU_TYPE_PING: {
             // PING videresendes eller leveres lokalt
-            handle_ping_message(my_mip_address, dest, src, ttl, sdu, sdu_len, eh, src_addr.sll_ifindex);
+            handle_ping_message(my_mip_address, dest, src, ttl, payload, length, eh, src_addr.sll_ifindex);
             break;
         }
 
         case SDU_TYPE_PONG: {
             //PONG videresendes eller leveres opp til ping_client
-            handle_pong_message(my_mip_address, dest, src, ttl, sdu, sdu_len);
+            handle_pong_message(my_mip_address, dest, src, ttl, payload, length);
             break;
         }
 
         case SDU_TYPE_ARP: {
             // ARP meldinger håndteres (request/response)
-            handle_arp_message(raw_sock, my_mip_address, sdu, sdu_len, eh, src_addr.sll_ifindex, src);
+            handle_arp_message(raw_sock, my_mip_address, payload, length, eh, src_addr.sll_ifindex, src);
             break;
         }
            
@@ -135,8 +135,8 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
 // Håndterer routing-meldinger (HELLO og UPDATE) som kommer inn fra nettverket
 // Sender dem videre til routing-daemonen via UNIX-socket
-void handle_routing_message(uint8_t src, const uint8_t *sdu, ssize_t sdu_len){
-     uint8_t rt_type = sdu[0]; // Første byte i payload angir routingmeldingen (HELLO eller UPDATE)
+void handle_routing_message(uint8_t src, const uint8_t *payload, ssize_t length){
+     uint8_t rt_type = payload[0]; // Første byte i payload angir routingmeldingen (HELLO eller UPDATE)
 
     if (debug_mode) {
         printf("[DEBUG][ROUTING] Mottatt SDU_TYPE_ROUTING fra %d, type=0x%02X\n", src, rt_type);
@@ -149,14 +149,14 @@ void handle_routing_message(uint8_t src, const uint8_t *sdu, ssize_t sdu_len){
         // Bygg buffer for å sende OPP til routingd
         uint8_t up_buf[256];
         up_buf[0] = src; // legg inn hvem meldingen kom fra
-        memcpy(&up_buf[1], sdu, sdu_len);
+        memcpy(&up_buf[1], payload, length);
 
         // Send via UNIX til routingd (din egen routingd-prosess)
         for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
             if (unix_clients[i].active &&
                 unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
 
-                write(unix_clients[i].fd, up_buf, sdu_len + 1);
+                write(unix_clients[i].fd, up_buf, length + 1);
                 if (debug_mode)
                     printf("[DEBUG][ROUTING] Sendte HELLO/UPDATE opp til routingd (fra %d)\n", src);
                 break;
@@ -177,10 +177,10 @@ void handle_routing_message(uint8_t src, const uint8_t *sdu, ssize_t sdu_len){
 // Prøver først å forwarde hvis pakken ikke er til en selv
 // Hvis den er til seg selv, leverer PING-en opp til UNIX-klienten
 void handle_ping_message(int my_mip_address, uint8_t dest, uint8_t src, uint8_t ttl,
-                         const uint8_t *sdu, ssize_t sdu_len,
+                         const uint8_t *payload, ssize_t length,
                          struct ethhdr *eh, int if_index)
 {
-    int fwd_result = forward_packet(my_mip_address, dest, src, ttl, SDU_TYPE_PING, sdu, sdu_len);
+    int fwd_result = forward_packet(my_mip_address, dest, src, ttl, SDU_TYPE_PING, payload, length);
 
     if (fwd_result != 0) {
         // 1 = forwarded, -1 = droppet
@@ -196,11 +196,11 @@ void handle_ping_message(int my_mip_address, uint8_t dest, uint8_t src, uint8_t 
             uint8_t reply[256];
             reply[0] = src; // avsender MIP
             reply[1] = ttl; // TTL
-            memcpy(&reply[2], sdu, sdu_len);
-            write(unix_clients[i].fd, reply, 2 + sdu_len);
+            memcpy(&reply[2], payload, length);
+            write(unix_clients[i].fd, reply, 2 + length);
             if (debug_mode) {
                 printf("[DEBUG] Sent PING to UNIX app (src=%u ttl=%u len=%zd)\n",
-                    src, ttl, sdu_len);
+                    src, ttl, length);
             }
             break;
         }
@@ -212,12 +212,12 @@ void handle_ping_message(int my_mip_address, uint8_t dest, uint8_t src, uint8_t 
 // Hvis den er til meg, leveres den opp til UNIX-klienten (ping_client).
 void handle_pong_message(int my_mip_address,
                          uint8_t dest, uint8_t src, uint8_t ttl,
-                         const uint8_t *sdu, ssize_t sdu_len)
+                         const uint8_t *payload, ssize_t length)
 {
     // Forsøk å forwarde pakken (bruker samme hjelpefunksjon som PING)
     int fwd_result = forward_packet(my_mip_address,
                                     dest, src, ttl,
-                                    SDU_TYPE_PONG, sdu, sdu_len);
+                                    SDU_TYPE_PONG, payload, length);
 
     if (fwd_result != 0) {
         // 1 = forwarded, -1 = droppet → ferdig
@@ -225,7 +225,7 @@ void handle_pong_message(int my_mip_address,
     }
     // Til meg: lever opp til ping_client
     if (debug_mode) printf("[RAW] PONG mottatt fra MIP %u: %.*s\n\n",
-           src, (int)sdu_len, (char*)sdu);
+           src, (int)length, (char*)payload);
 
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active &&
@@ -234,13 +234,13 @@ void handle_pong_message(int my_mip_address,
             uint8_t reply[256];
             reply[0] = src; // hvem svaret kom fra
             reply[1] = ttl; // TTL fra meldingen
-            memcpy(&reply[2], sdu, sdu_len);
+            memcpy(&reply[2], payload, length);
 
-            write(unix_clients[i].fd, reply, 2 + sdu_len);
+            write(unix_clients[i].fd, reply, 2 + length);
 
             if (debug_mode) {
                 printf("[DEBUG] Sent PONG to UNIX app (src=%u ttl=%u len=%zd)\n",
-                       src, ttl, sdu_len);
+                       src, ttl, length);
             }
             break;
         }
@@ -249,21 +249,21 @@ void handle_pong_message(int my_mip_address,
 
 // Håndterer mottatte ARP-meldinger (både request og response).
 void handle_arp_message(int raw_sock, int my_mip_address,
-                        const uint8_t *sdu, ssize_t sdu_len,
+                        const uint8_t *payload, ssize_t length,
                         const struct ethhdr *eh, int if_index, uint8_t src)
 {
     // Sjekk at payloaden er stor nok til å inneholde en mip_arp_msg
-    if (sdu_len < (ssize_t)sizeof(mip_arp_msg)) {
-        printf("[ERROR] ARP SDU for kort (%zd bytes)\n\n", sdu_len);
+    if (length < (ssize_t)sizeof(mip_arp_msg)) {
+        printf("[ERROR] ARP SDU for kort (%zd bytes)\n\n", length);
         return;
     }
 
     // Tolker payloaden som en ARP-melding (definert i arp.h)
-    const mip_arp_msg *arp = (const mip_arp_msg *)sdu;
+    const mip_arp_msg *arp = (const mip_arp_msg *)payload;
 
     if (debug_mode) {
         printf("[DEBUG] ARP msg: type=%u mip_addr=%u (payload_len=%zd)\n\n",
-               arp->type, arp->mip_addr, sdu_len);
+               arp->type, arp->mip_addr, length);
     }
 
     // ARP REQUEST 
@@ -314,7 +314,7 @@ void handle_arp_message(int raw_sock, int my_mip_address,
 // -1 hvis pakken ble droppet (f.eks. TTL utløpt)
 int forward_packet(int my_mip_address,
                    uint8_t dest, uint8_t src, uint8_t ttl,
-                   uint8_t sdu_type, const uint8_t *sdu, ssize_t sdu_len)
+                   uint8_t sdu_type, const uint8_t *payload, ssize_t length)
 {
     // Ikke forward hvis pakken er til meg eller broadcast (255)
     if (dest == my_mip_address || dest == 255) {
@@ -337,7 +337,7 @@ int forward_packet(int my_mip_address,
     }
 
     // Legg meldingen i kø mens man venter på routingd sitt svar
-    queue_routing_message(dest, src, ttl_new, sdu_type, sdu, sdu_len);
+    queue_routing_message(dest, src, ttl_new, sdu_type, payload, length);
 
     // Send en route request til routingd for å finne neste hopp
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
