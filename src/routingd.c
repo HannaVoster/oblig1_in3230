@@ -119,9 +119,7 @@ int main(int argc, char *argv[]) {
             if (events[i].data.fd == ROUTING_SOCK && (events[i].events & EPOLLIN)) {
                 uint8_t buf[256];
                 ssize_t len = read(ROUTING_SOCK, buf, sizeof(buf));
-               
-                for (int i = 0; i < len; i++) printf("%02X ", buf[i]);
-                printf("\n");
+             
                 if (len <= 0) {
                     printf("[ROUTINGD] Disconnected from MIPd\n");
                     goto cleanup;

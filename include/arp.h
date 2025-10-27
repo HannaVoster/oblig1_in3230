@@ -29,8 +29,7 @@ typedef struct {
 } arp_entry;
 
 extern arp_entry arp_cache[MAX_ARP]; 
-
-// Funksjoner for å bruke arp tabellen/vise den
+// Funksjoner 
 void arp_update(int mip_addr, const unsigned char *mac, int ifindex);
 int arp_lookup(int mip_addr, unsigned char *mac_out, int *ifindex_out);
 void print_arp_cache(void);
