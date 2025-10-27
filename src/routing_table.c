@@ -1,5 +1,16 @@
-// ROUTING TABLE HANDLER
-// Håndterer oppdatering, oppslag og utskrift av rutetabellen og naboer.
+
+/*
+Denne filen håndterer oppdatering, oppslag og utskrift av rutetabellen og naboer
+
+Funksjonene gjør dette:
+update_or_insert_neighbor(): legger til eller oppdaterer en rute i rutetabellen
+
+get_route(): finner og returnerer indeksen til en rute basert på destinasjonsadressen
+
+find_or_add_neighbor(): finner en kjent nabo eller legger den til hvis den er ny
+
+print_routing_table(): skriver ut rutetabellen for debugging og oversikt
+*/
 
 #include <stdio.h>
 #include <stdint.h>

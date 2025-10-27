@@ -1,3 +1,15 @@
+/*
+Denne filen håndterer det som har med kommunikasjon mellom routing-daemonen og MIP-daemonen å gjøre
+
+Den oppretter og kobler til UNIX-socketen, venter på at MIPd-socketen skal bli tilgjengelig, 
+og har en funskjon for å sende meldinger mellom prosessene
+
+Funksjonene gjør dette:
+connect_to_mipd(): kobler routing-daemonen til riktig MIP-daemon via UNIX-socket
+wait_for_socket(): venter til socket-filen faktisk finnes før tilkobling
+send_unix_message(): sender meldinger (HELLO, UPDATE, REQ, RSP) til MIP-daemonen over UNIX-socketen
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

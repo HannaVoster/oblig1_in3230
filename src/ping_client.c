@@ -14,7 +14,7 @@
 Program som sender en melding via MIP-daemonen (mipd), selve brukerprogrammet som sender/avslutter
   - Kobler seg til mipd via en UNIX domain socket (navn gis som argument)
   - Sender en melding til en spesifisert MIP-adresse
-  - Venter på svar i opptil 1 sekund, og beregner RTT hvis svar mottas
+  - Venter på svar, og beregner RTT hvis svar mottas
 */
 
 #define BUF_SIZE 512
@@ -26,23 +26,24 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    const char *socket_path = argv[1];
-    const char *message = argv[2];
-    uint8_t dest_host = atoi(argv[3]);
-    uint8_t ttl = atoi(argv[4]);
+    const char *socket_path = argv[1]; // UNIX-socket som skal kobles til mipd
+    const char *message = argv[2]; // selve meldingen som skal sendes
+    uint8_t dest_host = atoi(argv[3]); // MIP-adressen til mottaker
+    uint8_t ttl = atoi(argv[4]);  // Time To Live for meldingen
 
-    //unix socket
+    // Oppretter UNIX-socket for kommunikasjon med mipd
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (sock < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
+    // Setter opp adressestrukturen for socketen
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
 
-    // Bygg full sti – alltid i /tmp/
+    // Bygger full sti til socketen (legges i /tmp/ hvis ikke full bane oppgitt)
     char full_path[sizeof(addr.sun_path)];
     if (socket_path[0] != '/') {
         snprintf(full_path, sizeof(full_path), "/tmp/%s", socket_path);
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "[PING_CLIENT] Connecting to %s\n", addr.sun_path);
     fflush(stderr);
 
-    // Koble til MIP-daemonen
+    // Kobler til MIP-daemonen
     if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
         perror("connect");
         exit(EXIT_FAILURE);
@@ -71,9 +72,9 @@ int main(int argc, char *argv[]) {
         close(sock);
         return 1;
     }
-    sleep(1);
-    
-    // Lag melding: [dest_host][ttl][PING:<message>]
+    sleep(1); // kort pause for å sikre at registreringen er fullført
+
+    // Lag melding: [dest_host][ttl][PING:<message>], format gitt av oppgaven
     char buf[BUF_SIZE];
     buf[0] = dest_host;
     buf[1] = ttl;
@@ -91,6 +92,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Vent på svar i opptil 30 sekunder, prøver hvert sekund
+    // select() brukes for å sjekke om socketen har data tilgjengelig
     int total_wait = 30;
     int got_reply = 0;
 
@@ -102,8 +104,10 @@ int main(int argc, char *argv[]) {
 
         int rv = select(sock + 1, &fds, NULL, NULL, &tv);
         if (rv > 0 && FD_ISSET(sock, &fds)) {
+            //kommet svar fra mipd
             char reply[BUF_SIZE];
             int n = read(sock, reply, sizeof(reply) - 1);
+
             if (n == 0) {
                 printf("[PING_CLIENT] Socket closed by mipd.\n");
                 break;
@@ -111,15 +115,21 @@ int main(int argc, char *argv[]) {
                 perror("read");
                 break;
             }
-            reply[n] = '\0';
 
+            reply[n] = '\0'; // gjør svaret lesbart som streng
+
+            // Beregn RTT i millisekunder
             gettimeofday(&end, NULL);
             long ms = (end.tv_sec - start.tv_sec) * 1000 +
                     (end.tv_usec - start.tv_usec) / 1000;
+
+            // Pakker ut svaret: [0]=src, [1]=TTL, [2..]=payload
             uint8_t src = reply[0];
             uint8_t ttl_reply = reply[1];
+
             printf("[PING_CLIENT] Reply from MIP %u (TTL=%u): %s (RTT=%ld ms)\n",
                 src, ttl_reply, &reply[2], ms);
+                
             fflush(stdout);
             got_reply++;
         }
