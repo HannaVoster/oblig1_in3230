@@ -340,7 +340,15 @@ void process_unix_message(int raw_sock, uint8_t dest_addr, uint8_t ttl,
         free(pdu);
     } else {
         queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length);
-        send_route_request_to_routingd(dest_addr);
+            
+        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+            if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
+                if (debug_mode)
+                printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
+                return;
+            }
+        }
     }
 }
 
