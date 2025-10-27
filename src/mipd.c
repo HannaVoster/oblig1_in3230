@@ -8,9 +8,7 @@
 #include <sys/ioctl.h>      
 #include <netpacket/packet.h> 
 #include <net/ethernet.h>  
-#include <net/if.h>       
-#include <arpa/inet.h>      
-#include <netinet/if_ether.h> 
+#include <net/if.h>          
 #include <ifaddrs.h>       
 
 #include "mipd.h"
@@ -22,22 +20,26 @@
 #include "unix.h"
 #include "raw_handler.h"
 
-int debug_mode = 0; // debug flagg
-//int last_unix_client_fd = -1; // siste unix klient
-//int last_ping_src = -1;
+int debug_mode = 0; // globalt debug flagg
 int my_mip_address = -1; // min mip addresse
 
 /*
-Denne funksjonen starter MIP-daemonen. 
-Den håndterer flaggene -h og -d, henter inn socket-sti og MIP-adresse fra argumentene,
- finner nettverksinterface og oppretter både UNIX- og råsocket. 
- Disse legges i en epoll-instans, og programmet går deretter i en løkke som behandler 
- enten klientforespørsler eller mottatte MIP-pakker
+    Denne funksjonen starter MIP-daemonen. 
+    MIP-deamonen skal fungere som et mellomledd mellom unix klienter og nettverket
 
- Disse variablene brukes senere av andre funksjoner
+    Den håndterer flaggene -h og -d, henter inn socket-sti og MIP-adresse fra argumentene,
+    finner nettverksinterface og oppretter både UNIX- og råsocket
+
+    Disse legges i en epoll-instans, og programmet går deretter i en løkke som behandler 
+    enten klientforespørsler eller mottatte MIP-pakker samtidig
+
+    Når en klient kobler seg til, registreres den i en klienttabell. 
+    Når en pakke kommer inn fra nettverket, sendes den videre til riktig UNIX-klient, og motsatt
+
  */
 
 int main(int argc, char *argv[]) {
+
     // Håndterer -h og -d
     // getopt() returnerer flagg-bokstaven som en char eller -1 når det ikke er flere flagg
     int opt;
@@ -58,31 +60,35 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
+
+    // Sørger for linjebuffering på stdout/stderr (for jevn logging i flere terminaler)
     setvbuf(stdout, NULL, _IOLBF, 0);
     setvbuf(stderr, NULL, _IOLBF, 0);
     dup2(fileno(stdout), fileno(stderr));
-    //sjekker at argumentene gis riktig, avslutter hvis det ikke finnes mindt 2
+
+    //sjekker at argumentene gis riktig, avslutter hvis det ikke finnes minst 2, socket og mip addresse
     if (optind + 2 > argc) {
         fprintf(stderr, "Usage: %s [-d] <socket_upper> <MIP address>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
     
-    //henter ut filsti og adresse fra argumentene
+    // Leser inn UNIX socketsti og MIP-adresse
     char *socket_path = argv[optind];
     my_mip_address = atoi(argv[optind+1]);
 
-    //finner interface, metode i mipd
+    //Henter grensesnitt og initier ARP-cache
     find_all_ifaces();
     arp_init_cache();
 
     
-    printf("[DEBUG] Interfaces found at startup:\n");
-    for (int i = 0; i < iface_count; i++) {
-        printf("   iface[%d] = %s (index=%d)\n",
-               i, iface_name[i], iface_indices[i]);
-    
-    }
+    if(debug_mode){
+        printf("[DEBUG] Interfaces found at startup:\n");
 
+        for (int i = 0; i < iface_count; i++) {
+            printf("   iface[%d] = %s (index=%d)\n",
+                i, iface_name[i], iface_indices[i]);
+        }
+    }
 
     if (debug_mode) {
         printf("[DEBUG] Starting MIP daemon on UNIX socket '%s' with MIP address %d\n",
@@ -91,13 +97,12 @@ int main(int argc, char *argv[]) {
         print_arp_cache();
     }
 
-    //lager sockets
+    // Opprett UNIX- og RAW-socket
     int unix_sock = create_unix_socket(socket_path); //lytte socket
     int raw_sock = create_raw_socket();
 
     // oppretter en epoll instans
-    // epoll instans er en beholder som kan overvåle flere fildeskroptorer samtidig
-    //sockets eller filer
+    // Epoll instans er en beholder som kan overvåle flere fildeskriptorer samtidig
     int epollfd = epoll_create1(0);
 
     if (epollfd == -1) {
@@ -105,7 +110,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-     //ev brukes til å registrere en enkelt socket
+    //ev brukes til å registrere en enkelt socket
     //events er et array av hendelser som epoll_wait() returnerer og forteller hvilke
     //sockets som har tilgjengelig data
     struct epoll_event ev, events[MAX_EVENTS];
@@ -134,10 +139,10 @@ int main(int argc, char *argv[]) {
     printf("Daemon running. Listening on UNIX + RAW sockets...\n");
 
 
-    //overvåking av sockets i en evig løkke
+    // Hovedløkken – overvåker sockets og fordeler hendelser
     while (1) {
         // epoll.wait() venter på at en av de registrerte socketene får innkommende data
-        //nfds holder verdien i int for hvor mange sockets som har hendelser
+        // nfds holder verdien i int for hvor mange sockets som har hendelser
         int nfds = epoll_wait(epollfd, events, MAX_EVENTS, -1);
     
         if (nfds == -1) {
@@ -148,6 +153,7 @@ int main(int argc, char *argv[]) {
         for(int n = 0; n < nfds; n++){
             int fd = events[n].data.fd;
 
+            // Ny UNIX-klient kobler seg til mipd
             if (fd == unix_sock){
                 int client_fd = accept(unix_sock, NULL, NULL);
                 if (client_fd == -1) {
@@ -155,6 +161,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
+                // Klienten sender SDU-type som første byte
                 uint8_t sdu_type;
                 if(read(client_fd, &sdu_type, 1) != 1) {
                     perror("read sdu type");
@@ -172,6 +179,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
+                // Registrer ny klient i tabellen
                 for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
                     if (!unix_clients[i].active) {
                         unix_clients[i].fd = client_fd;
@@ -184,7 +192,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                // Legg til klient-socketen i epoll
+                // Legger klienten inn i epoll slik at man kan lese meldinger senere
                 ev.events = EPOLLIN;
                 ev.data.fd = client_fd;
                 if (epoll_ctl(epollfd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
@@ -194,10 +202,12 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            // Mottatt pakke fra nettverket via RAW-socket
             else if(fd == raw_sock) {
-                handle_raw_packet(raw_sock, my_mip_address);
+                handle_raw_packet(raw_sock, my_mip_address); //håndterer meldingen videre
             }
 
+            //Data mottatt fra en aktiv UNIX-klient
             else {
                 for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
                     if (unix_clients[i].active && unix_clients[i].fd == fd) {
@@ -209,6 +219,7 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                 }
+                // Håndterer meldingen
                 handle_unix_request(fd, raw_sock, my_mip_address);
             }
         }
@@ -218,9 +229,4 @@ int main(int argc, char *argv[]) {
     close(raw_sock);
     return 0;
 }
-
-
-
-
-
 

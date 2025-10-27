@@ -28,18 +28,4 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
 
 int send_pdu(int rawsocket, uint8_t *pdu, size_t pdu_length, unsigned char *dest_mac, int ifindex);
 
-// hentefunksjoner
-uint8_t get_src(const mip_header_t *h);
-uint8_t get_dest(const mip_header_t *h);
-uint8_t get_type(const mip_header_t *h);
-uint16_t get_length(const mip_header_t *h);
-uint8_t get_ttl(const mip_header_t *h);
-
-//sette funksjoner
-void set_dest(mip_header_t *h, uint8_t dest);
-void set_src(mip_header_t *h, uint8_t src);
-void set_ttl(mip_header_t *h, uint8_t ttl);
-void set_length(mip_header_t *h, uint16_t len_words);
-void set_type(mip_header_t *h, uint8_t type);
-
 #endif

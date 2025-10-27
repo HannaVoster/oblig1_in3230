@@ -1,17 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include <netpacket/packet.h>
 #include <netinet/ether.h>
 #include <ifaddrs.h>
-#include <arpa/inet.h>
-#include "iface.h"
-#include "mipd.h"
 
 #include "iface.h"
 #include "mipd.h"
@@ -20,18 +15,35 @@ int iface_indices[5];
 int iface_count = 0;
 char iface_name[MAX_IFACES][IFNAMSIZ];
 
+/*
+Finner alle aktive nettverksgrensesnitt på maskinen (unntatt loopback "lo") 
+og lagrer navn og ifindex (interface-indeks) for hvert i de globale listene iface_name[] 
+og iface_indices[] 
 
+Disse brukes senere for å sende og motta MIP-pakker via riktige nettverkskort
+
+Globalt resultat:
+    -iface_name[] og iface_indices[] fylles ut
+    -iface_count oppdateres
+*/
 void find_all_ifaces() {
     struct ifaddrs *ifaddr, *ifa;
     iface_count = 0;
+
+    // Henter systemets liste over nettverksgrensesnitt
     getifaddrs(&ifaddr);
 
+    // Henter kun fysiske grensesnitt (AF_PACKET), ikke lo eller IPv4/IPv6
     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
         if (!ifa->ifa_addr) continue;
+
         if (ifa->ifa_addr->sa_family == AF_PACKET &&
             strcmp(ifa->ifa_name, "lo") != 0) {
-
+            
+            // Hent interface-indeksen
             int ifindex = if_nametoindex(ifa->ifa_name);
+
+            // Lagre både navn og indeks i globale arrays
             iface_indices[iface_count] = ifindex;
             strncpy(iface_name[iface_count], ifa->ifa_name, IFNAMSIZ);
 
@@ -42,6 +54,7 @@ void find_all_ifaces() {
             iface_count++;
         }
     }
+    // Frigjør minnet allokert av getifaddrs()
     freeifaddrs(ifaddr);
 }
 
@@ -80,7 +93,7 @@ int get_iface_mac(const char *ifname, unsigned char *mac) {
 -create_raw_socket
 lager en råsocket for å sende og motta MIP-pakker direkte over Ethernet. 
 funksjonen binder socketen til det valgte nettverksinterface, 
-og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt.
+og returnerer filbeskriveren. Programmet avsluttes hvis noe går galt
 */
 int create_raw_socket() {
     int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));

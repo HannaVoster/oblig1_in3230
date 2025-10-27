@@ -22,4 +22,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address);
 void handle_route_response(int raw_sock, uint8_t next);
 void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len, const char *type_str);
 
+void process_unix_message(int raw_sock, uint8_t dest_addr, uint8_t ttl, uint8_t sdu_type, uint8_t *payload, size_t payload_length);
+
 #endif
