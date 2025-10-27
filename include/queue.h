@@ -4,12 +4,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
-//til å legge pakker i kø
+//til å legge pakker i kø, begrenser størrelsen på meldingskøen
 #define MAX_PENDING 20
+#define MAX_ROUTE_WAIT 16 //hvor mange pakker som kan ligge i routing kø, route_wait_queue
 
-typedef struct { //hvor er ttl og src her?
+// struktur som holder på meldinger i køen, klar til å bygge og sende pdu senere
+typedef struct { 
     uint8_t ultimate_dest;
-    uint8_t next; //til arp
+    uint8_t next; // ikke sikkert neste er samme som ultimate_dest (routing)
     uint8_t src;
     uint8_t ttl;
     uint8_t sdu_type;
@@ -19,21 +21,22 @@ typedef struct { //hvor er ttl og src her?
 } pending_entry;
 
 extern pending_entry pending_queue[MAX_PENDING];
+extern pending_entry route_wait_queue[MAX_ROUTE_WAIT];
 
 
-#define MAX_ROUTE_WAIT 16
-typedef struct {
-    uint8_t ultimate_dest;
-    uint8_t next;
-    uint8_t src;
-    uint8_t ttl;
-    uint8_t sdu_type;
-    uint8_t *sdu;
-    size_t sdu_len;
-    int valid;
-} route_wait;
+// //struktur for å holde
+// typedef struct {
+//     uint8_t ultimate_dest;
+//     uint8_t next;
+//     uint8_t src;
+//     uint8_t ttl;
+//     uint8_t sdu_type;
+//     uint8_t *sdu;
+//     size_t sdu_len;
+//     int valid;
+// } route_wait;
 
-extern route_wait route_wait_queue[MAX_ROUTE_WAIT];
+
 
 //metoder
 void queue_message(uint8_t ultimate_dest, uint8_t next_hop,

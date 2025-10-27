@@ -4,16 +4,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-
-#define MAX_UNIX_CLIENT 10
+#define MAX_UNIX_CLIENT 10 // maks antall unix klienter som kan være koblet på mipd samtidig
 
 typedef struct {
-    int fd;
-    uint8_t sdu_type;
-    int active;
+    int fd; //fildeskriptor for unix socketen til denne klienten
+    uint8_t sdu_type; //ping, pong, routing
+    int active; //hvis klienten er koblet til = 1, hvis ikke = 0
 } unix_client;
 
 //liste over unix klienter
+// defineres i unix.c
 extern unix_client unix_clients[MAX_UNIX_CLIENT];
 
 int create_unix_socket(const char *path);

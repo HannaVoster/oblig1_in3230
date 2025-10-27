@@ -79,6 +79,51 @@ int create_unix_socket(const char *path) {
 }
 
 /*
+Brukes av handle_unix_message() til å prossessere unix meldinger
+
+  Hvis man allerede vet MAC-adressen til mottakeren (fra ARP-cache),
+  sendes meldingen direkte over nettverket via RAW-socket - send_pdu()
+ 
+  Hvis man ikke kjenner MAC-adressen, legges meldingen i kø - queue_routing_message()
+  og det sendes en forespørsel til routing-daemonen for å finne ruten videre - send_route_request()
+
+*/
+void process_unix_message(int raw_sock, uint8_t dest_addr, uint8_t ttl,
+                          uint8_t sdu_type, uint8_t *payload, size_t payload_length, int my_mip_address) {
+    unsigned char mac[6];
+    int ifindex = -1;
+
+    // Sjekker om man allerede vet MAC-adressen til destinasjonen (fra ARP-cache)
+    if (arp_lookup(dest_addr, mac, &ifindex)) {
+        //treff
+        size_t pdu_len;
+        uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length, &pdu_len);
+        
+        // Sendes via RAW-socket til riktig interface og MAC
+        send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
+        free(pdu); 
+
+    } else {
+        // Ingen ARP-treff - vet ikke hvordan man skal nå destinasjonen
+
+        // Legger meldingen i kø til man får en rute
+        queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length);
+        
+        // Finn routing-daemonen blant UNIX-klientene
+        // sender en route request så routing deamonen kan svare med riktig rute (next_hop)
+        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+            if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
+                send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
+
+                if (debug_mode)
+                printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
+                return;
+            }
+        }
+    }
+}
+
+/*
 Håndterer meldinger som kommer fra UNIX-klienter (som ping_client, ping_server, routingd)
 Leser meldingen fra socketen, finner ut hvilken type SDU (meldingstype) det er, og sender
 den videre via nettverket (raw socket) eller til routingd om nødvendig
@@ -165,52 +210,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
     return;
 }
 
-/*
-Brukes av handle_unix_message() til å prossessere unix meldinger
-
-  Hvis man allerede vet MAC-adressen til mottakeren (fra ARP-cache),
-  sendes meldingen direkte over nettverket via RAW-socket - send_pdu()
- 
-  Hvis man ikke kjenner MAC-adressen, legges meldingen i kø - queue_routing_message()
-  og det sendes en forespørsel til routing-daemonen for å finne ruten videre - send_route_request()
-
-*/
-void process_unix_message(int raw_sock, uint8_t dest_addr, uint8_t ttl,
-                          uint8_t sdu_type, uint8_t *payload, size_t payload_length, int my_mip_address) {
-    unsigned char mac[6];
-    int ifindex = -1;
-
-    // Sjekker om man allerede vet MAC-adressen til destinasjonen (fra ARP-cache)
-    if (arp_lookup(dest_addr, mac, &ifindex)) {
-        //treff
-        size_t pdu_len;
-        uint8_t *pdu = mip_build_pdu(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length, &pdu_len);
-        
-        // Sendes via RAW-socket til riktig interface og MAC
-        send_pdu(raw_sock, pdu, pdu_len, mac, ifindex);
-        free(pdu); 
-
-    } else {
-        // Ingen ARP-treff - vet ikke hvordan man skal nå destinasjonen
-
-        // Legger meldingen i kø til man får en rute
-        queue_routing_message(dest_addr, my_mip_address, ttl, sdu_type, payload, payload_length);
-        
-        // Finn routing-daemonen blant UNIX-klientene
-        // sender en route request så routing deamonen kan svare med riktig rute (next_hop)
-        for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-            if (unix_clients[i].active && unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
-                send_route_request(unix_clients[i].fd, my_mip_address, dest_addr);
-
-                if (debug_mode)
-                printf("[UNIX][ROUTING] Sent route request for dest %u\n", dest_addr);
-                return;
-            }
-        }
-    }
-}
-
-
 // Hjelpemetode som brukes til å sende routing pakker (enten hello eller update) ut på nettverket
 // så andre noder i nettverket får oppdattert rutetabellene (update) sine og oppdaget naboer (hello)
 void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t len) {
@@ -241,12 +240,17 @@ void send_routing_packet(int raw_sock, uint8_t my_mip, uint8_t *payload, size_t 
     free(pdu);
 }
 
+// Metode som håndtere en RSP fra routing deamonen
+// Metoden sjekker først om det er en gyldig rute, 255 = ikke gyldig -> droppes
+// Hvis det er en gyldig rute går metoden gjennom køstrukturen for routing pakker og sender den første gyldige (valid)
+// Sjekker først om addressen ligger i arp cashen og sender en arp request hvis den ikke finnes
 void handle_route_response(int raw_sock, uint8_t next){
 
-    printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
+    if(debug_mode) printf("[ROUTING] RESPONSE mottatt: next_hop=%d\n", next);
+
     //sjekker of next = 255 for da er ingen rute funnet
     if (next == 255) {
-        printf("[ROUTING] Ingen rute funnet — dropper pakke.\n");
+        if(debug_mode) printf("[ROUTING] Ingen rute funnet — dropper pakke.\n");
         return;
     }
 
@@ -255,36 +259,40 @@ void handle_route_response(int raw_sock, uint8_t next){
     //så første gyldige pakke i køen vil være den svaret gjelder for
     for (int i = 0; i < MAX_ROUTE_WAIT; i++){
         if (route_wait_queue[i].valid) {
+
             //lagrer verdiene for pakken som skal sendes
             uint8_t dest = route_wait_queue[i].ultimate_dest;
             uint8_t src = route_wait_queue[i].src;
             uint8_t ttl = route_wait_queue[i].ttl;
             uint8_t sdu_type = route_wait_queue[i].sdu_type;
-            uint8_t *sdu = route_wait_queue[i].sdu;
-            size_t sdu_len = route_wait_queue[i].sdu_len;
+            uint8_t *payload = route_wait_queue[i].payload;
+            size_t length = route_wait_queue[i].length;
             
-            //sjekker i arp tabellen om vi har addressen til neste
+            //sjekker i arp tabellen om man har addressen til neste hopp
             unsigned char mac[6];
             int ifindex = -1;
+
             if (arp_lookup(next, mac, &ifindex)) {
-                //treff - addressen finnes - bygg og send pdu
+                //treff - addressen finnes - bygger og sender pdu
                 size_t new_pdu_length;
-                uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, sdu, sdu_len, &new_pdu_length);
+                uint8_t *new_pdu = mip_build_pdu(dest, src, ttl, sdu_type, payload, length, &new_pdu_length);
+
                 send_pdu(raw_sock, new_pdu, new_pdu_length, mac, ifindex);
                 free(new_pdu);
+                
                 printf("[ROUTING] Sendte pakke til next_hop=%d (dest=%d)\n",
                     next, dest);
             }
             //hvis ikke - mac finnes ikke for neste hopp og må sende arp req
             else{
-                printf("[ROUTING] Har ikke MAC for next hop=%d, sender ARP\n", next);
-                printf("[DEBUG][ROUTING] queue_message kalles: dest=%d next=%d src=%d ttl=%d type=%d len=%zu\n",
-                 dest, next, src, ttl, sdu_type, sdu_len);
-                queue_message(dest, next, src, ttl, sdu_type, sdu, sdu_len);
+                if(debug_mode) printf("[DEBUG][ROUTING] Har ikke MAC for next hop, queue_message kalles og det sendes arp request: dest=%d next=%d src=%d ttl=%d type=%d len=%zu\n",
+                        dest, next, src, ttl, sdu_type, length);
+
+                queue_message(dest, next, src, ttl, sdu_type, payload, length);
                 send_arp_request(raw_sock, next, my_mip_address);
             }
 
-            free(route_wait_queue[i].sdu);
+            free(route_wait_queue[i].payload);
             route_wait_queue[i].valid = 0;
             return;
         }
