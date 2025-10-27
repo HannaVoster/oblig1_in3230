@@ -7,6 +7,8 @@
 #include <net/if.h>
 #include <netinet/ether.h>
 #include <ifaddrs.h>
+#include <unistd.h>     
+#include <arpa/inet.h>  
 
 #include "iface.h"
 #include "mipd.h"
