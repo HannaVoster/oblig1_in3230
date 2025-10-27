@@ -19,7 +19,7 @@ Filen definerer to hovedkøer:
 #include "queue.h"
 #include "arp.h"
 
-route_wait route_wait_queue[MAX_ROUTE_WAIT];
+pending_entry route_wait_queue[MAX_ROUTE_WAIT];
 pending_entry pending_queue[MAX_PENDING];
 
 /*
@@ -136,7 +136,7 @@ void send_route_request(int routing_fd, uint8_t my_addr, uint8_t dest) {
 // Metode som legger en melding i route_wait_queue mens deamonen venter på at routingd skal svare med neste hopp (RSP)
 // Brukes av forward_packet i raw_handler.c
 void queue_routing_message(uint8_t ultimate_dest, uint8_t src, uint8_t ttl,
-                           uint8_t sdu_type, const uint8_t *sdu, size_t sdu_len) {
+                           uint8_t sdu_type, const uint8_t *payload, size_t length) {
     
     // Går gjennom hele route_wait_queue for å finne en ledig plass
     for (int i = 0; i < MAX_ROUTE_WAIT; i++) {
@@ -147,22 +147,22 @@ void queue_routing_message(uint8_t ultimate_dest, uint8_t src, uint8_t ttl,
             route_wait_queue[i].src = src;                     // hvem som sendte
             route_wait_queue[i].ttl = ttl;
             route_wait_queue[i].sdu_type = sdu_type;        
-            route_wait_queue[i].sdu_len = sdu_len;
+            route_wait_queue[i].length = length;
             route_wait_queue[i].valid = 1;
             route_wait_queue[i].next = 0; //vi vet ikke enda
 
             // Alloker minne kun hvis data faktisk finnes
-            if (sdu_len > 0) {
-                route_wait_queue[i].sdu = malloc(sdu_len);
-                if (!route_wait_queue[i].sdu) {
+            if (length > 0) {
+                route_wait_queue[i].payload = malloc(length);
+                if (!route_wait_queue[i].payload) {
                     perror("[ERROR] malloc queue_message");
                     exit(EXIT_FAILURE);
                 }
                 //kopierer payload
-                memcpy(route_wait_queue[i].sdu, sdu, sdu_len);
+                memcpy(route_wait_queue[i].payload, payload, length);
             }
             else{
-                route_wait_queue[i].sdu = NULL; //ingen payload
+                route_wait_queue[i].payload = NULL; //ingen payload
             }
 
             if(debug_mode) printf("[QUEUE][ROUTING] Meldingen for dest %d lagt i route_wait_queue (slot=%d)\n",
