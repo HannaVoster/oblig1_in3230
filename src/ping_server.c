@@ -56,9 +56,22 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "[PING_SERVER] Connecting to %s\n", addr.sun_path);
     fflush(stderr);
 
-    // Kobler til mipd sin socket
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_un)) < 0) {
-        perror("connect");
+    int retries = 10;
+    int connected = 0;
+    for (int i = 0; i < retries; i++) {
+        if (connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_un)) == 0) {
+            connected = 1;
+            break;
+        }
+        perror("[PING_SERVER] connect attempt failed");
+        fprintf(stderr, "[PING_SERVER] Retrying in 0.5 sec... (%d/%d)\n", i + 1, retries);
+        fflush(stderr);
+        usleep(500000); // vent 0.5 sek
+    }
+
+    if (!connected) {
+        fprintf(stderr, "[PING_SERVER] ERROR: Could not connect to MIP daemon after %d attempts.\n", retries);
+        close(sock);
         exit(EXIT_FAILURE);
     }
 

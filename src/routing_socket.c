@@ -71,8 +71,20 @@ int connect_to_mipd(const char *socket_path) {
     fprintf(stderr, "[ROUTINGD] Connecting to MIP daemon socket: %s\n", addr.sun_path);
 
     // Kobler til MIP-daemonen socket
-    if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
-        perror("connect to mipd");
+    int retries = 10;
+    int connected = 0;
+    for (int i = 0; i < retries; i++) {
+        if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == 0) {
+            connected = 1;
+            break;
+        }
+        perror("[ROUTINGD] connect attempt failed");
+        fprintf(stderr, "[ROUTINGD] Retrying in 0.5 sec... (%d/%d)\n", i + 1, retries);
+        usleep(500000); // 0.5 sek
+    }
+
+    if (!connected) {
+        fprintf(stderr, "[ROUTINGD] ERROR: Could not connect to MIP daemon after %d attempts.\n", retries);
         close(sock);
         exit(EXIT_FAILURE);
     }

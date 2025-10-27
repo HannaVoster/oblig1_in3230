@@ -29,7 +29,8 @@ typedef struct {
 // nabo entry til nabolisten
 typedef struct {
     uint8_t mip;        // naboens MIP-adresse
-    uint64_t last_hello_ms; // sist gang man hørte fra naboen
+    uint64_t last_hello_ms; // sist gang man hørte fra naboen - 
+                            // Brukes ikke per nå, men kan brukes til å "drepe" naboer man ikke har hørt fra
     int valid;
 } neighbor;
 
