@@ -202,9 +202,6 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         }
         return;
     }
-    unsigned char mac[6];
-    int ifindex = -1;
-
     // Alle andre meldinger håndteres likt (sendes videre eller legges i køen)
     process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length, my_mip_address);
     return;

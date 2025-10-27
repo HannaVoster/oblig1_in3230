@@ -27,6 +27,7 @@ void arp_init_cache() {
 
 // Oppdaterer ARP-cachen med en MIP-adresse og tilhørende MAC-adresse
 // brukes når det mottas en PING eller når man får en ARP RSP i raw_handler.c
+// Metoden tar inne en mac og index til interface som lagres i arp cashen
 void arp_update(int mip_addr, const unsigned char *mac, int ifindex) {
     if (!mac) return;
 
@@ -66,6 +67,9 @@ void arp_update(int mip_addr, const unsigned char *mac, int ifindex) {
 // Søker i ARP-cachen etter en gitt MIP-adresse
 // unsigned char *mac_out peker til bufferet hvor mac addressen eventuellt lagres
 // samme med ifindex_out
+
+//Returnerer 1 hvis addressen er funnet, så metodene som kaller vet om de må
+// sende arp request eller routing request
 int arp_lookup(int mip_addr, unsigned char *mac_out, int *ifindex_out) {
    if(debug_mode) printf("[DEBUG][ARP_LOOKUP] Søker etter MIP=%d\n", mip_addr);
 
@@ -99,6 +103,8 @@ void print_arp_cache(void) {
 
 /*
 Sender en ARP REQ til alle ikke loopback interface
+
+Tar inn destinasjonsaddressen så nodene som får pakken ved hva requesten gjelder for + egen addresse
 
  Flyt i systemet:
     1. En pakke skal videresendes, men routingd må først finne ruten - send_route_request()

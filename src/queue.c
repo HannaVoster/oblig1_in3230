@@ -106,7 +106,7 @@ void send_pending_messages(int raw_sock, uint8_t next_hop,
             ); 
 
             //kaller på send_pdu() som sender pakken ut på nettverkskortet
-            int sent = send_pdu(raw_sock, pdu, pdu_len, mac, if_index); 
+            send_pdu(raw_sock, pdu, pdu_len, mac, if_index); 
 
             // Frigjør minne for både PDU og lagret payload etter at den er sendt
             free(pdu);
