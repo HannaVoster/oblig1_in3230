@@ -23,21 +23,6 @@ typedef struct {
 extern pending_entry pending_queue[MAX_PENDING];
 extern pending_entry route_wait_queue[MAX_ROUTE_WAIT];
 
-
-// //struktur for å holde
-// typedef struct {
-//     uint8_t ultimate_dest;
-//     uint8_t next;
-//     uint8_t src;
-//     uint8_t ttl;
-//     uint8_t sdu_type;
-//     uint8_t *sdu;
-//     size_t sdu_len;
-//     int valid;
-// } route_wait;
-
-
-
 //metoder
 void queue_message(uint8_t ultimate_dest, uint8_t next_hop,
                    uint8_t src, uint8_t ttl,

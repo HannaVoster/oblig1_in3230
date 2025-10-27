@@ -63,8 +63,7 @@ void send_route_response(int sock, uint8_t my_address, uint8_t next){
     // Sender meldingen over UNIX-socketen til MIP-daemonen
     if (write(sock, rsp, sizeof(rsp)) != sizeof(rsp)){
         perror("write response");
-    }
-    else if(debug_mode) printf("[ROUTINGD] Sent RESPONSE: next hop =%d\n", next);   
+    } 
 }
 
 // Håndterer meldinger som kommer fra andre noder (via MIP-daemonen).
