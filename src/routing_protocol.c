@@ -37,7 +37,7 @@ void handle_route_request(int sock, uint8_t *msg, ssize_t length) {
     uint8_t my_addr = msg[0]; // egen MIP
     uint8_t dest    = msg[5]; // destinasjonsadressen som skal slås opp
 
-    if(debug_mode)("[ROUTINGD] handle_route_request: my=%d dest=%d\n", my_addr, dest);
+    if(debug_mode) printf("[ROUTINGD] handle_route_request: my=%d dest=%d\n", my_addr, dest);
 
     //standardverdi for ingen rute funnet, 255
     uint8_t next = INF_COST; 
@@ -63,7 +63,8 @@ void send_route_response(int sock, uint8_t my_address, uint8_t next){
     // Sender meldingen over UNIX-socketen til MIP-daemonen
     if (write(sock, rsp, sizeof(rsp)) != sizeof(rsp)){
         perror("write response");
-    } 
+    }
+ 
 }
 
 // Håndterer meldinger som kommer fra andre noder (via MIP-daemonen).

@@ -183,8 +183,7 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
 
     // Håndter meldinger fra routing-daemonen
     if (sdu_type == SDU_TYPE_ROUTING) {
-        uint8_t ttl = buffer[1];
-        uint8_t *payload = &buffer[2];
+        uint8_t *payload = (uint8_t *)&buffer[2];
         size_t len = bytes_read - 2;
 
         //index 0 i payload viser hvilket intern sdu type routing deamonen satt (hello, update evt 'R' fra 'R''E''Q')
