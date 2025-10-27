@@ -138,9 +138,6 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 void handle_routing_message(uint8_t src, const uint8_t *payload, ssize_t length){
      uint8_t rt_type = payload[0]; // Første byte i payload angir routingmeldingen (HELLO eller UPDATE)
 
-    if (debug_mode) {
-        printf("[DEBUG][ROUTING] Mottatt SDU_TYPE_ROUTING fra %d, type=0x%02X\n", src, rt_type);
-    }
 
     switch (rt_type) {
     case 0x01: // HELLO
@@ -157,8 +154,7 @@ void handle_routing_message(uint8_t src, const uint8_t *payload, ssize_t length)
                 unix_clients[i].sdu_type == SDU_TYPE_ROUTING) {
 
                 write(unix_clients[i].fd, up_buf, length + 1);
-                if (debug_mode)
-                    printf("[DEBUG][ROUTING] Sendte HELLO/UPDATE opp til routingd (fra %d)\n", src);
+               
                 break;
             }
         }
