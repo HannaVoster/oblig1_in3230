@@ -27,6 +27,7 @@ rt_entry routing_table[MAX_ROUTES];
 uint8_t MY_MIP = 0;
 int ROUTING_SOCK = -1;
 int debug_mode = 0;
+int triggered_update = 0;
 
 int main(int argc, char *argv[]) {
     // Leser kommandolinjeflagg (-h for hjelp, -d for debug)
@@ -148,11 +149,16 @@ int main(int argc, char *argv[]) {
             broadcast_update(); 
             last_update = now;
         }
+    
+        expire_stale_routes();
 
-        if (now - last_maintenance >= 2000) {
-            expire_stale_routes();
-            last_maintenance = now;
+        if (triggered_update) {
+            broadcast_update();
+            triggered_update = 0; // tilbakestill flagget
+            if (debug_mode)
+                printf("[ROUTINGD] Triggered UPDATE sent.\n");
         }
+      
         // Skriver ut rutetabellen hvert 15. sekund (for debugging)
         if (now_ms() - last_print > 20000) {
             print_routing_table();

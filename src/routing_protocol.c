@@ -195,6 +195,7 @@ void hello(void){
 
 void expire_stale_routes(void) {
     uint64_t now = now_ms();
+    int routes_removed = 0;
 
     // 1. Deaktiver naboer som ikke har sendt HELLO nylig
     for (int i = 0; i < MAX_NEIGHBORS; i++) {
@@ -210,6 +211,7 @@ void expire_stale_routes(void) {
                 if (routing_table[r].valid && routing_table[r].next_hop == neighbors[i].mip) {
                     routing_table[r].cost = INF_COST;
                     routing_table[r].valid = 0;
+                    routes_removed++;
                     if (debug_mode)
                         printf("[ROUTINGD] Route to %d invalidated (via %d)\n",
                                routing_table[r].dest, routing_table[r].next_hop);
