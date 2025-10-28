@@ -137,7 +137,6 @@ int main(int argc, char *argv[]) {
             }
         }
         uint64_t now = now_ms();
-        uint64_t last_maintenance = now_ms();
 
         // Sender HELLO-meldinger jevnlig (oppdaterer naboer)
         if (now - last_hello >= HELLO_INTERVAL_MS) {
