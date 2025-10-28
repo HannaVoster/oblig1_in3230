@@ -119,9 +119,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
 
                 // Hvis det ikke finnes en rute, eller denne nye veien er bedre — oppdater
                 if (id < 0 || new_cost < routing_table[id].cost || routing_table[id].next_hop == from) {
-                    if (debug_mode)
-                        printf("[ROUTINGD][handle_incoming_message] Oppdaterer rute: dest=%d via=%d cost=%d\n",
-                            dest, from, new_cost);
+                  
                     update_or_insert_neighbor(dest, from, new_cost);
                 } 
             }
@@ -195,4 +193,42 @@ void hello(void){
 }
 
 
+void expire_stale_routes(void) {
+    uint64_t now = now_ms();
 
+    // 1. Deaktiver naboer som ikke har sendt HELLO nylig
+    for (int i = 0; i < MAX_NEIGHBORS; i++) {
+        if (neighbors[i].valid && (now - neighbors[i].last_hello_ms) > NEIGHBOR_TIMEOUT_MS) {
+            if (debug_mode)
+                printf("[ROUTINGD] Neighbor %d timed out (last hello %llu ms ago)\n",
+                       neighbors[i].mip, (unsigned long long)(now - neighbors[i].last_hello_ms));
+
+            neighbors[i].valid = 0;
+
+            // Invalider alle ruter via denne naboen
+            for (int r = 0; r < MAX_ROUTES; r++) {
+                if (routing_table[r].valid && routing_table[r].next_hop == neighbors[i].mip) {
+                    routing_table[r].cost = INF_COST;
+                    routing_table[r].valid = 0;
+                    if (debug_mode)
+                        printf("[ROUTINGD] Route to %d invalidated (via %d)\n",
+                               routing_table[r].dest, routing_table[r].next_hop);
+                }
+            }
+        }
+    }
+
+    // 2. Fjern gamle ruter som ikke har blitt oppdatert på lenge
+    for (int r = 0; r < MAX_ROUTES; r++) {
+        if (routing_table[r].valid &&
+            (now - routing_table[r].updated_ms) > ROUTE_TIMEOUT_MS &&
+            routing_table[r].cost > 0) {
+
+            if (debug_mode)
+                printf("[ROUTINGD] Route to %d expired (last update %llu ms ago)\n",
+                       routing_table[r].dest, (unsigned long long)(now - routing_table[r].updated_ms));
+
+            routing_table[r].valid = 0;
+        }
+    }
+}

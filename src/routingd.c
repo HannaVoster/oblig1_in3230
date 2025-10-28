@@ -136,6 +136,7 @@ int main(int argc, char *argv[]) {
             }
         }
         uint64_t now = now_ms();
+        uint64_t last_maintenance = now_ms();
 
         // Sender HELLO-meldinger jevnlig (oppdaterer naboer)
         if (now - last_hello >= HELLO_INTERVAL_MS) {
@@ -147,11 +148,17 @@ int main(int argc, char *argv[]) {
             broadcast_update(); 
             last_update = now;
         }
+
+        if (now - last_maintenance >= 2000) {
+            expire_stale_routes();
+            last_maintenance = now;
+        }
         // Skriver ut rutetabellen hvert 15. sekund (for debugging)
         if (now_ms() - last_print > 15000) {
             print_routing_table();
             last_print = now_ms();
         }
+        
     }
     cleanup:
         close(epollfd);

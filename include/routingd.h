@@ -17,6 +17,11 @@
 #define RT_MSG_HELLO   0x01 //payload 
 #define RT_MSG_UPDATE  0x02 
 
+// Maks alder for gyldige naboer (i millisekunder)
+#define NEIGHBOR_TIMEOUT_MS 15000
+// Maks alder for ruter (i millisekunder)
+#define ROUTE_TIMEOUT_MS 30000
+
 // routing entry til routing tabellen
 typedef struct {
     uint8_t dest;       // dest MIP
