@@ -87,18 +87,22 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
     uint8_t old_cost = routing_table[id].cost;
 
     if (old_next_hop != next_hop || old_cost != cost) {
-        // Noe har endret seg — oppdater
-        routing_table[id].next_hop = next_hop;
-        routing_table[id].cost = cost;
-        routing_table[id].updated_ms = now_ms();
+        if (cost >= INF_COST) {
+            routing_table[id].valid = 0;
+            routing_table[id].cost = INF_COST;
+            if (debug_mode)
+                printf("[ROUTINGD] Route to %d invalidated (via %d, cost=INF)\n", dest, next_hop);
+        } else {
+            routing_table[id].valid = 1;
+            routing_table[id].next_hop = next_hop;
+            routing_table[id].cost = cost;
+            routing_table[id].updated_ms = now_ms();
 
-        if (debug_mode) {
-            printf("[ROUTINGD] UPDATED route: dest=%d via=%d→%d cost=%d→%d (slot=%d)\n",
-                   dest, old_next_hop, next_hop, old_cost, cost, id);
-        }
-    } else {
-        // Bare oppdater timestamp (naboen lever, men ingen endring)
-        routing_table[id].updated_ms = now_ms();
+            if (debug_mode) {
+                printf("[ROUTINGD] UPDATED route: dest=%d via=%d→%d cost=%d→%d (slot=%d)\n",
+                    dest, old_next_hop, next_hop, old_cost, cost, id);
+            }
+        } 
     }
     return id;
 }
