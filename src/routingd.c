@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
             last_maintenance = now;
         }
         // Skriver ut rutetabellen hvert 15. sekund (for debugging)
-        if (now_ms() - last_print > 15000) {
+        if (now_ms() - last_print > 20000) {
             print_routing_table();
             last_print = now_ms();
         }
