@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
             last_update = now;
         }
     
-        expire_stale_routes(triggered_update);
+        expire_stale_routes();
 
         if (triggered_update) {
             broadcast_update();
