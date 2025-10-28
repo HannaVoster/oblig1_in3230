@@ -47,7 +47,7 @@ extern neighbor neighbors[MAX_NEIGHBORS]; //settes i routingd.c
 extern uint8_t MY_MIP;   // settes fra routing_socket.c i connect_to_mipd()
 extern int ROUTING_SOCK; // SOCK_SEQPACKET til mipd
 extern int debug_mode; //git som argument i main
-extern int triggered_update = 0;
+extern int triggered_update;
 
 uint64_t now_ms(void);
 
