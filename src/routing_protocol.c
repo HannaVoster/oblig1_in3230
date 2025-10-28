@@ -193,7 +193,7 @@ void hello(void){
 }
 
 
-void expire_stale_routes(void) {
+void expire_stale_routes(int triggered_update) {
     uint64_t now = now_ms();
     int routes_removed = 0;
 
@@ -232,5 +232,13 @@ void expire_stale_routes(void) {
 
             routing_table[r].valid = 0;
         }
+    }
+
+
+    // Hvis ruter ble fjernet, sett flagget, triggered_update, så main kan sende broadcast
+    if (routes_removed > 0) {
+        triggered_update = 1;
+        if (debug_mode)
+            printf("[ROUTINGD] Triggered update scheduled (%d routes removed)\n", routes_removed);
     }
 }
