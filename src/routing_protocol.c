@@ -166,8 +166,7 @@ void broadcast_update(void) {
             //  - ruten ble lært VIA denne naboen
             //  - destinasjonen ikke ER naboen selv
             //  - ruten faktisk har en gyldig kost (ikke INF)
-            if (neighbor_count > 1 &&
-                routing_table[i].next_hop == neighbor_addr &&
+            if (routing_table[i].next_hop == neighbor_addr &&
                 routing_table[i].dest != neighbor_addr &&
                 routing_table[i].cost < INF_COST) {
 
