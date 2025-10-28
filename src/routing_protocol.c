@@ -193,7 +193,7 @@ void hello(void){
 }
 
 
-void expire_stale_routes(int triggered_update) {
+void expire_stale_routes(void) {
     uint64_t now = now_ms();
     int routes_removed = 0;
 
