@@ -109,30 +109,7 @@ void handle_incoming_message(uint8_t from, uint8_t msg_type, const uint8_t *payl
                 if (dest == 0 || dest > 254 || dest == MY_MIP) continue;
 
                 // Ignorer poisoned reverse, kostnad = 255 = uoppnåelig
-                //if (cost == INF_COST) continue;
-                
-                  // --- Håndtering av INF (poison) ---
-                if (cost >= INF_COST) {
-                    int rid = get_route(dest);
-                    if (rid >= 0 && routing_table[rid].valid) {
-                        if (routing_table[rid].next_hop == from) {
-                            // Ekte "route poison" fra vår nåværende next_hop => invalider
-                            routing_table[rid].valid = 0;
-                            routing_table[rid].cost = INF_COST;
-                            routing_table[rid].updated_ms = now_ms();
-                            if (debug_mode)
-                                printf("[ROUTINGD] Route to %u invalidated (poisoned by %u)\n", dest, from);
-                           
-                        } else {
-                            // PR for oss (avsender er ikke vår next_hop) => ignorer
-                            if (debug_mode)
-                                printf("[ROUTINGD] Ignored poison for dest=%u from %u (route via %u)\n",
-                                    dest, from, routing_table[rid].next_hop);
-                        }
-                    }
-                    continue;
-                }
-                
+                if (cost == INF_COST) continue;
 
                 // Kostnaden via denne naboen (1 ekstra hopp), 255(inf) hvis cost er høy
                 uint8_t new_cost = (cost >= 254) ? INF_COST : cost + 1;
