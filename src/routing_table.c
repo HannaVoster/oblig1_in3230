@@ -86,24 +86,32 @@ int update_or_insert_neighbor(uint8_t dest, uint8_t next_hop, uint8_t cost) {
     uint8_t old_next_hop = routing_table[id].next_hop;
     uint8_t old_cost = routing_table[id].cost;
 
-    if (old_next_hop != next_hop || old_cost != cost) {
-        if (cost >= INF_COST) {
+   if (cost >= INF_COST) {
+    // Bare slett ruten hvis den faktisk gikk via denne naboen
+        if (routing_table[id].next_hop == next_hop) {
             routing_table[id].valid = 0;
             routing_table[id].cost = INF_COST;
             if (debug_mode)
-                printf("[ROUTINGD] Route to %d invalidated (via %d, cost=INF)\n", dest, next_hop);
+                printf("[ROUTINGD] Route to %d invalidated (poisoned by %d)\n", dest, next_hop);
         } else {
-            routing_table[id].valid = 1;
-            routing_table[id].next_hop = next_hop;
-            routing_table[id].cost = cost;
-            routing_table[id].updated_ms = now_ms();
+            // Ignorer poison fra andre naboer
+            if (debug_mode)
+                printf("[ROUTINGD] Ignored poison for dest=%d (from %d, route via %d)\n",
+                    dest, next_hop, routing_table[id].next_hop);
+        }
+    } else {
+        // Vanlig oppdatering
+        routing_table[id].valid = 1;
+        routing_table[id].next_hop = next_hop;
+        routing_table[id].cost = cost;
+        routing_table[id].updated_ms = now_ms();
 
-            if (debug_mode) {
-                printf("[ROUTINGD] UPDATED route: dest=%d via=%d→%d cost=%d→%d (slot=%d)\n",
-                    dest, old_next_hop, next_hop, old_cost, cost, id);
-            }
-        } 
+        if (debug_mode) {
+            printf("[ROUTINGD] UPDATED route: dest=%d via=%d→%d cost=%d→%d (slot=%d)\n",
+                dest, old_next_hop, next_hop, old_cost, cost, id);
+        }
     }
+
     return id;
 }
 
