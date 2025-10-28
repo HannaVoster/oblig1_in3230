@@ -149,10 +149,10 @@ int main(int argc, char *argv[]) {
             last_update = now;
         }
     
-        expire_stale_routes();
+        expire_stale_routes(); // i routing_protocol.c
 
         if (triggered_update) {
-            broadcast_update();
+            broadcast_update(); // broadcaster endringer i rutetabell, grunnet utdaterte naboer
             triggered_update = 0; // tilbakestill flagget
             if (debug_mode)
                 printf("[ROUTINGD] Triggered UPDATE sent.\n");

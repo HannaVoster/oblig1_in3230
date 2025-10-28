@@ -192,18 +192,26 @@ void hello(void){
     send_unix_message(INF_COST, 1, &msg, 1);
 }
 
-
+/*
+    Denne funksjonen sjekker jevnlig om naboer og ruter fortsatt er gyldige.
+    Den "rydder opp" i routingtabellen ved å fjerne naboer som ikke har svart på en stund,
+    og ved å slette gamle ruter som ikke har blitt oppdatert på lenge.
+    Hvis noe blir fjernet, setter den et flagg (triggered_update) slik at main-løkka vet
+    at det bør sendes en ny oppdatering (broadcast) til andre noder
+ */
 void expire_stale_routes(void) {
-    uint64_t now = now_ms();
+    uint64_t now = now_ms(); // Henter nåværende tidspunkt i millisekunder
     int routes_removed = 0;
 
     // 1. Deaktiver naboer som ikke har sendt HELLO nylig
     for (int i = 0; i < MAX_NEIGHBORS; i++) {
+        // Hvis naboen er aktiv, men det er lenge siden sist HELLO
         if (neighbors[i].valid && (now - neighbors[i].last_hello_ms) > NEIGHBOR_TIMEOUT_MS) {
             if (debug_mode)
                 printf("[ROUTINGD] Neighbor %d timed out (last hello %llu ms ago)\n",
                        neighbors[i].mip, (unsigned long long)(now - neighbors[i].last_hello_ms));
 
+            // Marker naboen som ugyldig
             neighbors[i].valid = 0;
 
             // Invalider alle ruter via denne naboen
@@ -220,7 +228,7 @@ void expire_stale_routes(void) {
         }
     }
 
-    // 2. Fjern gamle ruter som ikke har blitt oppdatert på lenge
+    // 2. Fjern gamle ruter som ikke har blitt oppdatert på lenge (eldre enn ROUTE_TIMEOUT_MS)
     for (int r = 0; r < MAX_ROUTES; r++) {
         if (routing_table[r].valid &&
             (now - routing_table[r].updated_ms) > ROUTE_TIMEOUT_MS &&
@@ -235,7 +243,8 @@ void expire_stale_routes(void) {
     }
 
 
-    // Hvis ruter ble fjernet, sett flagget, triggered_update, så main kan sende broadcast
+    // Hvis ruter ble fjernet, sett flagget, triggered_update, så main kan sende broadcast me oppdatert 
+    //rutetabell til naboen
     if (routes_removed > 0) {
         triggered_update = 1;
         if (debug_mode)
