@@ -1,49 +1,43 @@
-# MIP Daemon IN3230 Oblig
+# MIP Daemon and Distance Vector Routing Daemon
 
-## Task
-This assignment implements a simple MIP daemon (mipd) together with two helper programs:
-- ping_client: sends messages via the daemon to a destination MIP address
-- ping_server: receives messages delivered by the daemon and replies back
+## Overview
+This project implements a MIP protocol and provides four separate programs that work together to enable communication and routing between MIP nodes:
 
-Communication happens over:
-1. UNIX domain sockets(be tween client/server and the daemon).
-2. RAW Ethernet sockets (between MIP daemons).
+- mipd – the main MIP daemon responsible for sending and receiving MIP packets over Ethernet  
+- routingd – a distance-vector routing daemon that exchanges routing information between MIP daemons  
+- ping_client – sends messages to a destination MIP address through the local mipd  
+- ping_server – receives messages from mipd and sends replies back
 
-The MIP protocol is implemented according to the specification provided in the assignment.
+Communication between the programs is handled through:
+- UNIX domain sockets – used for local communication between mipd and user programs (ping_client, ping_server, routingd)  
+- RAW Ethernet sockets – used for direct communication between mipd instances across the network
 
-## Note – deviation from assignment
-- In the implementation I open raw sockets with ETH_P_ALL instead of ETH_P_MIP (0x88B5).  
-- This was necessary because the Mininet environment does not deliver frames with 0x88B5 back to recvmsg().  
-- With ETH_P_ALL I can at least verify that raw packets are received, and I manually filter on 0x88B5 inside handle_raw_packet.
+### Communication
+- UNIX domain sockets – local communication between client/server and mipd  
+- RAW Ethernet sockets – network communication between different MIP daemons
 
-## What works
-- ping_client connects to the daemon via UNIX socket and sends correctly formatted messages 
-- mipd receives the message, queues it, and builds a valid MIP PDU.
-- Ethernet frames are built and dumped correctly (60 bytes, Ethertype 0x88B5).
-- sendto on the RAW socket returns OK, so the frame is transmitted on the interface.
-- Debug output shows the correct ifindex and interface name (A-eth0, C-eth0, etc.).
+## Routing Protocol
+The implemented routing protocol is a lightweight Distance Vector Routing (DVR) protocol that operates as an extension to the MIP daemon.
 
-## What does not work
-- handle_raw_packet never receives MIP frames.  
-- Only IPv6 traffic (ethertype 0x86DD) is observed.  
-- No 0x88B5 frames are delivered, and therefore ping_client always times out.
+Each node maintains a routing table with destination addresses, next hops, and costs (hop counts).  
+Routing information is exchanged periodically between neighbors through HELLO and UPDATE messages.
 
-## Debugging performed
-- Verified with debug:
-  - Interface name and ifindex are resolved correctly in find_iface.
-  - Frames are built with the correct Ethertype and transmitted (sendto ok).
-  - TX debug confirms broadcast destination MAC 
-- Tested both ETH_P_MIP and ETH_P_ALL as socket protocol:
-  - With ETH_P_ALL packets are received, but still never 0x88B5.
+### Key Features
+- Neighbor Discovery: Nodes periodically broadcast HELLO messages to detect active neighbors.  
+- Periodic Updates: Routing tables are shared with neighbors using UPDATE messages.  
+- Poison Reverse: Prevents routing loops by advertising routes learned from a neighbor with infinite cost.  
+- Link Failure Handling: If a neighbor becomes inactive, routes using that neighbor are invalidated and a triggered update is sent.  
+- Triggered Updates: Ensures fast network convergence when topology changes occur.
 
-## Hypothesis over why no 0x88B5 frames are delivered
-- Mininet maybe filters out unknown Ethertypes, meaning the MIP frames are transmitted but never delivered back to the receiver’s raw socket.  
-- Alternatively, the exercise setup used by the instructor may rely on a different script or patch that explicitly enables delivery of MIP traffic.  
+## Count-to-Infinity Prevention
+The Poison Reverse mechanism prevents loops and the count-to-infinity problem by explicitly marking routes as unreachable when advertised back to the neighbor they were learned from.  
+Additionally, routes are invalidated and broadcast immediately if a neighbor times out, helping the network quickly converge to a stable state.
 
-## Further implementation
-As further improvements, I would make all comments consistent and written in English for clarity.  
-Additionally, I would refactor the code into smaller source files and split large functions such as handle_raw_packet 
-into more modular components for better readability and maintainability.
+
+
+
+
+
 
 
 
