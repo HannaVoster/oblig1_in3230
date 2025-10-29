@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
 
     // Venter til mipd har opprettet UNIX-socketen
     wait_for_socket(socket_path);
+    usleep(300000); // 0.3 sekunder
     printf("[ROUTINGD] Socket %s er nå tilgjengelig, kobler til...\n", socket_path);
 
     // Koble til MIP-daemonen
