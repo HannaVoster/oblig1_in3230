@@ -122,7 +122,7 @@ void wait_for_socket(const char *path) {
 
     // Sjekker gjentatte ganger om socket-filen finnes
     while (stat(path, &sb) != 0) {
-        if (tries++ > 50) {
+        if (tries++ > 100) {
             fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
             exit(EXIT_FAILURE);
         }

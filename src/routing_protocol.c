@@ -170,7 +170,7 @@ void broadcast_update(void) {
                 routing_table[i].cost < INF_COST) {
 
                 advertised_cost = INF_COST;  // poison reverse
-        }
+            }
             // Legger til kostnaden (enten vanlig eller "poisoned")
             buf[pos++] = advertised_cost;
         }
