@@ -117,18 +117,22 @@ int connect_to_mipd(const char *socket_path) {
 // Venter på at MIP-daemonens UNIX-socket-fil skal dukke opp før routing deamon prøver å koble til
 // Brukes for å unngå at routingd starter før MIPd faktisk har laget socketen
 void wait_for_socket(const char *path) {
-    struct stat sb; // en struktur som lagrer filinfo, bruket den til å sjekke om path finnes
+    struct stat sb;
     int tries = 0;
 
-    // Sjekker gjentatte ganger om socket-filen finnes
     while (stat(path, &sb) != 0) {
+        fprintf(stderr, "[DEBUG] Waiting for socket: %s (try %d)\n", path, tries);
         if (tries++ > 150) {
             fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
+            perror("stat");
             exit(EXIT_FAILURE);
         }
         usleep(100000); // 0.1 sek
     }
+
+    fprintf(stderr, "[DEBUG] Socket %s detected!\n", path);
 }
+
 
 // Generisk metode til å kommuniserer med MIPD over unix socket
 // Pakker destinasjon, TTL og payload inn i en buffer og skriver den ut på ROUTING_SOCK
