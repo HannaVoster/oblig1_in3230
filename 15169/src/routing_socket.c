@@ -119,19 +119,28 @@ int connect_to_mipd(const char *socket_path) {
 void wait_for_socket(const char *path) {
     struct stat sb;
     int tries = 0;
+    char full_path[256];
 
-    while (stat(path, &sb) != 0) {
-        fprintf(stderr, "[DEBUG] Waiting for socket: %s (try %d)\n", path, tries);
+    if (path[0] != '/') {
+        snprintf(full_path, sizeof(full_path), "/tmp/%s", path);
+    } else {
+        strncpy(full_path, path, sizeof(full_path) - 1);
+        full_path[sizeof(full_path) - 1] = '\0';
+    }
+
+    while (stat(full_path, &sb) != 0) {
+        fprintf(stderr, "[DEBUG] Waiting for socket: %s (try %d)\n", full_path, tries);
         if (tries++ > 150) {
-            fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
+            fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", full_path);
             perror("stat");
             exit(EXIT_FAILURE);
         }
-        usleep(100000); // 0.1 sek
+        usleep(100000);
     }
 
-    fprintf(stderr, "[DEBUG] Socket %s detected!\n", path);
+    fprintf(stderr, "[DEBUG] Socket %s detected!\n", full_path);
 }
+
 
 
 // Generisk metode til å kommuniserer med MIPD over unix socket
