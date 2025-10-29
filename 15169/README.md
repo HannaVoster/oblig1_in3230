@@ -33,6 +33,13 @@ Routing information is exchanged periodically between neighbors through HELLO an
 The Poison Reverse mechanism prevents loops and the count-to-infinity problem by explicitly marking routes as unreachable when advertised back to the neighbor they were learned from.  
 Additionally, routes are invalidated and broadcast immediately if a neighbor times out, helping the network quickly converge to a stable state.
 
+## Implementation Notes on path check
+
+- Added a path check in all programs to ensure that UNIX socket files are correctly located.  
+  If a user provides a socket name without an absolute path (e.g., `usockA`), the program automatically prefixes `/tmp/`, since all socket files are created in `/tmp/`.  
+  This improves robustness and prevents connection issues such as *“Timeout waiting for socket”* that occurred when daemons could not find each other.
+
+
 
 
 
