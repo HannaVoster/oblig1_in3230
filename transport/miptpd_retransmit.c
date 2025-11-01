@@ -17,3 +17,7 @@ void init_retransmission_state();
 void check_retransmissions();
 void on_ack_received(uint16_t ack_seq);
 void buffer_outgoing_packet();
+
+
+// // Fra miptp_retransmit.c
+// void check_retransmissions(void);

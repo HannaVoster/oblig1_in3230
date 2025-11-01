@@ -11,6 +11,9 @@
 #define MIPTP_WINDOW_SIZE 16
 #define MIPTP_MAX_SEQ 16384  // 14 bits
 
+extern int debug_mode;
+extern int MIP_FD;
+
 typedef struct {
     uint8_t src_port;
     uint8_t dst_port;
@@ -28,25 +31,46 @@ typedef struct {
 
 // Oppstart og initiering
 int main(int argc, char *argv[]);
-void init_unix_socket(const char *path);
-void init_mip_socket(const char *path);
+// void init_unix_socket(const char *path);
+// void init_mip_socket(const char *path);
 
-// Håndtering av applikasjoner
-void handle_new_app_connection();
+// // Håndtering av applikasjoner
+// void handle_new_app_connection();
+// void handle_app_message(int app_fd);
+
+// // Håndtering av mottatte MIPTP-pakker
+// void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
+
+// // Sendefunksjoner
+// void send_miptp_data(...);
+// void send_miptp_ack(...);
+
+// // Tidsstyring / retransmisjon
+// void check_retransmissions();
+
+// // Hjelpefunksjoner
+// uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
+// void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
+
+//miptpd_unix.c
+void wait_for_socket(const char *path);
+int connect_to_mipd(const char *path);
+int create_app_socket(const char *path);
+void handle_new_app_connection(int unix_fd);
 void handle_app_message(int app_fd);
 
-// Håndtering av mottatte MIPTP-pakker
+// // Fra miptp_mip.c
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
+void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 
-// Sendefunksjoner
-void send_miptp_data(...);
-void send_miptp_ack(...);
+// // Fra miptp_retransmit.c
+// void check_retransmissions(void);
 
-// Tidsstyring / retransmisjon
-void check_retransmissions();
+// // Fra miptp_utils.c
+// uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
+// void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 
-// Hjelpefunksjoner
-uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
-void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
+
+
 
 #endif
