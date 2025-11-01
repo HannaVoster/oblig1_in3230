@@ -115,7 +115,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len);
     
-    uint16_t seq = ntohs(hdr.seq_pad) >> 2; // hent 14-bit sekvens
+    uint16_t seq = (hdr.seq_pad) >> 2; // hent 14-bit sekvens
     uint8_t pad = hdr.seq_pad & 0x3;
 
     printf("[MIPTPD] Got packet seq=%u src_port=%d dst_port=%d len=%zu\n",
