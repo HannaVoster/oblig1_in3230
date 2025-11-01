@@ -132,17 +132,34 @@ int main(int argc, char *argv[]) {
                     perror("accept");
                     continue;
                 }
-                if (debug_mode)
-                    printf("[MIPTPD] New app connected (fd=%d)\n", new_fd);
 
-                // legg den nye socketen inn i epoll
+                printf("[MIPTPD] New app connected (fd=%d)\n", new_fd);
+
+                // Les portnummeret (første byte appen sender)
+                uint8_t port = 0;
+                ssize_t n = read(new_fd, &port, 1);
+                if (n <= 0) {
+                    fprintf(stderr, "[MIPTPD] Failed to read port number from app (fd=%d)\n", new_fd);
+                    close(new_fd);
+                    continue;
+                }
+
+                // Registrer app i forbindelsestabellen
+                if (register_app_connection(new_fd, port) == 0)
+                    printf("[MIPTPD] Registered app on port %d (fd=%d)\n", port, new_fd);
+                else {
+                    fprintf(stderr, "[MIPTPD] Could not register new app (fd=%d)\n", new_fd);
+                    close(new_fd);
+                    continue;
+                }
+
+                // Legger den nye socketen inn i epoll
                 ev.events = EPOLLIN;
                 ev.data.fd = new_fd;
                 if (epoll_ctl(epollfd, EPOLL_CTL_ADD, new_fd, &ev) == -1)
                     perror("epoll_ctl: new_fd");
-
-                // TODO: les første byte (portnummer) fra app
             }
+
 
             // Meldinger fra applikasjoner
             else if (events[i].events & EPOLLIN) {

@@ -11,13 +11,16 @@
 #define MIPTP_WINDOW_SIZE 16
 #define MIPTP_MAX_SEQ 16384  // 14 bits
 
+#define MAX_APPS 20
+
 extern int debug_mode;
 extern int MIP_FD;
 
 typedef struct {
     uint8_t src_port;
     uint8_t dst_port;
-    uint16_t seq_pad;  // seq << 2 | padlen
+    uint16_t seq_pad; //[ sequence number (14 bits) | padding length (2 bits) ] = 16 bits
+
     // payload follows
 } __attribute__((packed)) miptp_hdr_t;
 
@@ -28,6 +31,14 @@ typedef struct {
     size_t len;
     uint8_t *data;
 } miptp_packet_t;
+
+//lager en connections tabell med app_fd, og port
+typedef struct {
+    int app_fd;
+    uint8_t port;
+} app_connection;
+
+app_connection app_connections[MAX_APPS]
 
 // Oppstart og initiering
 int main(int argc, char *argv[]);
@@ -69,7 +80,9 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 // // Fra miptp_utils.c
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
 void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
-
+uint8_t get_port_from_fd(int fd);
+int remove_app_connection(int fd);
+int register_app_connection(int fd, uint8_t port);
 
 
 
