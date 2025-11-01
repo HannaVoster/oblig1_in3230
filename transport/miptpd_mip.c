@@ -102,8 +102,19 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len);
 
-    // TODO: slå opp riktig app-fd for dst_port
-    // write(app_fd, payload, payload_len);
+    int app_fd = get_fd_from_port(hdr.dst_port);
+    if (app_fd >= 0) {
+        uint8_t msg[2 + payload_len];
+        msg[0] = src_mip;
+        msg[1] = hdr.src_port;
+        memcpy(msg + 2, payload, payload_len);
+
+        write(app_fd, msg, sizeof(msg));
+        printf("[MIPTPD] Delivered %zu bytes to app port %d (fd=%d)\n",
+               payload_len, hdr.dst_port, app_fd);
+    } else {
+        printf("[MIPTPD] No app registered for port %d\n", hdr.dst_port);
+    }
 }
 
 
