@@ -28,6 +28,7 @@ main funksjon og event loop
 
 #define MAX_EVENTS 32
 int debug_mode = 0;
+int MIP_FD; // global referanse til mipd-socket
 
 /**
  * Main-funksjon: oppretter sockets og kjører epoll-løkke
@@ -66,6 +67,7 @@ int main(int argc, char *argv[]) {
 
     // Koble til MIP-daemon
     int mip_fd = connect_to_mipd(mipd_path);
+    MIP_FD = mip_fd;
     if (mip_fd < 0) {
         fprintf(stderr, "[MIPTPD] Failed to connect to mipd.\n");
         exit(EXIT_FAILURE);
