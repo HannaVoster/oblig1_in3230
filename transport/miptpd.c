@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
                 uint8_t buf[1500];
                 ssize_t len = read(fd, buf, sizeof(buf));
                 if (len <= 0) {
-                    if (DEBUG)
+                    if (debug_mode)
                         printf("[MIPTPD] App fd=%d closed.\n", fd);
                     close(fd);
                     continue;
