@@ -67,7 +67,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 // void check_retransmissions(void);
 
 // // Fra miptp_utils.c
-// uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
+uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
 // void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 
 

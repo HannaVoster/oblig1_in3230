@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
                     printf("[MIPTPD] Disconnected from mipd.\n");
                     goto cleanup;
                 }
-                if (DEBUG)
+                if (debug_mode)
                     printf("[MIPTPD] Received %zd bytes from mipd\n", len);
 
                 // TODO: parse MIPTP header og lever til riktig app
