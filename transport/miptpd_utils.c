@@ -30,11 +30,13 @@ void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen) {
   Registrerer en ny applikasjon i tabellen
   Returnerer 0 ved suksess, -1 hvis tabellen er full
  */
-int register_app_connection(int fd, uint8_t port) {
+int new_app_connection(int fd, uint8_t port) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == 0) {
             app_connections[i].app_fd = fd;
             app_connections[i].port = port;
+            app_connections[i].next_seq = 0;
+            app_connection[i].last_acked_seq = 0;
             printf("[MIPTPD] Registered app fd=%d on port %d\n", fd, port);
             return 0;
         }
@@ -88,3 +90,12 @@ int get_fd_from_port(uint8_t port) {
 // void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 // uint8_t calc_padding(size_t sdu_len);
 // int seq_less(uint16_t a, uint16_t b);
+
+int get_index(int fd){
+    for (int i = 0; i < MAX_APPS; i++) {
+        if (app_connections[i].app_fd == fd)
+            return i;
+    }
+    fprintf(stderr, "[MIPTPD] No index found for fd=%d\n", fd);
+    return -1;
+}

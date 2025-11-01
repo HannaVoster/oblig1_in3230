@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 // Registrer app i forbindelsestabellen
-                if (register_app_connection(new_fd, port) == 0)
+                if (new_app_connection(new_fd, port) == 0)
                     printf("[MIPTPD] Registered app on port %d (fd=%d)\n", port, new_fd);
                 else {
                     fprintf(stderr, "[MIPTPD] Could not register new app (fd=%d)\n", new_fd);

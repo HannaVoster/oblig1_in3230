@@ -36,6 +36,8 @@ typedef struct {
 typedef struct {
     int app_fd;
     uint8_t port;
+    uint16_t next_seq;
+    uint16_t last_acked_seq;
 } app_connection;
 
 extern app_connection app_connections[MAX_APPS];
@@ -82,8 +84,9 @@ uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
 void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 uint8_t get_port_from_fd(int fd);
 int remove_app_connection(int fd);
-int register_app_connection(int fd, uint8_t port);
+int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
+int get_index(int fd);
 
 
 

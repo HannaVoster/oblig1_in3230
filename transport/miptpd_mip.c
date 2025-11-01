@@ -54,7 +54,10 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     // Lager selve MIPTP-header
     hdr.src_port = src_port;
     hdr.dst_port = dst_port;
-    hdr.seq_pad = pack_seq_pad(0, 0); //TODO , sekvensnummer per app
+
+    uint16_t seq = app_connections[get_index(app_fd)].next_seq++;
+    hdr.seq_pad = pack_seq_pad(seq, 0); 
+    printf("[MIPTPD] Sending seq=%u from port %d\n", seq, hdr.src_port);
 
     // Bygger MIPTP-pakken, [Header][Payload]
     uint8_t packet[1500];
@@ -111,6 +114,12 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len);
+    
+    uint16_t seq = ntohs(hdr.seq_pad) >> 2; // hent 14-bit sekvens
+    uint8_t pad = hdr.seq_pad & 0x3;
+
+    printf("[MIPTPD] Got packet seq=%u src_port=%d dst_port=%d len=%zu\n",
+       seq, hdr.src_port, hdr.dst_port, payload_len);
 
     int app_fd = get_fd_from_port(hdr.dst_port);
     if (app_fd < 0) {
