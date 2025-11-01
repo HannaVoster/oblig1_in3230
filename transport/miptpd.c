@@ -176,6 +176,7 @@ int main(int argc, char *argv[]) {
                     printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
 
                 // TODO: pakk inn i MIPTP-header og send via mip_fd
+                printf("[MIPTPD] Message received from app fd=%d\n", fd);
                 send_miptp_data(fd, buf, len);
             }
         }

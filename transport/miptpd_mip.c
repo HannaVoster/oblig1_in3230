@@ -33,6 +33,8 @@ Metode for å:
 */
 
 void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
+    printf("[MIPTPD] send_miptp_data() called (fd=%d, len=%zu)\n", app_fd, len);
+
     //sjekekr at lengden på payloaded er stor nok
     if (len < 2) {
         fprintf(stderr, "[MIPTPD] Invalid payload (too short)\n");
