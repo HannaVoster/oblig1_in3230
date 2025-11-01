@@ -155,8 +155,8 @@ int main(int argc, char *argv[]) {
 
                 // Les eventuelt første meldingen direkte (app sender ofte rett etter registrering)
                 uint8_t buf[1500];
-                ssize_t len = read(new_fd, buf, sizeof(buf));
-                if (len > 0) {
+                ssize_t len;
+                while ((len = read(new_fd, buf, sizeof(buf))) > 0) {
                     printf("[MIPTPD] Received initial %zd bytes from app fd=%d\n", len, new_fd);
                     send_miptp_data(new_fd, buf, len);
                 }
