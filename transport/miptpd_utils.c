@@ -38,6 +38,12 @@ int new_app_connection(int fd, uint8_t port) {
             app_connections[i].next_seq = 0;
             app_connections[i].last_acked_seq = 0;
             printf("[MIPTPD] Registered app fd=%d on port %d\n", fd, port);
+
+            printf("[DEBUG] Table after adding port %d:\n", port);
+            for (int i = 0; i < MAX_APPS; i++)
+                if (app_connections[i].app_fd)
+                    printf("  [%d] fd=%d port=%d\n", i, app_connections[i].app_fd, app_connections[i].port);
+
             return 0;
         }
     }
