@@ -153,14 +153,6 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // Les eventuelt første meldingen direkte (app sender ofte rett etter registrering)
-                uint8_t buf[1500];
-                ssize_t len;
-                while ((len = read(new_fd, buf, sizeof(buf))) > 0) {
-                    printf("[MIPTPD] Received initial %zd bytes from app fd=%d\n", len, new_fd);
-                    send_miptp_data(new_fd, buf, len);
-                }
-
                 // Legger den nye socketen inn i epoll
                 ev.events = EPOLLIN;
                 ev.data.fd = new_fd;
