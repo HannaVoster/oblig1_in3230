@@ -70,7 +70,8 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     else
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
     
-
+    //  Midlertidig: simuler at vi mottar denne pakken tilbake fra MIP=1
+    handle_incoming_miptp_packet(packet + 1, sizeof(hdr) + payload_len, 1);
 
 }
 
