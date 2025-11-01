@@ -69,6 +69,10 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         perror("[MIPTPD] write to mipd");
     else
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
+    
+    //  Midlertidig: simuler at vi mottar denne pakken tilbake fra MIP=1
+    handle_incoming_miptp_packet(packet + 1, sizeof(hdr) + payload_len, 1);
+
 }
 
 /*
@@ -77,6 +81,10 @@ Ansvar:
   Pakken kommer inn via UNIX-socketen mellom miptpd og mipd, og denne
   funksjonen står skal tolke MIPTP-headeren og videresende payload
   til riktig applikasjon (som er identifisert med destinasjonsport)
+    inkluderer
+        finne riktig destinasjonsport
+        slå opp app_fd med get_fd_from_port()
+        skriv tilbake til riktig app
 
   Tar inn:
     buf: peker til pakken inkludert header
@@ -105,13 +113,21 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
            src_mip, hdr.src_port, hdr.dst_port, payload_len);
 
     int app_fd = get_fd_from_port(hdr.dst_port);
-    if (app_fd >= 0) {
-        uint8_t msg[2 + payload_len];
-        msg[0] = src_mip;
-        msg[1] = hdr.src_port;
-        memcpy(msg + 2, payload, payload_len);
+    if (app_fd < 0) {
+        fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr.dst_port);
+        return;
 
-        write(app_fd, msg, sizeof(msg));
+    }
+    
+    uint8_t msg[2 + payload_len];
+    msg[0] = src_mip;
+    msg[1] = hdr.src_port;
+    memcpy(msg + 2, payload, payload_len);
+
+    ssize_t sent = write(app_fd, msg, sizeof(msg));
+ 
+
+    if(sent < 0) {  
         printf("[MIPTPD] Delivered %zu bytes to app port %d (fd=%d)\n",
                payload_len, hdr.dst_port, app_fd);
     } else {
