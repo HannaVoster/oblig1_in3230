@@ -38,7 +38,7 @@ typedef struct {
     uint8_t port;
 } app_connection;
 
-app_connection app_connections[MAX_APPS];
+extern app_connection app_connections[MAX_APPS];
 
 // Oppstart og initiering
 int main(int argc, char *argv[]);
