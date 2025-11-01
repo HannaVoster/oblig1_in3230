@@ -71,6 +71,19 @@ uint8_t get_port_from_fd(int fd) {
     return 0;
 }
 
+/*
+  Henter filbeskrivelsen (app_fd) for en gitt port
+  Returnerer -1 hvis ingen app er registrert på den porten
+ */
+int get_fd_from_port(uint8_t port) {
+    for (int i = 0; i < MAX_APPS; i++) {
+        if (app_connections[i].port == port)
+            return app_connections[i].app_fd;
+    }
+    fprintf(stderr, "[MIPTPD] No app found for port=%d\n", port);
+    return -1;
+}
+
 // uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
 // void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 // uint8_t calc_padding(size_t sdu_len);
