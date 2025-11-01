@@ -14,19 +14,19 @@ $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 MIPTPD_SRC = $(SRC_DIR)/miptpd.c \
-              $(SRC_DIR)/miptp_unix.c \
-              $(SRC_DIR)/miptp_mip.c \
-              $(SRC_DIR)/miptp_retransmit.c \
-              $(SRC_DIR)/miptp_utils.c
+              $(SRC_DIR)/miptpd_unix.c \
+              $(SRC_DIR)/miptpd_mip.c \
+              $(SRC_DIR)/miptpd_retransmit.c \
+              $(SRC_DIR)/miptpd_utils.c
 
-$(BIN_DIR)/miptpd: $(MIPTPD_SRC) $(SRC_DIR)/miptp.h
+$(BIN_DIR)/miptpd: $(MIPTPD_SRC) $(SRC_DIR)/miptpd.h
 	$(CC) $(CFLAGS) -o $@ $(MIPTPD_SRC)
 
-$(BIN_DIR)/miptp_client: $(SRC_DIR)/miptp_client.c $(SRC_DIR)/miptp.h
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptp_client.c
+$(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c $(SRC_DIR)/miptpd.h
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_client.c
 
-$(BIN_DIR)/miptp_server: $(SRC_DIR)/miptp_server.c $(SRC_DIR)/miptp.h
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptp_server.c
+$(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c $(SRC_DIR)/miptpd.h
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_server.c
 
 clean:
-	rm -f $(BIN_DIR)/miptpd $(BIN_DIR)/miptp_client $(BIN_DIR)/miptp_server
+	rm -f $(BIN_DIR)/miptpd $(BIN_DIR)/miptpd_client $(BIN_DIR)/miptpd_server
