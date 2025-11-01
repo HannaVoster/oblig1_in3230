@@ -124,10 +124,10 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     int app_fd = get_fd_from_port(hdr.dst_port);
     if (app_fd < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr.dst_port);
-        printf("[DEBUG] Current connection table:\n");
+        fprintf(stderr,"[DEBUG] Current connection table:\n");
         for (int i = 0; i < MAX_APPS; i++)
             if (app_connections[i].app_fd)
-                printf("  [%d] fd=%d port=%d\n", i, app_connections[i].app_fd, app_connections[i].port);
+                fprintf(stderr,"  [%d] fd=%d port=%d\n", i, app_connections[i].app_fd, app_connections[i].port);
         return;
         return;
 
