@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
                     perror("accept");
                     continue;
                 }
-                if (DEBUG)
+                if (debug_mode)
                     printf("[MIPTPD] New app connected (fd=%d)\n", new_fd);
 
                 // legg den nye socketen inn i epoll
