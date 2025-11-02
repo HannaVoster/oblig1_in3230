@@ -356,7 +356,7 @@ int forward_packet(int my_mip_address,
     return 1;
 }
 //HJEMMEEKSAMEN 2
-void handle_miptp_message(uint8_t *payload, size_t length) {
+void handle_miptp_message(const uint8_t *payload, size_t length) {
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active &&
             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
