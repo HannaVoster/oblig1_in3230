@@ -107,7 +107,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
 
     // sender pakken til mip deamon for å sende ut på nettverket
     printf("[DEBUG][TX->MIPD] Sending %zd bytes: ", packet_len);
-    for (size_t i = 0; i < packet_len; i++) printf("%02X ", packet[i]);
+    for (size_t i = 0; i < (size_t)packet_len; i++) printf("%02X ", packet[i]);
     printf("\n");
     ssize_t sent = write(MIP_FD, packet, packet_len);
 
