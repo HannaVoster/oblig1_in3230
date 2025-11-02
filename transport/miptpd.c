@@ -57,8 +57,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Leser inn socket-stier fra argumentene
-    const char *mipd_path = argv[optind];
-    const char *app_path = argv[optind + 1];
+    const char *mipd_arg = argv[optind];
+    const char *app_arg  = argv[optind + 1];
 
     char mipd_path[108];
     char app_path[108];
