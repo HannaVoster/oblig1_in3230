@@ -181,6 +181,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        check_retransmissions(MIP_FD);
+
         // TODO: kall check_retransmissions() her senere
     }
 
@@ -191,3 +193,5 @@ cleanup:
     printf("[MIPTPD] Shutting down.\n");
     return 0;
 }
+
+

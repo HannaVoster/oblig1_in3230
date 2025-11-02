@@ -81,8 +81,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
 void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq);
 
-// // Fra miptp_retransmit.c
-// void check_retransmissions(void);
 
 // // Fra miptp_utils.c
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
@@ -95,5 +93,8 @@ int get_index(int fd); //brukes denne?
 uint16_t get_next_seq(int fd);
 void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len);
 
+
+//fra mipdtps_retransmit.c
+void check_retransmissions(int mip_fd);
 
 #endif
