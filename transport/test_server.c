@@ -48,47 +48,12 @@ int main(void) {
     while (1) {
         uint8_t buf[1500];
         ssize_t n = read(fd, buf, sizeof(buf));
-        uint8_t buffer[1500];
+        if (n <= 0) break;
 
-        if (n > 0) {
-            uint8_t src_port = buffer[0];
-            uint8_t dst_port = buffer[1];
-
-            // sjekk om dette er en ekte MIPTP-pakke (minst 1 + header)
-            if (n >= (ssize_t)(1 + sizeof(miptp_hdr_t))) {
-                miptp_hdr_t *hdr = (miptp_hdr_t *)(buffer + 1);
-                uint16_t seq;
-                uint8_t pad;
-                unpack_seq_pad(hdr->seq_pad, &seq, &pad);
-
-                if (pad == 1) {
-                    printf("[SERVER] Got ACK for seq=%u from port=%d\n", seq, src_port);
-                    continue; // hopp over videre behandling
-                }
-
-                // ellers er det en datapakke
-                size_t payload_len = n - (1 + sizeof(miptp_hdr_t));
-                uint8_t *payload = buffer + 1 + sizeof(miptp_hdr_t);
-
-                printf("[SERVER] Got %zu bytes from port=%d → %d\n", payload_len, src_port, dst_port);
-                printf("[SERVER] Payload: %.*s\n", (int)payload_len, payload);
-
-                // Send ACK tilbake med samme seq:
-                miptp_hdr_t ack_hdr = {0};
-                ack_hdr.src_port = dst_port;
-                ack_hdr.dst_port = src_port;
-                ack_hdr.seq_pad = pack_seq_pad(seq, 1); // pad=1 -> ACK
-
-                uint8_t ack_packet[1 + sizeof(ack_hdr)];
-                ack_packet[0] = 1; // dummy MIP addr
-                memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
-
-                ssize_t sent = write(fd, ack_packet, sizeof(ack_packet));
-                if (sent > 0)
-                    printf("[SERVER] Sent ACK back to port %d (seq=%u, %zd bytes)\n", src_port, seq, sent);
-            }
-        }
-
+        uint8_t src_mip = buf[0];
+        uint8_t src_port = buf[1];
+        printf("[SERVER] Got %zd bytes from MIP=%d, port=%d\n", n, src_mip, src_port);
+        printf("[SERVER] Payload: %.*s\n", (int)(n - 2), buf + 2);
     }
 
     close(fd);
