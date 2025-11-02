@@ -122,25 +122,25 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
             printf("[LOOPBACK] No local receiver on port %d — skipping local delivery\n", dst_port);
         }
 
-        //TEST
-        sleep(1); // simulér RTT
-        miptp_hdr_t ack_hdr = {0};
-        ack_hdr.src_port = hdr.dst_port;
-        ack_hdr.dst_port = hdr.src_port;
-        ack_hdr.seq_pad   = pack_seq_pad(seq, 1);
+        // //TEST
+        // sleep(1); // simulér RTT
+        // miptp_hdr_t ack_hdr = {0};
+        // ack_hdr.src_port = hdr.dst_port;
+        // ack_hdr.dst_port = hdr.src_port;
+        // ack_hdr.seq_pad   = pack_seq_pad(seq, 1);
 
-        uint8_t ack_packet[1 + sizeof(ack_hdr)];
-        ack_packet[0] = 1; // dummy MIP address
-        memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
+        // uint8_t ack_packet[1 + sizeof(ack_hdr)];
+        // ack_packet[0] = 1; // dummy MIP address
+        // memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
 
-        printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
+        // printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
 
-        if (seq % 2 == 0) {
-            printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
-            handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
-        } else {
-            printf("[SIM] Dropping ACK for seq=%u (simulate loss)\n", seq);
-        }
+        // if (seq % 2 == 0) {
+        //     printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
+        //     handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
+        // } else {
+        //     printf("[SIM] Dropping ACK for seq=%u (simulate loss)\n", seq);
+        // }
     
 }
 
