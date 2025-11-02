@@ -55,7 +55,7 @@ int main(void) {
             uint8_t dst_port = buffer[1];
 
             // sjekk om dette er en ekte MIPTP-pakke (minst 1 + header)
-            if (n >= 1 + sizeof(miptp_hdr_t)) {
+            if (n >= (ssize_t)(1 + sizeof(miptp_hdr_t))) {
                 miptp_hdr_t *hdr = (miptp_hdr_t *)(buffer + 1);
                 uint16_t seq;
                 uint8_t pad;
