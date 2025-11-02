@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <time.h>
 #include "miptpd.h"
 
 app_connection app_connections[MAX_APPS] = {0}; //liste over app connections
