@@ -1,8 +1,7 @@
 #!/usr/bin/env python
-
 """
 Mininet script for IN3230/IN4230 – MIPTP test
-Oppsettet etterligner strukturen fra hjemmeeksamen 1.
+Struktur og rekkefølge følger hjemmeeksamen 1-oppsettet (mipd → routingd → miptpd → apper).
 """
 
 from mininet.topo import Topo
@@ -41,22 +40,30 @@ def init_miptp(self, line):
     B = net.get('B')
 
     print("\n=== Starting MIP daemons ===")
-    terms.append(openTerm(self, A, "MIP A", "80x14+0+0", "./mipd -d usockA 42"))
+    terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 42"))
     time.sleep(1)
-    terms.append(openTerm(self, B, "MIP B", "80x14+555+0", "./mipd -d usockB 99"))
+    terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 99"))
+    time.sleep(3)
+
+    print("\n=== Starting routing daemons ===")
+    terms.append(openTerm(self, A, "ROUTING [A]", "80x14+0+220", "./routingd -d usockA"))
+    time.sleep(1)
+    terms.append(openTerm(self, B, "ROUTING [B]", "80x14+555+220", "./routingd -d usockB"))
     time.sleep(3)
 
     print("\n=== Starting MIPTP daemons ===")
-    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+220", "./miptpd usockA miptp_appA.sock"))
-    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+220", "./miptpd usockB miptp_appB.sock"))
+    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd usockA miptp_appA.sock"))
+    time.sleep(1)
+    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd usockB miptp_appB.sock"))
     time.sleep(3)
 
     print("\n=== Launching applications ===")
-    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+220", "./test_server miptp_appB.sock"))
+    # Start server (port 99) på B
+    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+440",
+                          "./test_server miptp_appB.sock"))
     time.sleep(2)
-    # Start client på A (sender til MIP 99)
-    #endret
-    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+440",
+    # Start klient (port 42) på A – sender til MIP 99
+    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+660",
                           "./test_app miptp_appA.sock 'Hello from A' 99"))
 
     print("\n✅ MIPTP test setup complete.")
