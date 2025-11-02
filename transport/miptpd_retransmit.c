@@ -40,18 +40,38 @@ void check_retransmissions() {
         if (connection->app_fd <= 0) continue;
 
         for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) { //går igjennom alle pakker i vinduet for hver applikasjons forbindelse
-            packet_entry *p = &connection->window[j]; //packet entry, holder på seq, data, sent_time og acked
+            packet_entry *p = &connection->window[j]; //peker til packet entry, holder på seq, data, sent_time og acked
 
-            //betingelse for retransmisjon. sjekker:
-                // er pakken ikke bekreftet med ack
-                // er det data her, det vil si er slot in use
-                // har det gått mer enn to sekunder
-            if (!p->acked && p->len > 0 && difftime(now, p->sent_time) > 2.0) { //betingelse for retransmisjon
-                printf("[MIPTPD] Timeout — resending seq=%u port=%d\n",
+            // Hopper over tomme eller allerede ACKede pakker
+            if (p->acked || p->len == 0)
+                continue;
+
+            // Timeout på første uackede pakke - Go back N-resend
+            if (difftime(now, p->sent_time) > 2.0) { // Sjekker om det har gått mer enn 2 sekunder siden den ble sendt
+                printf("[MIPTPD] Timeout on seq=%u (port=%d) — resending window...\n",
                        p->seq, connection->port);
-                ssize_t resent = write(MIP_FD, p->data, p->len); //sender hele pakken på nytt ut på mip laget
-                if (resent > 0)
-                    p->sent_time = now; //setter ny tid hvis sendingen var vellykket
+                // Resender alle pakker fra base_seq til next_seq-1 når en timeout oppstår
+
+                // Starter fra første uackede pakke (vindusstart)
+                uint16_t seq = connection->base_seq;
+
+                while (seq != connection->next_seq) { // sender så lenge man er innen det aktive vinduet
+
+                    int slot = seq % MIPTP_WINDOW_SIZE; //finner bufferplass, sirkulær index i vinduet
+                    packet_entry *r = &connection->window[slot]; // peker til pakken vi jobber med i vinduet
+
+                    if (!r->acked && r->len > 0) { //hvis pakken fortsatt avventer ack + er gyldig
+
+                        ssize_t resent = write(MIP_FD, r->data, r->len);
+                        if (resent > 0) {
+                            r->sent_time = now; //oppdatterer tidspunkt
+                            printf("[MIPTPD] Resent seq=%u (%zd bytes)\n", seq, resent);
+                        }
+                    }
+                    seq = (seq + 1) % MIPTP_MAX_SEQ; //øker sekvensnummer med wrap around mod, sirkulært vindu
+                }
+
+                break; // Kun én timeout-runde per sjekk
             }
         }
     }
@@ -59,3 +79,5 @@ void check_retransmissions() {
 
 // // Fra miptp_retransmit.c
 // void check_retransmissions(void);
+
+

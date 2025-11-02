@@ -112,7 +112,13 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
 
         printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
-        handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
+
+        if (seq % 2 == 0) {
+            printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
+            handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
+        } else {
+            printf("[SIM] Dropping ACK for seq=%u (simulate loss)\n", seq);
+        }
     
 }
 
@@ -173,8 +179,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
             if (idx >= 0) {
                 app_connection *connection = &app_connections[idx];
                 uint16_t ack_seq = seq;
-                //app_connections[idx].last_acked_seq = seq;
-                //app_connections[idx].waiting_for_ack = 0;
 
                 printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
                     seq, hdr.dst_port);
