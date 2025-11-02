@@ -6,24 +6,30 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#define MY_PORT 42
+#define DST_PORT 99
 
 int main(int argc, char *argv[]) {
     const uint8_t my_port = 42;   // appens egen port
 
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <app_socket>\n", argv[0]);
-        exit(EXIT_FAILURE);
+    if (argc < 4 || strcmp(argv[1], "-h") == 0) {
+        printf("Usage: %s <app_socket> <message> <dst_mip>\n", argv[0]);
+        return 0;
     }
 
     const char *socket_arg = argv[1];
-    char socket_path[108];
+    const char *message = argv[2];
+    uint8_t dst_mip = atoi(argv[3]);
+    const uint8_t dst_port = DST_PORT;
 
-    if (socket_arg[0] != '/') {
+    // Bygg UNIX-socket-path (/tmp/)
+    char socket_path[108];
+    if (socket_arg[0] != '/')
         snprintf(socket_path, sizeof(socket_path), "/tmp/%s", socket_arg);
-    } else {
+    else
         strncpy(socket_path, socket_arg, sizeof(socket_path) - 1);
-        socket_path[sizeof(socket_path) - 1] = '\0';
-    }
+
+    printf("[CLIENT] Starting test_app (port %d)\n", MY_PORT);
 
     // Opprett UNIX-socket
     int fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
@@ -53,9 +59,7 @@ int main(int argc, char *argv[]) {
     }
     printf("Sent port number %d to miptpd.\n", my_port);
 
-    // Bygg og send flere meldinger i rask rekkefølge
-    const uint8_t dst_mip = 1;
-    const uint8_t dst_port = 99;
+    
 
     for (int i = 0; i < 5; i++) {
         char msg[64];

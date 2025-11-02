@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         close(mip_fd);
         exit(EXIT_FAILURE);
     }
-
+    if (debug_mode) printf("[MIPTPD] Registered with MIPD (SDU type 0x%02X)\n", sdu_type);
     // Opprett socket for applikasjoner
     int app_listen_fd = create_app_socket(app_path);
 
