@@ -26,44 +26,39 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                        const uint8_t *sdu, uint16_t sdu_len_bytes,
                        size_t *out_len)
 {
-    // SDU må være 32-bit justert
-    uint16_t aligned = (sdu_len_bytes + 3) & ~0x03;
-    uint16_t len_words = aligned / 4;
+    // Beregn antall 32-bits ord (avrund opp)
+    uint16_t len_words = (sdu_len_bytes + 3) / 4;
 
-    // alloker buffer (4 byte header + SDU + pad)
-    size_t total = 4 + aligned;
-    uint8_t *buf = (uint8_t *)malloc(total);
+    // Total faktisk lengde (header + ekte data, ingen padding)
+    size_t total = 4 + sdu_len_bytes;
+    uint8_t *buf = malloc(total);
     if (!buf) {
         perror("malloc mip_build_pdu");
         exit(EXIT_FAILURE);
     }
 
-    // pakk inn headerfeltene
+    // Pakk inn headerfeltene
     buf[0] = dest;
     buf[1] = src;
     buf[2] = ((ttl & 0x0F) << 4) | ((len_words >> 5) & 0x0F);
     buf[3] = ((len_words & 0x1F) << 3) | (sdu_type & 0x07);
 
-    // Kopier SDU + pad
-    if (sdu_len_bytes && sdu) {
+    // Kopier SDU (ingen padding!)
+    if (sdu && sdu_len_bytes)
         memcpy(buf + 4, sdu, sdu_len_bytes);
-    }
-    //pad resterende bytes opp til aligned length
-    if (aligned > sdu_len_bytes) {
-        memset(buf + 4 + sdu_len_bytes, 0, aligned - sdu_len_bytes);
-    }
 
-    // Gi total lengde tilbake til caller
-    if (out_len) *out_len = total;
+    if (out_len)
+        *out_len = total;
 
     if (debug_mode) {
         printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
-               "sdu_len=%u aligned=%u words=%u total=%zu\n\n",
-               dest, src, ttl, sdu_type,
-               sdu_len_bytes, aligned, len_words, total);
+               "sdu_len=%u words=%u total=%zu\n",
+               dest, src, ttl, sdu_type, sdu_len_bytes, len_words, total);
     }
-    return buf; //caller må free()
+
+    return buf; // caller må free()
 }
+
 
 //Tolker og parser en mip pakke fra rådata mottat i handle_raw_packet
 //returnerer en peker til sdu delen - payloaden til pakken
