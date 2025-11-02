@@ -77,8 +77,18 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         update_last_packet_from_fd(app_fd, packet, packet_len);
 
         sleep(1);
-    //  Midlertidig: simuler at vi mottar denne pakken tilbake fra MIP=1
-        handle_incoming_miptp_packet(packet + 1, sizeof(hdr) + payload_len, 1);
+   // --- simuler en ACK-pakke tilbake ---
+        miptp_hdr_t ack_hdr = {0};
+        ack_hdr.src_port = hdr.dst_port;  // server svarer
+        ack_hdr.dst_port = hdr.src_port;  // går tilbake til klienten
+        ack_hdr.seq_pad = pack_seq_pad(seq, 1); // padlen = 1 → ACK
+
+        uint8_t ack_packet[1 + sizeof(ack_hdr)];
+        ack_packet[0] = 1; // MIP=1, spiller ingen rolle her
+        memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
+
+        // Simuler at ACK mottas
+        handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
     }
 }
 
