@@ -18,7 +18,7 @@
 app_connection app_connections[MAX_APPS] = {0}; //liste over app connections
 
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen) {
-    return (seq << 2) | (padlen & 0x03);
+    return (seq << 2) | (padlen & 0x03); //skyver sekvensnummer 2 bits til venstre og OR'er inn padlen i de to nederste bits
 }
 
 void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen) {
@@ -113,4 +113,17 @@ uint16_t get_next_seq(int fd) {
         }
     }
     return 0;
+}
+
+void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len) {
+    for (int i = 0; i < MAX_APPS; i++) {
+        if (app_connections[i].app_fd == fd)
+            memcpy(app_connections[i].last_packet, packet, len);
+            app_connections[i].last_len = len;
+            app_connections[i].last_sent_time = time(NULL);
+            app_connections[i].waiting_for_ack = 1;
+            return;
+    }
+    fprintf(stderr, "[MIPTPD] No connection found for fd=%d (update_last_packet_from_fd)\n", fd);
+    return;
 }

@@ -67,12 +67,15 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     memcpy(packet + 1 + sizeof(hdr), payload, payload_len); //kopierer dataen
 
     // sender pakken til mip deamon for å sende ut på nettverket
+    ssize_t packet_len = 1 + sizeof(hdr) + payload_len;
     ssize_t sent = write(MIP_FD, packet, 1+ sizeof(hdr) + payload_len);
-    if (sent < 0)
+    if (sent < 0){
         perror("[MIPTPD] write to mipd");
-    else
+    }
+    else {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
-    
+        update_last_packet_from_fd(app_fd, packet, packet_len);
+    }
     //  Midlertidig: simuler at vi mottar denne pakken tilbake fra MIP=1
     handle_incoming_miptp_packet(packet + 1, sizeof(hdr) + payload_len, 1);
 

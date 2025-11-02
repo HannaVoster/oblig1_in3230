@@ -38,6 +38,10 @@ typedef struct {
     uint8_t port;
     uint16_t next_seq;
     uint16_t last_acked_seq;
+    uint8_t last_packet[1500]; //pakker som sendes lagres her
+    ssize_t last_len;
+    time_t last_sent_time; //holder styr på tiden for retransmisjon
+    int waiting_for_ack; // 1 når man venter på ack, 0 når ack mottas
 } app_connection;
 
 extern app_connection app_connections[MAX_APPS];
@@ -89,7 +93,7 @@ int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd); //brukes denne?
 uint16_t get_next_seq(int fd);
-
+void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len);
 
 
 #endif
