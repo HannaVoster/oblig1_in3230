@@ -8,8 +8,6 @@ TARGETS = $(BIN_DIR)/miptpd \
            $(BIN_DIR)/miptp_client \
            $(BIN_DIR)/miptp_server
 
-TARGETS = $(BIN_DIR)/miptpd
-
 all: $(BIN_DIR) $(TARGETS)
 
 # Sørgrt for at bin/ finnes
