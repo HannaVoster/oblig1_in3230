@@ -1,31 +1,28 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+
 """
-Mininet script to test MIPTP over MIP daemons
-IN3230/IN4230 — Hanna’s Go-Back-N Test
+Mininet script for IN3230/IN4230 – MIPTP test
+Oppsettet etterligner strukturen fra hjemmeeksamen 1.
 """
 
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.term import tunnelX11
-import os
-import time
-import signal
+import os, time, signal
 
 terms = []
 
 
-# ===== Topology Definition =====
-class MIPTPTestTopo(Topo):
+# ===== TOPOLOGY =====
+class MIPTPTopo(Topo):
     def __init__(self):
         Topo.__init__(self)
-
-        # To noder koblet direkte (A <-> B)
         A = self.addHost('A')
         B = self.addHost('B')
         self.addLink(A, B, bw=10, delay='10ms')
 
 
-# ===== Helper: open XTerm on node =====
+# ===== OPEN TERMINAL =====
 def openTerm(self, node, title, geometry, cmd="bash"):
     display, tunnel = tunnelX11(node)
     return node.popen([
@@ -37,48 +34,34 @@ def openTerm(self, node, title, geometry, cmd="bash"):
     ])
 
 
-# ===== Custom Init Command =====
+# ===== INIT COMMAND =====
 def init_miptp(self, line):
-    """
-    Starts:
-      - 2x MIP daemons (A,B)
-      - 2x MIPTP daemons (A,B)
-      - test_server on B
-      - test_app on A
-    """
-
     net = self.mn
     A = net.get('A')
     B = net.get('B')
 
     print("\n=== Starting MIP daemons ===")
-    terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 42"))
+    terms.append(openTerm(self, A, "MIP A", "80x14+0+0", "./mipd -d usockA 42"))
     time.sleep(1)
-    terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 99"))
-    time.sleep(2)
+    terms.append(openTerm(self, B, "MIP B", "80x14+555+0", "./mipd -d usockB 99"))
+    time.sleep(3)
 
     print("\n=== Starting MIPTP daemons ===")
-    # MIPTP kobles til MIP sin socket + lager egen app-socket
     terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+220", "./miptpd usockA miptp_appA.sock"))
     terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+220", "./miptpd usockB miptp_appB.sock"))
-    time.sleep(2)
+    time.sleep(3)
 
-    print("\n=== Launching test applications ===")
-    # Start server (port 99) på node B
-    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+220", "./bin/test_server miptp_appB.sock"))
+    print("\n=== Launching applications ===")
+    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+220", "./test_server miptp_appB.sock"))
     time.sleep(2)
-
-    # Start client (port 42) på node A
-    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+440", "./bin/test_app miptp_appA.sock"))
+    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+440", "./test_app miptp_appA.sock"))
 
     print("\n✅ MIPTP test setup complete.")
     print("Use the Mininet CLI to monitor logs or type 'exit' to stop.")
 
 
-# ===== Clean Exit =====
+# ===== CLEAN EXIT =====
 orig_EOF = CLI.do_EOF
-
-
 def do_EOF(self, line):
     for t in terms:
         try:
@@ -87,13 +70,8 @@ def do_EOF(self, line):
             pass
     return orig_EOF(self, line)
 
-
 CLI.do_EOF = do_EOF
-
-
-# Register custom Mininet command
 CLI.do_init_miptp = init_miptp
 
+topos = {"miptp": (lambda: MIPTPTopo())}
 
-# ===== Topology Mapping =====
-topos = {"miptp": (lambda: MIPTPTestTopo())}
