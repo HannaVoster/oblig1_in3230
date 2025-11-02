@@ -96,6 +96,10 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     memcpy(packet + offset, payload, payload_len);
     ssize_t packet_len = offset + payload_len;
 
+    printf("[DEBUG][TX->MIPD] First 10 bytes: ");
+    for (size_t i = 0; i < 10; i++) printf("%02X ", packet[i]);
+    printf("\n");
+
     // -- lagrer pakken i sendebuffer for retransmisjon
     int slot = seq % MIPTP_WINDOW_SIZE; // Beregner plass i vinduet (sirkulær buffer)
     connection->window[slot].seq = seq; // Lagrer sekvensnummer i vindusplassen
