@@ -153,9 +153,9 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
     //kopierer ut miptpd header fra buffer
     miptp_hdr_t hdr;
-    memcpy(&hdr, buf, sizeof(hdr));
-    uint8_t *payload = buf + sizeof(hdr);
-    size_t payload_len = len - sizeof(hdr);
+    memcpy(&hdr, buf + 1, sizeof(hdr));
+    uint8_t *payload = buf + 1 + sizeof(hdr);
+    size_t payload_len = len - 1 - sizeof(hdr);
 
 
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
