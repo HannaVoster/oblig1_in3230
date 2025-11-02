@@ -75,10 +75,11 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     else {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
         update_last_packet_from_fd(app_fd, packet, packet_len);
-    }
-    //  Midlertidig: simuler at vi mottar denne pakken tilbake fra MIP=1
-    handle_incoming_miptp_packet(packet + 1, sizeof(hdr) + payload_len, 1);
 
+        sleep(1);
+    //  Midlertidig: simuler at vi mottar denne pakken tilbake fra MIP=1
+        handle_incoming_miptp_packet(packet + 1, sizeof(hdr) + payload_len, 1);
+    }
 }
 
 /*
@@ -137,10 +138,15 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
             for (int i = 0; i < MAX_APPS; i++) {
                 if (app_connections[i].app_fd == fd) {
                     app_connections[i].last_acked_seq = seq;
-                    break;
+                    app_connections[i].waiting_for_ack = 0;
+                    printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
+                       seq, hdr.dst_port);
+                    return;
                 }
             }
         }
+        printf("[MIPTPD] ACK received but no matching connection found (dst_port=%d)\n",
+               hdr.dst_port);
         return;
     }
     
@@ -149,8 +155,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     if (app_fd < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr.dst_port);
         return;
-        return;
-
     }
     
     uint8_t msg[2 + payload_len];
@@ -177,8 +181,8 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
 void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq) {
     miptp_hdr_t hdr = {0};
-    hdr.src_port = src_port;
-    hdr.dst_port = dst_port;
+    hdr.src_port = dst_port; // egen port er nå source
+    hdr.dst_port = src_port; // sender tilbake ack til source
 
     // padlen=1 (ACK-type), sekvensnummer settes som vanlig
     hdr.seq_pad = pack_seq_pad(seq, 1);
