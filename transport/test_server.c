@@ -48,38 +48,49 @@ int main(void) {
     while (1) {
         uint8_t buf[1500];
         ssize_t n = read(fd, buf, sizeof(buf));
-        if (n <= 0) {
-            printf("[SERVER] Connection closed or error.\n");
-            break;
+        uint8_t buffer[1500];
+        ssize_t n = read(fd, buffer, sizeof(buffer));
+
+        if (n > 0) {
+            uint8_t src_port = buffer[0];
+            uint8_t dst_port = buffer[1];
+
+            // sjekk om dette er en ekte MIPTP-pakke (minst 1 + header)
+            if (n >= 1 + sizeof(miptp_hdr_t)) {
+                miptp_hdr_t *hdr = (miptp_hdr_t *)(buffer + 1);
+                uint16_t seq;
+                uint8_t pad;
+                unpack_seq_pad(hdr->seq_pad, &seq, &pad);
+
+                if (pad == 1) {
+                    printf("[SERVER] Got ACK for seq=%u from port=%d\n", seq, src_port);
+                    continue; // hopp over videre behandling
+                }
+
+                // ellers er det en datapakke
+                size_t payload_len = n - (1 + sizeof(miptp_hdr_t));
+                uint8_t *payload = buffer + 1 + sizeof(miptp_hdr_t);
+
+                printf("[SERVER] Got %zu bytes from port=%d → %d\n", payload_len, src_port, dst_port);
+                printf("[SERVER] Payload: %.*s\n", (int)payload_len, payload);
+
+                // Send ACK tilbake med samme seq:
+                miptp_hdr_t ack_hdr = {0};
+                ack_hdr.src_port = dst_port;
+                ack_hdr.dst_port = src_port;
+                ack_hdr.seq_pad = pack_seq_pad(seq, 1); // pad=1 -> ACK
+
+                uint8_t ack_packet[1 + sizeof(ack_hdr)];
+                ack_packet[0] = 1; // dummy MIP addr
+                memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
+
+                ssize_t sent = write(fd, ack_packet, sizeof(ack_packet));
+                if (sent > 0)
+                    printf("[SERVER] Sent ACK back to port %d (seq=%u, %zd bytes)\n", src_port, seq, sent);
+            }
         }
 
-        uint8_t src_port = buf[0];  // avsenderens port (fra klienten)
-        uint8_t dst_port = my_port; // denne serverens port
-
-        printf("[SERVER] Got %zd bytes from port=%d → %d\n", n, src_port, dst_port);
-        printf("[SERVER] Payload: %.*s\n", (int)(n - 2), buf + 2);
-
-            //-------------------------------------------------------------
-        // 👇 SEND ET EKTE MIPTP-ACK
-        //-------------------------------------------------------------
-        miptp_hdr_t ack_hdr = {0};
-        ack_hdr.src_port = dst_port;  // fra denne appen (server)
-        ack_hdr.dst_port = src_port;  // tilbake til klienten
-        ack_hdr.seq_pad = pack_seq_pad(0, 1); // pad = 1 betyr "ACK"
-
-        uint8_t ack_packet[1 + sizeof(ack_hdr)];
-        ack_packet[0] = 1; // dummy MIP-adresse, brukes ikke lokalt
-        memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
-
-        // send til MIPTPD
-        ssize_t sent = write(fd, ack_packet, sizeof(ack_packet));
-        if (sent > 0)
-            printf("[SERVER] Sent MIPTP ACK back to port %d (%zd bytes)\n", src_port, sent);
-        else
-            perror("[SERVER] Failed to send ACK");
-
-        }
-
+    }
 
     close(fd);
     return 0;
