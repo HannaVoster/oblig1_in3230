@@ -73,7 +73,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     miptp_hdr_t hdr = {0};
     hdr.src_port = src_port;
     hdr.dst_port = dst_port;
-    hdr.seq_pad = htons(pack_seq_pad(seq, 0));// 0 = data, ikke ack
+    hdr.seq_pad = pack_seq_pad(seq, 0);// 0 = data, ikke ack
     printf("[MIPTPD] Sending seq=%u from port %d\n", seq, src_port);
 
     // -- Bygger selve MIPTP-pakken, [Header][Payload]
@@ -177,7 +177,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     printf("[DEBUG] Raw incoming MIPTP packet (len=%zu): ", len);
     for (size_t i = 0; i < len; i++) printf("%02X ", buf[i]);
     printf("\n");
-    
+
     //kopierer ut miptpd header fra buffer
     miptp_hdr_t hdr;
     memcpy(&hdr, buf+1, sizeof(hdr));
