@@ -41,32 +41,33 @@ int main(void) {
     }
     printf("Sent port number %d to miptpd.\n", my_port);
 
-    // 2️⃣ Bygg meldingen: [dst_mip][dst_port][payload...]
-    const char *message = "Hello from test_app!";
-    size_t msg_len = strlen(message);
+    // Bygg og send flere meldinger i rask rekkefølge
+    const uint8_t dst_mip = 1;
+    const uint8_t dst_port = 99;
 
-    uint8_t packet[2 + msg_len];
-    packet[0] = dst_mip;
-    packet[1] = dst_port;
-    memcpy(packet + 2, message, msg_len);
+    for (int i = 0; i < 5; i++) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Hello #%d from port %d", i, my_port);
 
-    // 3️⃣ Send meldingen
-    ssize_t sent = write(fd, packet, sizeof(packet));
-    if (sent < 0) {
-        perror("write message");
-    } else {
-        printf("Sent message to MIP=%d, port=%d (%zd bytes)\n", dst_mip, dst_port, sent);
+        uint8_t packet[2 + strlen(msg)];
+        packet[0] = dst_mip;  // Hvem vi sender til
+        packet[1] = dst_port; // Hvilken port hos mottaker
+        memcpy(packet + 2, msg, strlen(msg));
+
+        ssize_t sent = write(fd, packet, sizeof(packet));
+        if (sent < 0) {
+            perror("write message");
+            break;
+        }
+
+        printf("[CLIENT] Sent message %d (%zd bytes)\n", i, sent);
+        usleep(200000); // 0.2 sek mellom sendingene for tydelig logging
     }
 
-    // 4️⃣ (Valgfritt) Vent på svar
-    uint8_t buf[256];
-    ssize_t n = read(fd, buf, sizeof(buf));
-    if (n > 0) {
-        printf("Got reply: %.*s\n", (int)n, buf);
-    } else {
-        printf("No reply or connection closed.\n");
-    }
+    printf("[CLIENT] All messages sent, waiting for potential responses...\n");
 
+    // Valgfritt: vent litt for å se eventuelle svar
+    sleep(3);
     close(fd);
     return 0;
 }
