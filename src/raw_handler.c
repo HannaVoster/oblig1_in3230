@@ -356,59 +356,59 @@ int forward_packet(int my_mip_address,
     return 1;
 }
 //HJEMMEEKSAMEN 2
-// void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length) {
-//     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-//         if (unix_clients[i].active &&
-//             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
-            
-//             printf("[DEBUG][MIPD->MIPTPD] Forwarding %zd bytes to MIPTPD:\n", length);
-//             for (size_t i = 0; i < length && i < 32; i++) printf("%02X ", payload[i]);
-//             printf("\n");
-
-
-//             ssize_t n = write(unix_clients[i].fd, payload, length);
-//             if (n < 0){
-//                 perror("[MIPD] write to MIPTPD failed");
-//             }
-//             else {
-//                 printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src = %d, dest = %d\n",
-//                         n, unix_clients[i].fd, src, dest);
-//                 print_payload_hex(payload, length);
-//             }
-//             return;
-//         }
-//     }
-//     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
-// }
-
 void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length) {
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active &&
             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
             
-            uint8_t buffer[2048];
-            size_t total = 1 + length;
+            printf("[DEBUG][MIPD->MIPTPD] Forwarding %zd bytes to MIPTPD:\n", length);
+            for (size_t i = 0; i < length && i < 32; i++) printf("%02X ", payload[i]);
+            printf("\n");
 
-            buffer[0] = dest; // gjeninnfør MIP-dest i starten
-            memcpy(buffer + 1, payload, length);
 
-            printf("[DEBUG][MIPD->MIPTPD] Forwarding %zu bytes to MIPTPD (with dst_mip=%d)\n",
-                   total, dest);
-            print_payload_hex(buffer, total);
-
-            ssize_t n = write(unix_clients[i].fd, buffer, total);
-            if (n < 0) {
+            ssize_t n = write(unix_clients[i].fd, payload, length);
+            if (n < 0){
                 perror("[MIPD] write to MIPTPD failed");
-            } else {
-                printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src=%d dest=%d\n",
-                       n, unix_clients[i].fd, src, dest);
             }
-
+            else {
+                printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src = %d, dest = %d\n",
+                        n, unix_clients[i].fd, src, dest);
+                print_payload_hex(payload, length);
+            }
             return;
         }
     }
     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
 }
+
+// void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length) {
+//     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+//         if (unix_clients[i].active &&
+//             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
+            
+//             uint8_t buffer[2048];
+//             size_t total = 1 + length;
+
+//             buffer[0] = dest; // gjeninnfør MIP-dest i starten
+//             memcpy(buffer + 1, payload, length);
+
+//             printf("[DEBUG][MIPD->MIPTPD] Forwarding %zu bytes to MIPTPD (with dst_mip=%d)\n",
+//                    total, dest);
+//             print_payload_hex(buffer, total);
+
+//             ssize_t n = write(unix_clients[i].fd, buffer, total);
+//             if (n < 0) {
+//                 perror("[MIPD] write to MIPTPD failed");
+//             } else {
+//                 printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src=%d dest=%d\n",
+//                        n, unix_clients[i].fd, src, dest);
+//             }
+
+//             return;
+//         }
+//     }
+//     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
+// }
 
 
 
