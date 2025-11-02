@@ -6,7 +6,10 @@ SRC_DIR = .
 
 TARGETS = $(BIN_DIR)/miptpd \
            $(BIN_DIR)/miptpd_client \
-           $(BIN_DIR)/miptpd_server
+           $(BIN_DIR)/miptpd_server \
+           $(BIN_DIR)/test_app \
+           $(BIN_DIR)/test_server
+
 
 all: $(BIN_DIR) $(TARGETS)
 
@@ -30,6 +33,15 @@ $(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c $(SRC_DIR)/miptpd.h
 
 $(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c $(SRC_DIR)/miptpd.h
 	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_server.c
+
+#TESTER
+# Test applications
+$(BIN_DIR)/test_app: $(SRC_DIR)/test_app.c $(SRC_DIR)/miptpd.h
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/test_app.c
+
+$(BIN_DIR)/test_server: $(SRC_DIR)/test_server.c $(SRC_DIR)/miptpd.h
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/test_server.c
+
 
 clean:
 	rm -f $(BIN_DIR)/miptpd $(BIN_DIR)/miptpd_client $(BIN_DIR)/miptpd_server

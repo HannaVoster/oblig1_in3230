@@ -16,7 +16,8 @@ install:
 	cp -u bin/ping_client .
 	cp -u bin/ping_server .
 	cp -u bin/routingd .
-
+	cp -u bin/test_app .
+	cp -u bin/test_server .
 clean:
 	$(MAKE) -C src clean
 	$(MAKE) -C transport clean
