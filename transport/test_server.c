@@ -49,7 +49,6 @@ int main(void) {
         uint8_t buf[1500];
         ssize_t n = read(fd, buf, sizeof(buf));
         uint8_t buffer[1500];
-        ssize_t n = read(fd, buffer, sizeof(buffer));
 
         if (n > 0) {
             uint8_t src_port = buffer[0];
