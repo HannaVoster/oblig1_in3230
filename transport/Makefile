@@ -4,9 +4,9 @@ CFLAGS  = -Wall -Wextra -g -I../include
 BIN_DIR = ../bin
 SRC_DIR = .
 
-# TARGETS = $(BIN_DIR)/miptpd \
-#            $(BIN_DIR)/miptp_client \
-#            $(BIN_DIR)/miptp_server
+TARGETS = $(BIN_DIR)/miptpd \
+           $(BIN_DIR)/miptp_client \
+           $(BIN_DIR)/miptp_server
 
 TARGETS = $(BIN_DIR)/miptpd
 
