@@ -5,8 +5,8 @@ BIN_DIR = ../bin
 SRC_DIR = .
 
 TARGETS = $(BIN_DIR)/miptpd \
-           $(BIN_DIR)/miptp_client \
-           $(BIN_DIR)/miptp_server
+           $(BIN_DIR)/miptpd_client \
+           $(BIN_DIR)/miptpd_server
 
 all: $(BIN_DIR) $(TARGETS)
 
