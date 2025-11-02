@@ -58,7 +58,7 @@ typedef struct {
 extern app_connection app_connections[MAX_APPS];
 
 // Oppstart og initiering
-int main(int argc, char *argv[]);
+
 // void init_unix_socket(const char *path);
 // void init_mip_socket(const char *path);
 
