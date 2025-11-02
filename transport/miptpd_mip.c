@@ -172,7 +172,12 @@ Ansvar:
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     // er pakken stor nok til å ha en header
     if (len < sizeof(miptp_hdr_t)) return;
-
+    
+     // Debug: dump hele rå MIPTP-pakken slik den kommer fra mipd
+    printf("[DEBUG] Raw incoming MIPTP packet (len=%zu): ", len);
+    for (size_t i = 0; i < len; i++) printf("%02X ", buf[i]);
+    printf("\n");
+    
     //kopierer ut miptpd header fra buffer
     miptp_hdr_t hdr;
     memcpy(&hdr, buf+1, sizeof(hdr));
