@@ -88,8 +88,7 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
     *sdu_type = rcv[3] & 0x07;
 
     // beregner sdu lengde i bytes
-    //size_t sdu_bytes = (size_t)len_words * 4;
-    size_t sdu_bytes = rcv_len - 4;
+    size_t sdu_bytes = (size_t)len_words * 4;
 
     // Sjekk at bufferen faktisk er stor nok til å inneholde alt
     if (rcv_len < 4 + sdu_bytes) return -1;
