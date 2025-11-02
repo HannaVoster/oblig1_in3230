@@ -78,10 +78,21 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
 
     // -- Bygger selve MIPTP-pakken, [Header][Payload]
     uint8_t packet[1500];
-    packet[0] = dst_mip;
-    memcpy(packet + 1, &hdr, sizeof(hdr)); //kopierer MIPTP-header til pakken
-    memcpy(packet + 1 + sizeof(hdr), payload, payload_len); //kopierer dataen
-    ssize_t packet_len = 1 + sizeof(hdr) + payload_len;
+    size_t offset = 0;
+
+    packet[offset++] = dst_mip;
+    // src_port
+    packet[offset++] = src_port;
+    // dst_port
+    packet[offset++] = dst_port;
+    // seq_pad
+    uint16_t seq_pad_net = pack_seq_pad(seq, 0);
+    memcpy(packet + offset, &seq_pad_net, sizeof(uint16_t));
+    offset += sizeof(uint16_t);
+
+    // payload
+    memcpy(packet + offset, payload, payload_len);
+    ssize_t packet_len = offset + payload_len;
 
     // -- lagrer pakken i sendebuffer for retransmisjon
     int slot = seq % MIPTP_WINDOW_SIZE; // Beregner plass i vinduet (sirkulær buffer)
@@ -93,8 +104,8 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     connection->window[slot].acked = 0;   // Setter ACK-status til 0 — den er sendt, men ikke bekreftet
 
     // sender pakken til mip deamon for å sende ut på nettverket
-    ssize_t sent = write(MIP_FD, packet, 1+ sizeof(hdr) + payload_len);
-    
+    ssize_t sent = write(MIP_FD, packet, packet_len);
+
 
     if (sent < 0){
         perror("[MIPTPD] write to mipd");
