@@ -22,6 +22,7 @@ main funksjon og event loop
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include "miptpd.h"   // felles header for MIPTP
