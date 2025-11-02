@@ -75,6 +75,7 @@ void handle_app_message(int app_fd);
 // // Fra miptp_mip.c
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
 void send_miptp_data(int app_fd, uint8_t *data, size_t len);
+void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq);
 
 // // Fra miptp_retransmit.c
 // void check_retransmissions(void);
