@@ -28,5 +28,6 @@ int forward_packet(int my_mip_address,
 
 //HJEMMEEKSAMEN 2
 void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length);
+void print_payload_hex(const uint8_t *data, size_t len);
 
 #endif

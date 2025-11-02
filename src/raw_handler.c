@@ -362,11 +362,30 @@ void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, siz
             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
             
             ssize_t n = write(unix_clients[i].fd, payload, length);
-            if (n < 0) perror("[MIPD] write to MIPTPD failed");
-            else printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src = %d, dest = %d\n",
+            if {
+                (n < 0) perror("[MIPD] write to MIPTPD failed");
+            }
+            else {
+                printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src = %d, dest = %d\n",
                         n, unix_clients[i].fd, src, dest);
+                print_payload_hex(payload, length);
+            }
             return;
         }
     }
     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
+}
+
+void print_payload_hex(const uint8_t *data, size_t len) {
+    printf("[MIPD] Payload dump (%zu bytes):\n", len);
+    for (size_t i = 0; i < len; i++) {
+        printf("%02X ", data[i]);
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\nASCII: ");
+    for (size_t i = 0; i < len; i++) {
+        char c = (data[i] >= 32 && data[i] <= 126) ? data[i] : '.';
+        printf("%c", c);
+    }
+    printf("\n");
 }
