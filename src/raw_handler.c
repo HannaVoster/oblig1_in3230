@@ -361,6 +361,11 @@ void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, siz
         if (unix_clients[i].active &&
             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
             
+            printf("[DEBUG][MIPD->MIPTPD] Forwarding %zd bytes to MIPTPD:\n", length);
+            for (size_t i = 0; i < length && i < 32; i++) printf("%02X ", payload[i]);
+            printf("\n");
+
+
             ssize_t n = write(unix_clients[i].fd, payload, length);
             if (n < 0){
                 perror("[MIPD] write to MIPTPD failed");

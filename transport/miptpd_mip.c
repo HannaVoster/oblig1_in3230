@@ -106,6 +106,9 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     connection->window[slot].acked = 0;   // Setter ACK-status til 0 — den er sendt, men ikke bekreftet
 
     // sender pakken til mip deamon for å sende ut på nettverket
+    printf("[DEBUG][TX->MIPD] Sending %zd bytes: ", packet_len);
+    for (size_t i = 0; i < packet_len; i++) printf("%02X ", packet[i]);
+    printf("\n");
     ssize_t sent = write(MIP_FD, packet, packet_len);
 
 
@@ -145,6 +148,10 @@ Ansvar:
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     // er pakken stor nok til å ha en header
     if (len < sizeof(miptp_hdr_t)) return;
+
+    printf("[DEBUG][RX<-MIPD] First 10 bytes: ");
+    for (size_t i = 0; i < len && i < 10; i++) printf("%02X ", buf[i]);
+    printf("\n");
     
      // Debug: dump hele rå MIPTP-pakken slik den kommer fra mipd
     printf("[DEBUG] Raw incoming MIPTP packet (len=%zu): ", len);
