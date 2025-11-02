@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     }
     printf("Sent port number %d to miptpd.\n", my_port);
 
-    
+    usleep(50000);
 
     for (int i = 0; i < 5; i++) {
         char msg[64];

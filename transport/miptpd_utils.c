@@ -19,14 +19,17 @@
 
 app_connection app_connections[MAX_APPS] = {0}; //liste over app connections
 
-uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen) {
-    return (seq << 2) | (padlen & 0x03); //skyver sekvensnummer 2 bits til venstre og OR'er inn padlen i de to nederste bits
+// 16 bits total: [type(2 bits)][sequence(14 bits)]
+uint16_t pack_seq_pad(uint16_t seq, uint8_t type) {
+    // type legges i de to høyeste bitene
+    return ((type & 0x03) << 14) | (seq & 0x3FFF);
 }
 
-void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen) {
-    *padlen = seq_pad & 0x03;
-    *seq = seq_pad >> 2;
+void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *type) {
+    *type = (seq_pad >> 14) & 0x03;   // hent de to øverste bitene
+    *seq  = seq_pad & 0x3FFF;         // hent de nederste 14 bitene
 }
+
 
 /*
   Registrerer en ny applikasjon i tabellen
