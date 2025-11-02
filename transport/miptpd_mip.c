@@ -93,12 +93,34 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
 
     // sender pakken til mip deamon for å sende ut på nettverket
     ssize_t sent = write(MIP_FD, packet, 1+ sizeof(hdr) + payload_len);
+
     if (sent < 0){
         perror("[MIPTPD] write to mipd");
     }
     else {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
      }
+
+            //-------------------------------------------------------------
+    // 👇 LOKAL LOOPBACK-SIMULERING
+    //-------------------------------------------------------------
+        int dest_fd = get_fd_from_port(dst_port); // Finn mottaker-app via port
+        if (dest_fd > 0) {
+            uint8_t msg[2 + payload_len];
+            msg[0] = hdr.src_port;   // avsenderport (så mottaker vet hvem det er fra)
+            msg[1] = dst_port;       // mottakerport
+            memcpy(msg + 2, payload, payload_len);
+
+            ssize_t delivered = write(dest_fd, msg, sizeof(msg));
+            if (delivered > 0) {
+                printf("[LOOPBACK] Delivered %zd bytes locally to app port %d (fd=%d)\n",
+                    delivered, dst_port, dest_fd);
+            } else {
+                perror("[LOOPBACK] write to local app failed");
+            }
+        } else {
+            printf("[LOOPBACK] No local receiver on port %d — skipping local delivery\n", dst_port);
+        }
 
         //TEST
         sleep(1); // simulér RTT
