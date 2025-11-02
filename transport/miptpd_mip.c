@@ -41,48 +41,47 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         return;
     }
 
-    miptp_hdr_t hdr = {0};
-
+    // -- pakker ut app meldingen
     uint8_t dst_mip  = data[0]; // der pakken skal
     uint8_t dst_port = data[1]; //porten pakkes skal sendes ut på
     uint8_t *payload = data + 2; //selve dataen som skal sendes
     size_t payload_len = len - 2; //lengden på dataen, -2 siden dst_mip og dst_port har data[0] og data[1]
 
-    // henter faktisk port fra app_fd (lagret i en connections_table)
+    // -- henter faktisk port fra app_fd (lagret i en connections_table)
     uint8_t src_port = get_port_from_fd(app_fd);
 
-    // Lager selve MIPTP-header
-    hdr.src_port = src_port;
-    hdr.dst_port = dst_port;
-
-    uint16_t seq = get_next_seq(app_fd); //henter og øker seq
-    hdr.seq_pad = pack_seq_pad(seq, 0); 
-    printf("[MIPTPD] Sending seq=%u from port %d\n", seq, hdr.src_port);
-
-    // Bygger MIPTP-pakken, [Header][Payload]
-    uint8_t packet[1500];
-    packet[0] = dst_mip;
-
-    memcpy(packet + 1, &hdr, sizeof(hdr)); //kopierer MIPTP-header til pakken
-    memcpy(packet + 1 + sizeof(hdr), payload, payload_len); //kopierer dataen
-    ssize_t packet_len = 1 + sizeof(hdr) + payload_len;
-    //SJEKKER OM VINDU ER FULLT
+    //-- finner riktig forbindelse
     int idx = get_index(app_fd);
     if (idx < 0) return;
 
     app_connection *connection = &app_connections[idx];
 
-    // sjekk om vinduet er fullt
+     // -- sjekker om vinduet er fullt
     if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {
         // Hvis antall pakker i flyt (next_seq - base_seq) er lik vindusstørrelsen
         printf("[MIPTPD] Window full for port %d — cannot send yet\n", connection->port);
         return;
     }
 
+    // -- setter sekvensnummer
     uint16_t seq = connection->next_seq; // Bruker gjeldende next_seq som sekvensnummer for denne pakken
     connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ; // mod 2^14 for å håndtere sekvens-wraparound
 
-    
+    // -- Lager selve MIPTP-header
+    miptp_hdr_t hdr = {0};
+    hdr.src_port = src_port;
+    hdr.dst_port = dst_port;
+    hdr.seq_pad = pack_seq_pad(seq, 0); // 0 = data, ikke ack
+    printf("[MIPTPD] Sending seq=%u from port %d\n", seq, src_port);
+
+    // -- Bygger selve MIPTP-pakken, [Header][Payload]
+    uint8_t packet[1500];
+    packet[0] = dst_mip;
+    memcpy(packet + 1, &hdr, sizeof(hdr)); //kopierer MIPTP-header til pakken
+    memcpy(packet + 1 + sizeof(hdr), payload, payload_len); //kopierer dataen
+    ssize_t packet_len = 1 + sizeof(hdr) + payload_len;
+
+    // -- lagrer pakken i sendebuffer for retransmisjon
     int slot = seq % MIPTP_WINDOW_SIZE; // Beregner plass i vinduet (sirkulær buffer)
     connection->window[slot].seq = seq; // Lagrer sekvensnummer i vindusplassen
     connection->window[slot].len = packet_len; // Lagre hvor lang pakken er (for retransmisjon)
@@ -98,7 +97,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     }
     else {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
-        update_last_packet_from_fd(app_fd, packet, packet_len);
+     }
 
         //TEST
         sleep(1); // simulér RTT
@@ -113,7 +112,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
 
         printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
         handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
-    }
+    
 }
 
 /*
