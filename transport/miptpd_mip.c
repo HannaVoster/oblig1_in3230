@@ -55,7 +55,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     hdr.src_port = src_port;
     hdr.dst_port = dst_port;
 
-    uint16_t seq = app_connections[get_index(app_fd)].next_seq++;
+    uint16_t seq = get_next_seq(app_fd); //henter og øker seq
     hdr.seq_pad = pack_seq_pad(seq, 0); 
     printf("[MIPTPD] Sending seq=%u from port %d\n", seq, hdr.src_port);
 
@@ -115,12 +115,33 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len);
     
-    uint16_t seq = (hdr.seq_pad) >> 2; // hent 14-bit sekvens
-    uint8_t pad = hdr.seq_pad & 0x3; //brukes senere for padding controll
+    // uint16_t seq = (hdr.seq_pad) >> 2; // hent 14-bit sekvens
+    // uint8_t pad = hdr.seq_pad & 0x3; //brukes senere for padding controll
+
+    uint16_t seq;
+    uint8_t pad;
+
+    unpack_seq_pad(hdr.seq_pad, &seq, &pad);
 
     printf("[MIPTPD] Got packet seq=%u src_port=%d dst_port=%d len=%zu\n",
        seq, hdr.src_port, hdr.dst_port, payload_len);
 
+    // ACK pdu
+    if (pad == 1) {
+        int fd = get_fd_from_port(hdr.dst_port);
+        if (fd >= 0) {
+            printf("[MIPTPD] Got ACK for seq=%u on port %d\n", seq, hdr.dst_port);
+            for (int i = 0; i < MAX_APPS; i++) {
+                if (app_connections[i].app_fd == fd) {
+                    app_connections[i].last_acked_seq = seq;
+                    break;
+                }
+            }
+        }
+        return;
+    }
+    
+    //data pdu
     int app_fd = get_fd_from_port(hdr.dst_port);
     if (app_fd < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr.dst_port);
@@ -135,6 +156,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     memcpy(msg + 2, payload, payload_len);
 
     ssize_t sent = write(app_fd, msg, sizeof(msg));
+    send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, seq);
  
     if (sent > 0) {
     printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n",
@@ -146,8 +168,30 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
             if (app_connections[i].app_fd)
                 fprintf(stderr, "  [%d] fd=%d port=%d\n",
                         i, app_connections[i].app_fd, app_connections[i].port);
+    }
 }
+
+
+void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq) {
+    miptp_hdr_t hdr = {0};
+    hdr.src_port = src_port;
+    hdr.dst_port = dst_port;
+
+    // padlen=1 (ACK-type), sekvensnummer settes som vanlig
+    hdr.seq_pad = pack_seq_pad(seq, 1);
+
+    // Bygg pakken
+    uint8_t packet[1 + sizeof(hdr)];
+    packet[0] = dst_mip;
+    memcpy(packet + 1, &hdr, sizeof(hdr));
+
+    ssize_t sent = write(MIP_FD, packet, sizeof(packet));
+    if (sent < 0)
+        perror("[MIPTPD] write ACK to mipd");
+    else
+        printf("[MIPTPD] Sent ACK (seq=%u) to MIP %d, port=%d\n", seq, dst_mip, dst_port);
 }
+
 
 
 // int init_mip_socket(const char *path);
@@ -159,3 +203,12 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 // // Fra miptp_mip.c
 // void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
 // void send_miptp_data(int app_fd, uint8_t *data, size_t len);
+
+
+/*
+  Sender en MIPTP-ACK tilbake til avsender.
+  - dst_mip: MIP-adressen pakken skal til
+  - src_port: porten som sender ACK (vår port)
+  - dst_port: porten vi svarer til
+  - seq: sekvensnummeret vi bekrefter
+*/

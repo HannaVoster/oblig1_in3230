@@ -105,3 +105,12 @@ int get_index(int fd){
     fprintf(stderr, "[MIPTPD] No index found for fd=%d\n", fd);
     return -1;
 }
+
+uint16_t get_next_seq(int fd) {
+    for (int i = 0; i < MAX_APPS; i++) {
+        if (app_connections[i].app_fd == fd) {
+            return app_connections[i].next_seq++;
+        }
+    }
+    return 0;
+}

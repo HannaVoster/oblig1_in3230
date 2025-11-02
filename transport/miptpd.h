@@ -86,7 +86,8 @@ uint8_t get_port_from_fd(int fd);
 int remove_app_connection(int fd);
 int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
-int get_index(int fd);
+int get_index(int fd); //brukes denne?
+uint16_t get_next_seq(int fd);
 
 
 
