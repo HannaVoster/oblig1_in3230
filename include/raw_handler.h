@@ -26,4 +26,7 @@ int forward_packet(int my_mip_address,
                    uint8_t dest, uint8_t src, uint8_t ttl,
                    uint8_t sdu_type, const uint8_t *sdu, ssize_t sdu_len);
 
+//HJEMMEEKSAMEN 2
+void handle_miptp_message(uint8_t *payload, size_t length);
+
 #endif

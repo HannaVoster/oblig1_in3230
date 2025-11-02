@@ -126,6 +126,11 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
             handle_arp_message(raw_sock, my_mip_address, payload, length, eh, src_addr.sll_ifindex, src);
             break;
         }
+
+        case MIPTP_SDU_TYPE: {
+            handle_miptp_message(payload, length); //HJEMMEEKSAMEN 2
+            break;
+        }
            
         default:
             printf("[RAW] Ukjent SDU-type: %u\n\n", sdu_type);
@@ -349,4 +354,19 @@ int forward_packet(int my_mip_address,
         printf("[DEBUG][RAW][FWD] Route request sendt til routingd, pakke lagret midlertidig.\n");
 
     return 1;
+}
+//HJEMMEEKSAMEN 2
+void handle_miptp_message(uint8_t *payload, size_t length) {
+    for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
+        if (unix_clients[i].active &&
+            unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
+            
+            ssize_t n = write(unix_clients[i].fd, payload, length);
+            if (n < 0) perror("[MIPD] write to MIPTPD failed");
+            else printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d)\n",
+                        n, unix_clients[i].fd);
+            return;
+        }
+    }
+    printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
 }
