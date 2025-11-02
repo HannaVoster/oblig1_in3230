@@ -27,11 +27,11 @@ MIPTPD_SRC = $(SRC_DIR)/miptpd.c \
 $(BIN_DIR)/miptpd: $(MIPTPD_SRC) $(SRC_DIR)/miptpd.h
 	$(CC) $(CFLAGS) -o $@ $(MIPTPD_SRC)
 
-# $(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c $(SRC_DIR)/miptpd.h
-# 	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_client.c
+$(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c $(SRC_DIR)/miptpd.h
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_client.c
 
-# $(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c $(SRC_DIR)/miptpd.h
-# 	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_server.c
+$(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c $(SRC_DIR)/miptpd.h
+	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_server.c
 
 clean:
 	rm -f $(BIN_DIR)/miptpd $(BIN_DIR)/miptpd_client $(BIN_DIR)/miptpd_server
