@@ -31,27 +31,35 @@ void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen) {
 /*
   Registrerer en ny applikasjon i tabellen
   Returnerer 0 ved suksess, -1 hvis tabellen er full
- */
+*/
 int new_app_connection(int fd, uint8_t port) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == 0) {
             app_connections[i].app_fd = fd;
             app_connections[i].port = port;
-            app_connections[i].next_seq = 0;
-            app_connections[i].last_acked_seq = 0;
-            printf("[MIPTPD] Registered app fd=%d on port %d\n", fd, port);
 
-            printf("[DEBUG] Table after adding port %d:\n", port);
-            for (int i = 0; i < MAX_APPS; i++)
-                if (app_connections[i].app_fd)
-                    printf("  [%d] fd=%d port=%d\n", i, app_connections[i].app_fd, app_connections[i].port);
+            // Initialiser Go-Back-N tilstand
+            app_connections[i].base_seq = rand() % MIPTP_MAX_SEQ; // starter med tilfeldig sekvensnummer
+            app_connections[i].next_seq = app_connections[i].base_seq;
+            app_connections[i].window_count = 0;
+
+            // Nullstill vinduet
+            for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) {
+                app_connections[i].window[j].acked = 1; // tom plass
+                app_connections[i].window[j].len = 0;
+            }
+
+            printf("[MIPTPD] Registered app fd=%d on port %d (seq start=%u)\n",
+                   fd, port, app_connections[i].base_seq);
 
             return 0;
         }
     }
+
     fprintf(stderr, "[MIPTPD] Connection table full, could not register app fd=%d\n", fd);
     return -1;
 }
+
 
 /*
   Fjerner en app fra tabellen når socketen lukkes
@@ -59,9 +67,9 @@ int new_app_connection(int fd, uint8_t port) {
 int remove_app_connection(int fd) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == fd) {
-            app_connections[i].app_fd = 0;
-            app_connections[i].port = 0;
             printf("[MIPTPD] Removed app fd=%d\n", fd);
+            // Nullstill hele strukturen
+            memset(&app_connections[i], 0, sizeof(app_connection));
             return 0;
         }
     }
