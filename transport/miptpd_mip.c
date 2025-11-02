@@ -198,6 +198,11 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
                 // marker pakken som ACKet
                 int slot = ack_seq % MIPTP_WINDOW_SIZE; // Finner posisjonen i vinduet (mod MIPTP_WINDOW_SIZE for sirkulær buffer)
+                if (connection->window[slot].acked) {
+                    printf("[DEBUG] Duplicate ACK ignored (seq=%u)\n", ack_seq);
+                    return; // vi trenger ikke gjøre mer
+                }
+
                 connection->window[slot].acked = 1; //markerer pakken som mottatt
 
                 // flytter base_seq frem hvis mulig (ruller frem vinduet)
