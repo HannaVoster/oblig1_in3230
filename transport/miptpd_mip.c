@@ -86,10 +86,11 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     // dst_port
     packet[offset++] = dst_port;
     // seq_pad
-    uint16_t seq_pad_net = pack_seq_pad(seq, 0);
-
+    uint16_t seq_pad_host = pack_seq_pad(seq, 0);
+    uint16_t seq_pad_net = htons(seq_pad_host);       // Viktig!
     memcpy(packet + offset, &seq_pad_net, sizeof(uint16_t));
     offset += sizeof(uint16_t);
+
 
     // payload
     memcpy(packet + offset, payload, payload_len);
@@ -152,11 +153,10 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
     //kopierer ut miptpd header fra buffer
     miptp_hdr_t hdr;
-    memcpy(&hdr, buf+1, sizeof(hdr));
+    memcpy(&hdr, buf, sizeof(hdr));
+    uint8_t *payload = buf + sizeof(hdr);
+    size_t payload_len = len - sizeof(hdr);
 
-    //lager en peker til payload og beregner lengde
-    uint8_t *payload = buf +1 + sizeof(hdr);
-    size_t payload_len = len - 1 - sizeof(hdr);
 
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len);
@@ -240,7 +240,8 @@ void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_
     hdr.dst_port = src_port; // sender tilbake ack til source
 
     // padlen=1 (ACK-type), sekvensnummer settes som vanlig
-    hdr.seq_pad = pack_seq_pad(seq, 1);
+    uint16_t sp_host = pack_seq_pad(seq, 1);
+    hdr.seq_pad = htons(sp_host);   
 
     // Bygg pakken
     uint8_t packet[1 + sizeof(hdr)];
