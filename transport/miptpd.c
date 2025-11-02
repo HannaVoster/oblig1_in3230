@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        check_retransmissions(MIP_FD);
+        check_retransmissions();
 
         // TODO: kall check_retransmissions() her senere
     }

@@ -22,7 +22,9 @@
 // void on_ack_received(uint16_t ack_seq);
 // void buffer_outgoing_packet();
 
-void check_retransmissions(int mip_fd){
+
+//bruker MIP_FD som global variabel
+void check_retransmissions(){
     // Etter for-løkken som håndterer epoll events
     time_t now = time(NULL);
 

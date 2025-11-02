@@ -95,6 +95,6 @@ void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len);
 
 
 //fra mipdtps_retransmit.c
-void check_retransmissions(int mip_fd);
+void check_retransmissions();
 
 #endif
