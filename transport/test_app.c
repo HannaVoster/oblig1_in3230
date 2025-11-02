@@ -10,8 +10,6 @@
 
 int main(void) {
     const uint8_t my_port = 42;   // appens egen port
-    const uint8_t dst_mip = 1;    // hvem vi vil sende til (eksempel)
-    const uint8_t dst_port = 99;  // port hos mottakerappen
 
     // Opprett UNIX-socket
     int fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
