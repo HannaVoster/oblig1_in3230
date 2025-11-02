@@ -175,6 +175,20 @@ void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
         printf("[UNIX] Message from fd=%d (type=0x%02X) dest=%d ttl=%d len=%zu\n",
                client_fd, sdu_type, dest_addr, ttl, payload_length);
     }
+    // Finn sdu_type tidligere som du allerede gjør
+    if (sdu_type == MIPTP_SDU_TYPE) {
+        // SDU fra miptpd begynner ALLEREDE med dst_mip
+        uint8_t dest_addr = (uint8_t) buffer[0]; // eller dra fra payload[0] etter behov
+        uint8_t ttl = 10; // velg en standard TTL for MIPTP
+        uint8_t *payload = (uint8_t *)buffer;     // <- IKKE buffer+2
+        size_t payload_length = (size_t)bytes_read;
+
+        process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length, my_mip_address);
+        return;
+    }
+
+// ellers: gammel sti for PING/PONG/ROUTING
+
     // Håndter PING (0x02) og PONG (0x03), behandles likt
     if (sdu_type == SDU_TYPE_PING || sdu_type == SDU_TYPE_PONG) {
         process_unix_message(raw_sock, dest_addr, ttl, sdu_type, payload, payload_length, my_mip_address);
