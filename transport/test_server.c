@@ -6,12 +6,28 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define APP_SOCKET_PATH "/tmp/miptp_app.sock"
 #include "miptpd.h"  // eller inkluder filen som definerer miptp_hdr_t, pack_seq_pad()
 
 
-int main(void) {
+int main(int argc, char *argv[]) {
     const uint8_t my_port = 99;  // denne appens port
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <app_socket>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    const char *socket_arg = argv[1];
+    char socket_path[108];
+
+    // Legg til /tmp/ hvis brukeren oppga kun et kort navn
+    if (socket_arg[0] != '/') {
+        snprintf(socket_path, sizeof(socket_path), "/tmp/%s", socket_arg);
+    } else {
+        strncpy(socket_path, socket_arg, sizeof(socket_path) - 1);
+        socket_path[sizeof(socket_path) - 1] = '\0';
+    }
+
     printf("[SERVER] Starting test server (port %d)\n", my_port);
 
     // Opprett UNIX-socket
@@ -24,7 +40,7 @@ int main(void) {
     // Koble til miptpd
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, APP_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
     if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("connect");
@@ -32,7 +48,7 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    printf("[SERVER] Connected to MIPTP daemon at %s\n", APP_SOCKET_PATH);
+    printf("[SERVER] Connected to MIPTP daemon at %s\n", socket_path);
 
     // Send portnummer som første byte (registrering)
     if (write(fd, &my_port, 1) != 1) {

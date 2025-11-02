@@ -34,6 +34,7 @@ int MIP_FD; // global referanse til mipd-socket
  * Main-funksjon: oppretter sockets og kjører epoll-løkke
  */
 int main(int argc, char *argv[]) {
+    //flagghåndtering
     int opt;
     while ((opt = getopt(argc, argv, "hd")) != -1) {
         switch (opt) {
@@ -55,8 +56,27 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // Leser inn socket-stier fra argumentene
     const char *mipd_path = argv[optind];
     const char *app_path = argv[optind + 1];
+
+    char mipd_path[108];
+    char app_path[108];
+
+    // Hvis ikke absolutt sti, legg til /tmp/
+    if (mipd_arg[0] != '/') {
+        snprintf(mipd_path, sizeof(mipd_path), "/tmp/%s", mipd_arg);
+    } else {
+        strncpy(mipd_path, mipd_arg, sizeof(mipd_path) - 1);
+        mipd_path[sizeof(mipd_path) - 1] = '\0';
+    }
+
+    if (app_arg[0] != '/') {
+        snprintf(app_path, sizeof(app_path), "/tmp/%s", app_arg);
+    } else {
+        strncpy(app_path, app_arg, sizeof(app_path) - 1);
+        app_path[sizeof(app_path) - 1] = '\0';
+    }
 
     printf("[MIPTPD] Starting...\n");
     printf("[MIPTPD] MIPD socket: %s\n", mipd_path);

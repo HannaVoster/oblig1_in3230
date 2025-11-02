@@ -19,13 +19,13 @@ class MIPTPTestTopo(Topo):
     def __init__(self):
         Topo.__init__(self)
 
-        # Two hosts connected directly
+        # To noder koblet direkte (A <-> B)
         A = self.addHost('A')
         B = self.addHost('B')
         self.addLink(A, B, bw=10, delay='10ms')
 
 
-# ===== Helper to open XTerm =====
+# ===== Helper: open XTerm on node =====
 def openTerm(self, node, title, geometry, cmd="bash"):
     display, tunnel = tunnelX11(node)
     return node.popen([
@@ -37,10 +37,14 @@ def openTerm(self, node, title, geometry, cmd="bash"):
     ])
 
 
-# ===== Test Initialization =====
+# ===== Custom Init Command =====
 def init_miptp(self, line):
     """
-    Starts two MIP daemons, two MIPTP daemons, and test apps
+    Starts:
+      - 2x MIP daemons (A,B)
+      - 2x MIPTP daemons (A,B)
+      - test_server on B
+      - test_app on A
     """
 
     net = self.mn
@@ -54,20 +58,21 @@ def init_miptp(self, line):
     time.sleep(2)
 
     print("\n=== Starting MIPTP daemons ===")
-    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+220", "./miptpd"))
-    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+220", "./miptpd"))
+    # MIPTP kobles til MIP sin socket + lager egen app-socket
+    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+220", "./miptpd usockA miptp_appA.sock"))
+    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+220", "./miptpd usockB miptp_appB.sock"))
     time.sleep(2)
 
-    print("\n=== Launching applications ===")
-    # On node B, start server
-    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+220", "./bin/test_server"))
+    print("\n=== Launching test applications ===")
+    # Start server (port 99) på node B
+    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+220", "./bin/test_server miptp_appB.sock"))
     time.sleep(2)
 
-    # On node A, start client
-    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+440", "./bin/test_app"))
+    # Start client (port 42) på node A
+    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+440", "./bin/test_app miptp_appA.sock"))
 
-    print("\n✅ MIPTP Test setup complete.")
-    print("Use the Mininet CLI to observe logs or type 'exit' to stop.")
+    print("\n✅ MIPTP test setup complete.")
+    print("Use the Mininet CLI to monitor logs or type 'exit' to stop.")
 
 
 # ===== Clean Exit =====
