@@ -128,7 +128,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         case MIPTP_SDU_TYPE: {
-            handle_miptp_message(payload, length); //HJEMMEEKSAMEN 2
+            handle_miptp_message(src, dest, payload, length); //HJEMMEEKSAMEN 2
             break;
         }
            
