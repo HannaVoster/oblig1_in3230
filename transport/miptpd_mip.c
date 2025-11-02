@@ -115,48 +115,6 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     else {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
         printf("[MIPTPD] Sending packet to mipd (dst_mip=%d, len=%zd)\n", packet[0], sent);
-     }
-
-            //-------------------------------------------------------------
-    // 👇 LOKAL LOOPBACK-SIMULERING
-    //-------------------------------------------------------------
-        // int dest_fd = get_fd_from_port(dst_port); // Finn mottaker-app via port
-        // if (dest_fd > 0) {
-        //     uint8_t msg[2 + payload_len];
-        //     msg[0] = hdr.src_port;   // avsenderport (så mottaker vet hvem det er fra)
-        //     msg[1] = dst_port;       // mottakerport
-        //     memcpy(msg + 2, payload, payload_len);
-
-        //     ssize_t delivered = write(dest_fd, msg, sizeof(msg));
-        //     if (delivered > 0) {
-        //         printf("[LOOPBACK] Delivered %zd bytes locally to app port %d (fd=%d)\n",
-        //             delivered, dst_port, dest_fd);
-        //     } else {
-        //         perror("[LOOPBACK] write to local app failed");
-        //     }
-        // } else {
-        //     printf("[LOOPBACK] No local receiver on port %d — skipping local delivery\n", dst_port);
-        // }
-
-        // //TEST
-        // sleep(1); // simulér RTT
-        // miptp_hdr_t ack_hdr = {0};
-        // ack_hdr.src_port = hdr.dst_port;
-        // ack_hdr.dst_port = hdr.src_port;
-        // ack_hdr.seq_pad   = pack_seq_pad(seq, 1);
-
-        // uint8_t ack_packet[1 + sizeof(ack_hdr)];
-        // ack_packet[0] = 1; // dummy MIP address
-        // memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
-
-        // printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
-
-        // if (seq % 2 == 0) {
-        //     printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
-        //     handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
-        // } else {
-        //     printf("[SIM] Dropping ACK for seq=%u (simulate loss)\n", seq);
-        // }
     
 }
 
