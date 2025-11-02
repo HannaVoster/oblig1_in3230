@@ -55,6 +55,7 @@ def init_miptp(self, line):
     terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+220", "./test_server miptp_appB.sock"))
     time.sleep(2)
     # Start client på A (sender til MIP 99)
+    #endret
     terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+440",
                           "./test_app miptp_appA.sock 'Hello from A' 99"))
 
