@@ -89,8 +89,15 @@ int main(int argc, char *argv[]) {
     int mip_fd = connect_to_mipd(mipd_path);
     MIP_FD = mip_fd;
     if (mip_fd < 0) {
-        fprintf(stderr, "[MIPTPD] Failed to connect to mipd.\n");
+        if (errno == EACCES) {
+        fprintf(stderr, "[MIPTPD] Permission denied on %s, trying chmod 666...\n", mipd_path);
+        chmod(mipd_path, 0666);
+        mip_fd = connect_to_mipd(mipd_path);
+    }
+    if (mip_fd < 0) {
+        perror("[MIPTPD] connect mipd failed");
         exit(EXIT_FAILURE);
+    }
     }
 
     // Opprett socket for applikasjoner
