@@ -1,11 +1,24 @@
 
 
-.PHONY: all clean
+.PHONY: all clean install
 
 all:
 	$(MAKE) -C src
 	$(MAKE) -C transport
+	$(MAKE) install
+
+# Kopier binærfiler ut i prosjektroten for kompatibilitet 
+install:
+	cp -u bin/mipd .
+	cp -u bin/miptpd .
+	cp -u bin/miptpd_client .
+	cp -u bin/miptpd_server .
+	cp -u bin/ping_client .
+	cp -u bin/ping_server .
+	cp -u bin/routingd .
 
 clean:
 	$(MAKE) -C src clean
 	$(MAKE) -C transport clean
+	rm -f mipd miptpd miptpd_client miptpd_server ping_client ping_server routingd
+
