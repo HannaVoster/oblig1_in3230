@@ -7,6 +7,8 @@
 #include <sys/un.h>
 
 #define APP_SOCKET_PATH "/tmp/miptp_app.sock"
+#include "miptpd.h"  // eller inkluder filen som definerer miptp_hdr_t, pack_seq_pad()
+
 
 int main(void) {
     const uint8_t my_port = 99;  // denne appens port
@@ -57,27 +59,26 @@ int main(void) {
         printf("[SERVER] Got %zd bytes from port=%d → %d\n", n, src_port, dst_port);
         printf("[SERVER] Payload: %.*s\n", (int)(n - 2), buf + 2);
 
+            //-------------------------------------------------------------
+        // 👇 SEND ET EKTE MIPTP-ACK
         //-------------------------------------------------------------
-        // 👇 SEND ET EKTE ACK TIL MIPTPD
-        //-------------------------------------------------------------
-        uint16_t seq = 0; // sekvensnummeret er ikke kjent i test_server
-                        // så vi kan sende et dummy ACK for nå, eller
-                        // utvide senere slik at det pakkes i header.
+        miptp_hdr_t ack_hdr = {0};
+        ack_hdr.src_port = dst_port;  // fra denne appen (server)
+        ack_hdr.dst_port = src_port;  // tilbake til klienten
+        ack_hdr.seq_pad = pack_seq_pad(0, 1); // pad = 1 betyr "ACK"
 
-        // Lag ACK-pakken [dst_mip][dst_port][payload]
-        // Her bruker vi “pad=1” for å signalisere at dette er ACK.
-        uint8_t ack_msg[4];
-        ack_msg[0] = src_port;  // send ACK tilbake til klientporten
-        ack_msg[1] = dst_port;  // fra denne porten (server)
-        ack_msg[2] = 0xAA;      // symbolsk "ACK" markør
-        ack_msg[3] = 0x00;      // reserved / dummy
+        uint8_t ack_packet[1 + sizeof(ack_hdr)];
+        ack_packet[0] = 1; // dummy MIP-adresse, brukes ikke lokalt
+        memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
 
-        ssize_t sent = write(fd, ack_msg, sizeof(ack_msg));
+        // send til MIPTPD
+        ssize_t sent = write(fd, ack_packet, sizeof(ack_packet));
         if (sent > 0)
-            printf("[SERVER] Sent ACK back to port %d (%zd bytes)\n", src_port, sent);
+            printf("[SERVER] Sent MIPTP ACK back to port %d (%zd bytes)\n", src_port, sent);
         else
             perror("[SERVER] Failed to send ACK");
-    }
+
+        }
 
 
     close(fd);
