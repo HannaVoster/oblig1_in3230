@@ -90,15 +90,15 @@ int main(int argc, char *argv[]) {
     int mip_fd = connect_to_mipd(mipd_path);
     MIP_FD = mip_fd;
     if (mip_fd < 0) {
-        if (errno == EACCES) {
-        fprintf(stderr, "[MIPTPD] Permission denied on %s, trying chmod 666...\n", mipd_path);
-        chmod(mipd_path, 0666);
-        mip_fd = connect_to_mipd(mipd_path);
-    }
-    if (mip_fd < 0) {
         perror("[MIPTPD] connect mipd failed");
         exit(EXIT_FAILURE);
     }
+    uint8_t sdu_type = MIPTP_SDU_TYPE;
+    ssize_t n = write(mip_fd, &sdu_type, sizeof(sdu_type));
+    if (n != sizeof(sdu_type)) {
+        perror("[MIPTPD] register sdu_type");
+        close(mip_fd);
+        exit(EXIT_FAILURE);
     }
 
     // Opprett socket for applikasjoner
