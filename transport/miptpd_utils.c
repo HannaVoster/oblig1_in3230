@@ -117,16 +117,16 @@ uint16_t get_next_seq(int fd) {
     return 0;
 }
 
-void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len) {
-    for (int i = 0; i < MAX_APPS; i++) {
-        if (app_connections[i].app_fd == fd){
-            memcpy(app_connections[i].last_packet, packet, len);
-            app_connections[i].last_len = len;
-            app_connections[i].last_sent_time = time(NULL);
-            app_connections[i].waiting_for_ack = 1;
-            return;
-        }   
-    }
-    fprintf(stderr, "[MIPTPD] No connection found for fd=%d (update_last_packet_from_fd)\n", fd);
-    return;
-}
+// void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len) {
+//     for (int i = 0; i < MAX_APPS; i++) {
+//         if (app_connections[i].app_fd == fd){
+//             memcpy(app_connections[i].last_packet, packet, len);
+//             app_connections[i].last_len = len;
+//             app_connections[i].last_sent_time = time(NULL);
+//             app_connections[i].waiting_for_ack = 1;
+//             return;
+//         }   
+//     }
+//     fprintf(stderr, "[MIPTPD] No connection found for fd=%d (update_last_packet_from_fd)\n", fd);
+//     return;
+// }

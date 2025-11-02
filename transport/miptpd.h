@@ -16,6 +16,7 @@
 extern int debug_mode;
 extern int MIP_FD;
 
+//bruker hver gang det bygges eller fjernes header rundt data
 typedef struct {
     uint8_t src_port;
     uint8_t dst_port;
@@ -24,6 +25,7 @@ typedef struct {
     // payload follows
 } __attribute__((packed)) miptp_hdr_t;
 
+//hjelpedtruktur for sending, hjelper med å pakke inn felter før det kopieres inn i sendebuffer
 typedef struct {
     uint8_t dst_mip;
     uint8_t dst_port;
@@ -32,16 +34,25 @@ typedef struct {
     uint8_t *data;
 } miptp_packet_t;
 
-//lager en connections tabell med app_fd, og port
+// "vindusplass" til go back n vindu, lagrer ferdig byggede pakker som skal sendes på nytt ved timeout
+typedef struct {
+    uint8_t data[1500];
+    ssize_t len;
+    uint16_t seq;
+    time_t sent_time;
+    int acked;
+} packet_entry;
+
+// støtter go back n logikk, retransmisjon, sliding window og ack håndtering
 typedef struct {
     int app_fd;
     uint8_t port;
-    uint16_t next_seq;
-    uint16_t last_acked_seq;
-    uint8_t last_packet[1500]; //pakker som sendes lagres her
-    ssize_t last_len;
-    time_t last_sent_time; //holder styr på tiden for retransmisjon
-    int waiting_for_ack; // 1 når man venter på ack, 0 når ack mottas
+
+    uint16_t base_seq; // første uackede sekvens
+    uint16_t next_seq;  // neste som skal sendes
+    packet_entry window[MIPTP_WINDOW_SIZE]; // pakke-buffer
+
+    uint8_t window_count; // antall aktive i vinduet
 } app_connection;
 
 extern app_connection app_connections[MAX_APPS];
@@ -91,7 +102,7 @@ int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd); //brukes denne?
 uint16_t get_next_seq(int fd);
-void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len);
+//void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len);
 
 
 //fra mipdtps_retransmit.c

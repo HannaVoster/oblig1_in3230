@@ -65,9 +65,33 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
 
     memcpy(packet + 1, &hdr, sizeof(hdr)); //kopierer MIPTP-header til pakken
     memcpy(packet + 1 + sizeof(hdr), payload, payload_len); //kopierer dataen
+    ssize_t packet_len = 1 + sizeof(hdr) + payload_len;
+    //SJEKKER OM VINDU ER FULLT
+    int idx = get_index(app_fd);
+    if (idx < 0) return;
+
+    app_connection *connection = &app_connections[idx];
+
+    // sjekk om vinduet er fullt
+    if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {
+        // Hvis antall pakker i flyt (next_seq - base_seq) er lik vindusstørrelsen
+        printf("[MIPTPD] Window full for port %d — cannot send yet\n", connection->port);
+        return;
+    }
+
+    uint16_t seq = connection->next_seq; // Bruker gjeldende next_seq som sekvensnummer for denne pakken
+    connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ; // mod 2^14 for å håndtere sekvens-wraparound
+
+    
+    int slot = seq % MIPTP_WINDOW_SIZE; // Beregner plass i vinduet (sirkulær buffer)
+    connection->window[slot].seq = seq; // Lagrer sekvensnummer i vindusplassen
+    connection->window[slot].len = packet_len; // Lagre hvor lang pakken er (for retransmisjon)
+
+    memcpy(connection->window[slot].data, packet, packet_len); // Kopier hele pakken inn i vindusbufferen (slik den kan sendes igjen)
+    connection->window[slot].sent_time = time(NULL); // Merker tidspunktet pakken ble sendt (for timeout-sjekk)
+    connection->window[slot].acked = 0;   // Setter ACK-status til 0 — den er sendt, men ikke bekreftet
 
     // sender pakken til mip deamon for å sende ut på nettverket
-    ssize_t packet_len = 1 + sizeof(hdr) + payload_len;
     ssize_t sent = write(MIP_FD, packet, 1+ sizeof(hdr) + payload_len);
     if (sent < 0){
         perror("[MIPTPD] write to mipd");
@@ -75,6 +99,20 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     else {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
         update_last_packet_from_fd(app_fd, packet, packet_len);
+
+        //TEST
+        sleep(1); // simulér RTT
+        miptp_hdr_t ack_hdr = {0};
+        ack_hdr.src_port = hdr.dst_port;
+        ack_hdr.dst_port = hdr.src_port;
+        ack_hdr.seq_pad   = pack_seq_pad(seq, 1);
+
+        uint8_t ack_packet[1 + sizeof(ack_hdr)];
+        ack_packet[0] = 1; // dummy MIP address
+        memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
+
+        printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
+        handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
     }
 }
 
@@ -128,17 +166,32 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
     // ACK pdu
     if (pad == 1) {
-        int fd = get_fd_from_port(hdr.dst_port);
+        int fd = get_fd_from_port(hdr.dst_port); //henter hvilken app tilkobling acken hører til
         if (fd >= 0) {
-            int idx = get_index(fd);
+            int idx = get_index(fd); //henter indexen appen har i app_connections tabellen
           
             if (idx >= 0) {
-                app_connections[idx].last_acked_seq = seq;
-                app_connections[idx].waiting_for_ack = 0;
+                app_connection *connection = &app_connections[idx];
+                uint16_t ack_seq = seq;
+                //app_connections[idx].last_acked_seq = seq;
+                //app_connections[idx].waiting_for_ack = 0;
 
                 printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
                     seq, hdr.dst_port);
-                return;
+
+                // marker pakken som ACKet
+                int slot = ack_seq % MIPTP_WINDOW_SIZE; // Finner posisjonen i vinduet (mod MIPTP_WINDOW_SIZE for sirkulær buffer)
+                connection->window[slot].acked = 1; //markerer pakken som mottatt
+
+                // flytter base_seq frem hvis mulig (ruller frem vinduet)
+                while (connection->base_seq != connection->next_seq && // det finnes usendte eller uackede pakker
+                    connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) { // // og den eldste (base_seq) er ACK-et
+
+                    connection->base_seq = (connection->base_seq + 1) % MIPTP_MAX_SEQ; // flytter base_seq ett steg frem (vindusstart flyttes)
+                    connection->window_count--; // reduser antall pakker i vinduet (frigjør plass)
+                }
+
+                return; 
             }
         }
         printf("[MIPTPD] ACK received but no matching connection found (dst_port=%d)\n",
