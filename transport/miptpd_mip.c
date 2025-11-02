@@ -76,18 +76,17 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
         update_last_packet_from_fd(app_fd, packet, packet_len);
 
-        sleep(1);
-   // --- simuler en ACK-pakke tilbake ---
+        sleep(1); // simulér RTT
         miptp_hdr_t ack_hdr = {0};
-        ack_hdr.src_port = hdr.dst_port;  // server svarer
-        ack_hdr.dst_port = hdr.src_port;  // går tilbake til klienten
-        ack_hdr.seq_pad = pack_seq_pad(seq, 1); // padlen = 1 → ACK
+        ack_hdr.src_port = hdr.dst_port;
+        ack_hdr.dst_port = hdr.src_port;
+        ack_hdr.seq_pad   = pack_seq_pad(seq, 1);
 
         uint8_t ack_packet[1 + sizeof(ack_hdr)];
-        ack_packet[0] = 1; // MIP=1, spiller ingen rolle her
+        ack_packet[0] = 1; // dummy MIP address
         memcpy(ack_packet + 1, &ack_hdr, sizeof(ack_hdr));
 
-        // Simuler at ACK mottas
+        printf("[SIM] Injecting fake ACK for seq=%u\n", seq);
         handle_incoming_miptp_packet(ack_packet + 1, sizeof(ack_hdr), 1);
     }
 }
@@ -144,15 +143,31 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     if (pad == 1) {
         int fd = get_fd_from_port(hdr.dst_port);
         if (fd >= 0) {
-            printf("[MIPTPD] Got ACK for seq=%u on port %d\n", seq, hdr.dst_port);
-            for (int i = 0; i < MAX_APPS; i++) {
-                if (app_connections[i].app_fd == fd) {
-                    app_connections[i].last_acked_seq = seq;
-                    app_connections[i].waiting_for_ack = 0;
-                    printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
-                       seq, hdr.dst_port);
-                    return;
-                }
+            int idx = get_index(fd);
+          
+            if (idx >= 0) {
+                app_connections[idx].last_acked_seq = seq;
+                app_connections[idx].waiting_for_ack = 0;
+
+                printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
+                    seq, hdr.dst_port);
+
+                // 🔽 TEST: send neste pakke automatisk
+                // (bare for å demonstrere sekvenslogikken)
+                uint8_t next_msg[20];
+                snprintf((char *)next_msg, sizeof(next_msg),
+                        "NEXT-PKT-%u", app_connections[idx].next_seq);
+                uint8_t dst_mip = 1; // eller hent fra tidligere
+                uint8_t dst_port = hdr.src_port;
+
+                uint8_t wrapped[2 + strlen((char *)next_msg)];
+                wrapped[0] = dst_mip;
+                wrapped[1] = dst_port;
+                memcpy(wrapped + 2, next_msg, strlen((char *)next_msg));
+
+                send_miptp_data(fd, wrapped, sizeof(wrapped));
+
+                return;
             }
         }
         printf("[MIPTPD] ACK received but no matching connection found (dst_port=%d)\n",
