@@ -70,10 +70,10 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ; // mod 2^14 for å håndtere sekvens-wraparound
 
     // -- Lager selve MIPTP-header
-    miptp_hdr_t hdr = {0};
-    hdr.src_port = src_port;
-    hdr.dst_port = dst_port;
-    hdr.seq_pad = pack_seq_pad(seq, 0);// 0 = data, ikke ack
+    // miptp_hdr_t hdr = {0};
+    // hdr.src_port = src_port;
+    // hdr.dst_port = dst_port;
+    // hdr.seq_pad = pack_seq_pad(seq, 0);// 0 = data, ikke ack
     printf("[MIPTPD] Sending seq=%u from port %d\n", seq, src_port);
 
     // -- Bygger selve MIPTP-pakken, [Header][Payload]
@@ -87,6 +87,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     packet[offset++] = dst_port;
     // seq_pad
     uint16_t seq_pad_net = pack_seq_pad(seq, 0);
+
     memcpy(packet + offset, &seq_pad_net, sizeof(uint16_t));
     offset += sizeof(uint16_t);
 
