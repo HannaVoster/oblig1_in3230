@@ -357,6 +357,19 @@ int forward_packet(int my_mip_address,
 }
 //HJEMMEEKSAMEN 2
 void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length) {
+
+    int fwd_result = forward_packet(my_mip_address,
+                                    dest, src, ttl,
+                                    SDU_TYPE_PONG, payload, length);
+
+    if (fwd_result != 0) {
+        // 1 = forwarded, -1 = droppet → ferdig
+        return;
+    }
+
+    if (debug_mode) printf("[RAW] MIPTPD melding %u: %.*s\n\n",
+           src, (int)length, (char*)payload);
+
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active &&
             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
@@ -381,34 +394,6 @@ void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, siz
     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
 }
 
-// void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length) {
-//     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-//         if (unix_clients[i].active &&
-//             unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
-            
-//             uint8_t buffer[2048];
-//             size_t total = 1 + length;
-
-//             buffer[0] = dest; // gjeninnfør MIP-dest i starten
-//             memcpy(buffer + 1, payload, length);
-
-//             printf("[DEBUG][MIPD->MIPTPD] Forwarding %zu bytes to MIPTPD (with dst_mip=%d)\n",
-//                    total, dest);
-//             print_payload_hex(buffer, total);
-
-//             ssize_t n = write(unix_clients[i].fd, buffer, total);
-//             if (n < 0) {
-//                 perror("[MIPD] write to MIPTPD failed");
-//             } else {
-//                 printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src=%d dest=%d\n",
-//                        n, unix_clients[i].fd, src, dest);
-//             }
-
-//             return;
-//         }
-//     }
-//     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
-// }
 
 
 
