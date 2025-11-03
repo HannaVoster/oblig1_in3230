@@ -128,11 +128,11 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
     // Pakk ut MIPTP-headeren (starter etter MIP-destinasjonsbyte)
     miptp_hdr_t hdr;
-    memcpy(&hdr, buf + 1, sizeof(hdr));
+    memcpy(&hdr, buf, sizeof(hdr));
 
     // Finn peker til payload (SDU) og lengden på den
-    uint8_t *payload = buf + 1 + sizeof(hdr);
-    size_t payload_len = len - 1 - sizeof(hdr);
+    uint8_t *payload = buf + sizeof(hdr);
+    size_t payload_len = len - sizeof(hdr);
 
     // Hent sekvensnummer og padding fra feltet (14 + 2 bit)
     uint16_t seq;
