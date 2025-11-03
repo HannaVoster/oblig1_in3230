@@ -341,8 +341,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
             return;
         }
     }
-
-
+}
 uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
                         uint16_t seq, const uint8_t *sdu, size_t sdu_len,
                         size_t *out_len)
