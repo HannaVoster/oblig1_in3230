@@ -66,19 +66,14 @@ int main(int argc, char *argv[]) {
         snprintf(msg, sizeof(msg), "Hello #%d from port %d", i, my_port);
 
         uint8_t packet[2 + strlen(msg)];
-        packet[0] = dst_mip;  // Hvem vi sender til
-        packet[1] = dst_port; // Hvilken port hos mottaker
+        packet[0] = dst_mip;
+        packet[1] = dst_port;
         memcpy(packet + 2, msg, strlen(msg));
 
-        ssize_t sent = write(fd, packet, sizeof(packet));
-        if (sent < 0) {
-            perror("write message");
-            break;
-        }
-
-        printf("[CLIENT] Sent message %d (%zd bytes)\n", i, sent);
-        usleep(200000); // 0.2 sek mellom sendingene for tydelig logging
+        write(fd, packet, sizeof(packet));
+        printf("[CLIENT] Sent message %d\n", i);
     }
+
 
     printf("[CLIENT] All messages sent, waiting for potential responses...\n");
 
