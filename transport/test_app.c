@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 
     usleep(50000);
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 30; i++) {
         char msg[64];
         snprintf(msg, sizeof(msg), "Hello #%d from port %d", i, my_port);
 
