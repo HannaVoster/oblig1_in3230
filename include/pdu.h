@@ -9,6 +9,7 @@
 #define SDU_TYPE_PONG  0x03
 
 
+
 // PDU header
 typedef struct __attribute__((packed)) {
     uint8_t dest;

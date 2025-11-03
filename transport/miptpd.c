@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
                     printf("[MIPTPD] Received %zd bytes from mipd\n", len);
 
                 // TODO: parse MIPTP header og lever til riktig app
-                handle_incoming_miptp_packet(buf, len, buf[0]); // foreløpig placeholder
+                handle_incoming_miptp_packet(buf, len, buf[0]); 
             }
 
             // Ny applikasjonsforbindelse

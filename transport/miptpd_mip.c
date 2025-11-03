@@ -113,7 +113,7 @@ Ansvar:
 */
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     // Sjekk at vi har nok data til å inneholde minst en MIPTP-header
-    if (len < 1 + sizeof(miptp_hdr_t)) {
+    if (len < sizeof(miptp_hdr_t)) {
         fprintf(stderr, "[MIPTPD] Incoming packet too short (%zu bytes)\n", len);
         return;
     }
