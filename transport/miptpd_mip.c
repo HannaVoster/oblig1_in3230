@@ -259,7 +259,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     if (idx >= 0) {
         app_connection *connection = &app_connections[idx];
         uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
-        uint16_t max_accept = (expected + MIPTP_WINDOW_SIZE) % MIPTP_MAX_SEQ;
 
         // Beregner "avstand" mellom seq og expected i 14-bit-verden
         int16_t diff_seq_exp = (int16_t)((seq - expected + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
