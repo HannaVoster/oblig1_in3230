@@ -69,13 +69,13 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         return;
     }
 
-    // --- Pakker ut felter fra app-meldingen ---
+    // ---- Pakker ut felter fra app-meldingen ---
     uint8_t dst_mip  = data[0];  // destinasjons-MIP
     uint8_t dst_port = data[1];  // mottakerens port
     uint8_t *payload = data + 2; // selve nyttelasten
     size_t payload_len = len - 2;
 
-    // --- Finner avsenderport og connection ---
+    // ---- Finner avsenderport og connection ---
     uint8_t src_port = get_port_from_fd(app_fd);
     int idx = get_index(app_fd);
     if (idx < 0) return; // ugyldig tilkobling
@@ -83,7 +83,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     app_connection *connection = &app_connections[idx];
     connection->peer_mip = dst_mip; // lagrer mottakerens MIP-adresse, brujes av miptpd_retransmit
 
-    // --- Sjekker at vinduet ikke er fullt ---
+    // --- Sjekker at vinduet ikke er fullt -----
     if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {
         // hvis også køen er full, må forbindelsen avsluttes
         if (connection->queue_count >= MIPTP_MAX_QUEUE) {
@@ -104,7 +104,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
         return;
     }
 
-    // --- Setter sekvensnummer ---
+    // --- Setter sekvensnummer ----
     uint16_t seq = connection->next_seq;
     connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ;
 
@@ -123,7 +123,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     connection->window[slot].acked = 0;
     connection->window_count++;
 
-    // --- Sender pdu til mipd ---
+    // ----- Sender pdu til mipd -----
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu);
 
