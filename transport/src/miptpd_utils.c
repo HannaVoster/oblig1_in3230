@@ -1,8 +1,6 @@
-// hjelpemetoder (sekvensnummer, padding, logging)
 
 /*
-**Ansvar:**
-
+Ansvar:
 - Sekvensnummer-logikk (inkl. wrap-around)
 - Paddingberegning (for 32-bit justering)
 - Generelle verktøy som brukes av flere filer

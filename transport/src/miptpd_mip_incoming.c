@@ -39,7 +39,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         return;
     }
 
-    //pskker ut header og felt 
+    //pakker ut header og felt 
     miptp_hdr_t hdr;
     memcpy(&hdr, buf, sizeof(hdr));
     uint8_t *payload = buf + sizeof(hdr);
@@ -52,9 +52,9 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu seq=%u pad=%u\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len, seq, pad);
 
-    // skille mellom ACK og DATA 
+    // skiller mellom ACK og DATA 
     if (payload_len == 0)
-        handle_incoming_ack(&hdr, seq, src_mip);
+        handle_incoming_ack(&hdr, seq);
     else
         handle_incoming_data(&hdr, payload, payload_len, seq, pad, src_mip);
 }
@@ -72,54 +72,56 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
  *      seq     - sekvensnummeret som ble ACKet
  *      src_mip - MIP-adresse til avsender
  */
-void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip) {
-    int fd = get_fd_from_port(hdr->dst_port);
+void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq) {
+    int fd = get_fd_from_port(hdr->dst_port); // Finner applikasjonens socket basert på destinasjonsporten i headeren
     if (fd < 0) {
         printf("[MIPTPD] ACK for unknown app port=%d ignored\n", hdr->dst_port);
-        return;
+        return; // Ignorerer ACK — det finnes ingen gyldig mottaker
     }
 
     int idx = get_index(fd);
     if (idx < 0) return;
-    app_connection *conn = &app_connections[idx];
+    app_connection *conn = &app_connections[idx]; // Peker til applikasjonens forbindelsesstruktur
 
     printf("[MIPTPD] ACK received for seq=%u (port=%d)\n", seq, hdr->dst_port);
 
-    // Ignorerer ACKer utenfor vinduet
-    uint16_t diff = (seq + MIPTP_MAX_SEQ - conn->base_seq) % MIPTP_MAX_SEQ;
-    if (diff >= MIPTP_WINDOW_SIZE) {
+    // --- Valider at ACK gjelder for det aktive vinduet ---
+    uint16_t diff = (seq + MIPTP_MAX_SEQ - conn->base_seq) % MIPTP_MAX_SEQ; // Hvor langt unna base_seq denne ACKen er
+    if (diff >= MIPTP_WINDOW_SIZE) {                                        // Hvis ACKen gjelder en pakke utenfor gjeldende vindu
         printf("[MIPTPD][GBN] Ignored stale ACK (ack=%u base=%u)\n", seq, conn->base_seq);
         return;
     }
 
-    // Oppdaterer base_seq frem til ack_seq + 1
+    // --- Flytter vindu fremover ---
     uint16_t old_base = conn->base_seq;
-    conn->base_seq = (seq + 1) % MIPTP_MAX_SEQ;
+    conn->base_seq = (seq + 1) % MIPTP_MAX_SEQ;  // ACK indikerer at alle pakker opp til seq er mottatt
 
-    // Markerer vindusplasser som ACKet
+    // --- Marker vindusplasser som ACKet ---
     for (uint16_t s = old_base; s != conn->base_seq; s = (s + 1) % MIPTP_MAX_SEQ) {
-        int slot = s % MIPTP_WINDOW_SIZE;
-        conn->window[slot].acked = 1;
+        int slot = s % MIPTP_WINDOW_SIZE; // Finner posisjon (sirkulært vindu)
+        conn->window[slot].acked = 1; //markerer som acket
         conn->window[slot].len = 0;
     }
 
-    // Sender køede meldinger dersom vinduet har plass
+    // --- Sjekker om man kan sende flere pakker fra køen ---
     while (conn->queue_count > 0 &&
-          ((conn->next_seq + MIPTP_MAX_SEQ - conn->base_seq) % MIPTP_MAX_SEQ) < MIPTP_WINDOW_SIZE) {
+          ((conn->next_seq + MIPTP_MAX_SEQ - conn->base_seq) % MIPTP_MAX_SEQ) < MIPTP_WINDOW_SIZE) { // er det pakker i kø og er vindu ikke fullt
 
         int pos = conn->queue_head % MIPTP_MAX_QUEUE;
-        send_miptp_data(conn->app_fd, conn->queue[pos].data, conn->queue[pos].len);
-        conn->queue_head++;
+        send_miptp_data(conn->app_fd, conn->queue[pos].data, conn->queue[pos].len); // tømmer kø
+
+        conn->queue_head++; // Flytter køhode fremover
         conn->queue_count--;
     }
 
-    // Statuslogging
+    // --- Logger status på vinduet etter oppdatering ---
     if (conn->base_seq == conn->next_seq)
         printf("[MIPTPD][GBN] All packets ACKed — window empty\n");
     else
         printf("[MIPTPD][GBN] Waiting for more ACKs (base=%u next=%u)\n",
                conn->base_seq, conn->next_seq);
 }
+
 
 /*
  *  handle_incoming_data()
@@ -140,48 +142,50 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip) {
  */
 void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
                           uint16_t seq, uint8_t pad, uint8_t src_mip) {
-    int app_fd = get_fd_from_port(hdr->dst_port);
+
+    int app_fd = get_fd_from_port(hdr->dst_port);// Finner file descriptor (socket) til applikasjonen som har registrert denne destinasjonsporten
     if (app_fd < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr->dst_port);
         return;
     }
 
-    int idx = get_index(app_fd);
+    int idx = get_index(app_fd); // Finner indeksen i app_connections[] som tilsvarer denne applikasjonen
     if (idx < 0) return;
     app_connection *conn = &app_connections[idx];
 
     // Init synkronisering på første mottatte pakke
     if (!conn->synced) {
-        conn->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
-        conn->synced = 1;
+        conn->expected_seq = (seq + 1) % MIPTP_MAX_SEQ; // Setter forventet sekvensnummer til neste etter den vi nettopp mottok
+        conn->synced = 1;                               // Merker forbindelsen som “synkronisert” (klar for Go-Back-N)
+
         printf("[MIPTPD][INIT] First packet seq=%u → expected_seq=%u\n",
                seq, conn->expected_seq);
     }
 
     uint16_t expected = conn->expected_seq;
-    uint16_t ahead = (seq + MIPTP_MAX_SEQ - expected) % MIPTP_MAX_SEQ;
+    uint16_t ahead = (seq + MIPTP_MAX_SEQ - expected) % MIPTP_MAX_SEQ; // Beregner hvor langt frem (eller bak) den mottatte sekvensen er i forhold til det forventede
 
-    // Duplikatpakke
-    if (ahead >= MIPTP_MAX_SEQ - MIPTP_WINDOW_SIZE) {
+    // kontroll ------ Duplikatpakke 
+    if (ahead >= MIPTP_MAX_SEQ - MIPTP_WINDOW_SIZE) { // Hvis sekvensnummeret ligger “bak” i vinduet (duplikat)
         printf("[MIPTPD][RX] Duplicate DATA ignored (seq=%u expected=%u)\n", seq, expected);
         send_miptp_ack(src_mip, hdr->dst_port, hdr->src_port,
                        (expected - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
         return;
     }
 
-    // Out-of-order pakke
-    if (seq != expected) {
+    // kontroll ------ Out-of-order pakke 
+    if (seq != expected) { // Hvis sekvensnummeret ikke er det som forventes (dvs. en pakke har blitt droppet)
         printf("[MIPTPD][RX] Out-of-order DATA ignored (seq=%u expected=%u)\n", seq, expected);
         send_miptp_ack(src_mip, hdr->dst_port, hdr->src_port,
-                       (expected - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
-        return;
+                       (expected - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ); // Bekrefter siste mottatte riktige pakke, slik at avsender vet hvor den må retransmittere fra
+        return; // Ignorerer denne pakken (venter på riktig sekvens)
     }
 
     // In-order pakke, leveres til applikasjonen
-    if (len >= pad) len -= pad; // fjerner padding
-    uint8_t msg[2 + len];
-    msg[0] = src_mip;
-    msg[1] = hdr->src_port;
+    if (len >= pad) len -= pad; // fjerner padding som ble lagt til ved sending
+    uint8_t msg[2 + len];       // buffer for å sende opp til appen, 2 ekstra byte til metadata
+    msg[0] = src_mip;           // mip addressen til avsender
+    msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
     memcpy(msg + 2, payload, len);
 
     ssize_t sent = write(app_fd, msg, sizeof(msg));
@@ -190,7 +194,7 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     else
         perror("[MIPTPD] write to app failed");
 
-    // Oppdater forventet sekvens og send ACK
+    // Oppdater forventet sekvens og send ACK til avsender for å bekrefte mottak
     conn->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
     send_miptp_ack(src_mip, hdr->dst_port, hdr->src_port, seq);
 }

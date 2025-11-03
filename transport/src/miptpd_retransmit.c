@@ -15,8 +15,6 @@
 #include "miptpd_retransmit.h"
 #include "miptpd_send.h"
 
-
-//sjekker at pakker som ikke er blitt acked innen en viss tid sendes på nytt
 /*
     Sjekker alle aktive forbindelser (app_connections) for
     pakker som ikke har blitt ACKet innen tidsfristen (timeout).

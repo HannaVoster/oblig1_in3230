@@ -65,6 +65,13 @@ int main(int argc, char *argv[]) {
 
 // ......Støttemetoder til main.........
 
+/*
+  Leser kommandolinjeflagg og argumenter ved oppstart.
+  - Støtter flaggene:
+      -h  viser hjelpetekst og avslutter
+      -d  aktiverer debug-modus
+  - Kontrollerer at to socket-stier (mipd_socket og app_socket) er oppgitt
+*/
 void handle_flags(int argc, char *argv[]) {
     int opt;
     while ((opt = getopt(argc, argv, "hd")) != -1) {
@@ -88,6 +95,12 @@ void handle_flags(int argc, char *argv[]) {
     }
 }
 
+/*
+  Bygger fullstendige UNIX-socketstier for MIPD og appen.
+  Hvis brukeren oppgir et navn uten '/', legges "/tmp/" foran
+  Hvis en full sti oppgis, brukes den direkte
+*/
+
 void parse_socket_paths(char *mipd_arg, char *app_arg, char *mipd_path, char *app_path) {
     if (mipd_arg[0] != '/') {
         snprintf(mipd_path, 108, "/tmp/%s", mipd_arg);
@@ -103,7 +116,11 @@ void parse_socket_paths(char *mipd_arg, char *app_arg, char *mipd_path, char *ap
         app_path[107] = '\0';
     }
 }
-
+/*
+  Kobler transportlaget (miptpd) til MIP-daemonen via UNIX-socket
+  Registrerer MIPTP som SDU-type slik at MIPD vet hvilke pakker som skal sendes hit
+  Avslutter programmet hvis forbindelsen feiler
+*/
 int setup_mip_connection(const char *mipd_path) {
     int mip_fd = connect_to_mipd(mipd_path);
     MIP_FD = mip_fd;
@@ -125,7 +142,12 @@ int setup_mip_connection(const char *mipd_path) {
 
     return mip_fd;
 }
-
+/*
+  Setter opp et epoll-objekt for å overvåke hendelser på flere file descriptors:
+  - mip_fd: kommunikasjon med MIP-daemonen
+  - app_listen_fd: nye tilkoblinger fra apper
+  Returnerer epoll-fd som brukes i main og inn i eventloopen
+*/
 int setup_epoll(int mip_fd, int app_listen_fd) {
     int epollfd = epoll_create1(0);
     if (epollfd < 0) {
@@ -151,6 +173,13 @@ int setup_epoll(int mip_fd, int app_listen_fd) {
     return epollfd;
 }
 
+/*
+  Hovedhendelsesløkke som venter på data eller tilkoblinger via epoll
+  - Leser fra mip_fd når MIP-pakker kommer
+  - Godtar nye apper via app_listen_fd
+  - Leser meldinger fra eksisterende app-forbindelser
+  - Kaller jevnlig check_retransmissions() for å håndtere tidsavbrudd
+*/
 void run_event_loop(int epollfd, int mip_fd, int app_listen_fd) {
     struct epoll_event events[MAX_EVENTS];
 
@@ -179,6 +208,11 @@ void run_event_loop(int epollfd, int mip_fd, int app_listen_fd) {
     }
 }
 
+/*
+  Behandler innkommende data fra MIP-daemonen (mipd)
+  Leser hele MIPTP-pakken og sender den videre til pakkebehandling
+  Avslutter programmet hvis forbindelsen til mipd brytes
+*/
 void handle_mip_event(int mip_fd) {
     uint8_t buf[1500];
     ssize_t len = read(mip_fd, buf, sizeof(buf));
@@ -193,6 +227,11 @@ void handle_mip_event(int mip_fd) {
     handle_incoming_miptp_packet(buf, len, buf[0]);
 }
 
+/*
+  Håndterer nye applikasjonsforbindelser 
+  Leser første byte for å finne portnummeret appen vil bruke
+  Registrerer appen i app_connections-tabellen og legger til i epoll
+*/
 void handle_new_app_connection(int app_listen_fd, int epollfd) {
     struct epoll_event ev;
     int new_fd = accept(app_listen_fd, NULL, NULL);
@@ -225,6 +264,11 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
         perror("epoll_ctl: new_fd");
 }
 
+/*
+  Leser meldinger sendt fra en applikasjon til transportlaget
+  Hvis forbindelsen er lukket, fjernes den
+  Ellers sendes dataen videre via MIPTP (send_miptp_data)
+*/
 void handle_app_message(int fd) {
     uint8_t buf[1500];
     ssize_t len = read(fd, buf, sizeof(buf));
@@ -242,6 +286,10 @@ void handle_app_message(int fd) {
     send_miptp_data(fd, buf, len);
 }
 
+/*
+  Lukker alle åpne file descriptors og skriver ut en avslutningsmelding.
+  Brukes ved normal nedstenging av miptpd
+*/
 void cleanup(int epollfd, int mip_fd, int app_listen_fd) {
     close(epollfd);
     close(mip_fd);
