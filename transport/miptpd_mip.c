@@ -177,8 +177,8 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 uint16_t next = connection->next_seq;
 
                 // Beregner "avstand" mellom to sekvensnumre i 14-bit-verden
-                int16_t diff_base_ack = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
-                int16_t diff_ack_next = (int16_t)((next - ack_seq + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+                // int16_t diff_base_ack = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+                // int16_t diff_ack_next = (int16_t)((next - ack_seq + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
 
                 // Beregn hvor langt ACK ligger fra base_seq
                 int16_t diff = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
@@ -263,10 +263,13 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         app_connection *connection = &app_connections[idx];
 
         // --- Første pakke mottatt: synkroniser expected_seq ---
-        if (connection->expected_seq == 0 && seq > 0) {
-            connection->expected_seq = seq;
-            printf("[MIPTPD][INIT] Syncing expected_seq to first received seq=%u\n", seq);
+        if (!connection->synced) {
+            connection->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
+            connection->synced = 1;
+            printf("[MIPTPD][INIT] Syncing expected_seq=%u (after first received seq=%u)\n",
+                connection->expected_seq, seq);
         }
+
         uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
 
         // Beregner "avstand" mellom seq og expected i 14-bit-verden
