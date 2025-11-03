@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+
 #include <time.h>
 
 /*
@@ -37,95 +38,56 @@ Metode for å:
 void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     printf("[MIPTPD] send_miptp_data() called (fd=%d, len=%zu)\n", app_fd, len);
 
-    //sjekekr at lengden på payloaded er stor nok
     if (len < 2) {
         fprintf(stderr, "[MIPTPD] Invalid payload (too short)\n");
         return;
     }
 
-    // -- pakker ut app meldingen
-    uint8_t dst_mip  = data[0]; // der pakken skal
-    uint8_t dst_port = data[1]; //porten pakkes skal sendes ut på
-    uint8_t *payload = data + 2; //selve dataen som skal sendes
-    size_t payload_len = len - 2; //lengden på dataen, -2 siden dst_mip og dst_port har data[0] og data[1]
+    // --- Pakk ut felter fra app-meldingen ---
+    uint8_t dst_mip  = data[0];  // destinasjons-MIP
+    uint8_t dst_port = data[1];  // mottakerens port
+    uint8_t *payload = data + 2; // selve nyttelasten
+    size_t payload_len = len - 2;
 
-    // -- henter faktisk port fra app_fd (lagret i en connections_table)
+    // --- Finn avsenderport og connection ---
     uint8_t src_port = get_port_from_fd(app_fd);
-
-    //-- finner riktig forbindelse
     int idx = get_index(app_fd);
     if (idx < 0) return;
-
     app_connection *connection = &app_connections[idx];
 
-     // -- sjekker om vinduet er fullt
+    // --- Sjekk at vinduet ikke er fullt ---
     if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {
-        // Hvis antall pakker i flyt (next_seq - base_seq) er lik vindusstørrelsen
         printf("[MIPTPD] Window full for port %d — cannot send yet\n", connection->port);
         return;
     }
 
-    // -- setter sekvensnummer
-    uint16_t seq = connection->next_seq; // Bruker gjeldende next_seq som sekvensnummer for denne pakken
-    connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ; // mod 2^14 for å håndtere sekvens-wraparound
+    // --- Sett sekvensnummer ---
+    uint16_t seq = connection->next_seq;
+    connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ;
 
-    // -- Lager selve MIPTP-header
-    // miptp_hdr_t hdr = {0};
-    // hdr.src_port = src_port;
-    // hdr.dst_port = dst_port;
-    // hdr.seq_pad = pack_seq_pad(seq, 0);// 0 = data, ikke ack
     printf("[MIPTPD] Sending seq=%u from port %d\n", seq, src_port);
 
-    // -- Bygger selve MIPTP-pakken, [Header][Payload]
-    uint8_t packet[1500];
-    size_t offset = 0;
+    // --- Bygg MIPTP PDU ---
+    size_t pdu_len;
+    uint8_t *pdu = build_data_pdu(src_port, dst_port, seq, payload, payload_len, &pdu_len);
 
-    packet[offset++] = dst_mip;
-    // src_port
-    packet[offset++] = src_port;
-    // dst_port
-    packet[offset++] = dst_port;
-    // seq_pad
-    uint16_t seq_pad_host = pack_seq_pad(seq, 0);
-    uint16_t seq_pad_net = htons(seq_pad_host);       // Viktig!
-    memcpy(packet + offset, &seq_pad_net, sizeof(uint16_t));
-    offset += sizeof(uint16_t);
+    // --- Lagre i sendvinduet for retransmisjon ---
+    int slot = seq % MIPTP_WINDOW_SIZE;
+    connection->window[slot].seq = seq;
+    connection->window[slot].len = pdu_len;
+    memcpy(connection->window[slot].data, pdu, pdu_len);
+    connection->window[slot].sent_time = time(NULL);
+    connection->window[slot].acked = 0;
+    connection->window_count++;
 
+    // --- Send til mipd ---
+    send_miptp_pdu(dst_mip, pdu, pdu_len);
+    free(pdu);
 
-    // payload
-    memcpy(packet + offset, payload, payload_len);
-    ssize_t packet_len = offset + payload_len;
-
-    printf("[DEBUG][TX->MIPD] First 10 bytes: ");
-    for (size_t i = 0; i < 10; i++) printf("%02X ", packet[i]);
-    printf("\n");
-
-    // -- lagrer pakken i sendebuffer for retransmisjon
-    int slot = seq % MIPTP_WINDOW_SIZE; // Beregner plass i vinduet (sirkulær buffer)
-    connection->window[slot].seq = seq; // Lagrer sekvensnummer i vindusplassen
-    connection->window[slot].len = packet_len; // Lagre hvor lang pakken er (for retransmisjon)
-
-    memcpy(connection->window[slot].data, packet, packet_len); // Kopier hele pakken inn i vindusbufferen (slik den kan sendes igjen)
-    connection->window[slot].sent_time = time(NULL); // Merker tidspunktet pakken ble sendt (for timeout-sjekk)
-    connection->window[slot].acked = 0;   // Setter ACK-status til 0 — den er sendt, men ikke bekreftet
-
-    // sender pakken til mip deamon for å sende ut på nettverket
-    printf("[DEBUG][TX->MIPD] Sending %zd bytes: ", packet_len);
-    for (size_t i = 0; i < (size_t)packet_len; i++) printf("%02X ", packet[i]);
-    printf("\n");
-    ssize_t sent = write(MIP_FD, packet, packet_len);
-
-
-    if (sent < 0){
-        perror("[MIPTPD] write to mipd");
-    }
-    else {
-        printf("[MIPTPD] Sent %zd bytes to mipd\n", sent);
-        printf("[MIPTPD] Sending packet to mipd (dst_mip=%d, len=%zd)\n", packet[0], sent);
-     }
-
-   
+    printf("[MIPTPD] Packet queued and sent (dst_mip=%d, seq=%u, len=%zu)\n",
+           dst_mip, seq, pdu_len);
 }
+
 
 /*
 Ansvar:
@@ -150,95 +112,98 @@ Ansvar:
  *   - Fjern eventuell padding fra payload
 */
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
-    // er pakken stor nok til å ha en header
-    if (len < sizeof(miptp_hdr_t)) return;
+    // Sjekk at vi har nok data til å inneholde minst en MIPTP-header
+    if (len < 1 + sizeof(miptp_hdr_t)) {
+        fprintf(stderr, "[MIPTPD] Incoming packet too short (%zu bytes)\n", len);
+        return;
+    }
 
     printf("[DEBUG][RX<-MIPD] First 10 bytes: ");
     for (size_t i = 0; i < len && i < 10; i++) printf("%02X ", buf[i]);
     printf("\n");
-    
-     // Debug: dump hele rå MIPTP-pakken slik den kommer fra mipd
+
     printf("[DEBUG] Raw incoming MIPTP packet (len=%zu): ", len);
     for (size_t i = 0; i < len; i++) printf("%02X ", buf[i]);
     printf("\n");
 
-    //kopierer ut miptpd header fra buffer
+    // Pakk ut MIPTP-headeren (starter etter MIP-destinasjonsbyte)
     miptp_hdr_t hdr;
     memcpy(&hdr, buf + 1, sizeof(hdr));
+
+    // Finn peker til payload (SDU) og lengden på den
     uint8_t *payload = buf + 1 + sizeof(hdr);
     size_t payload_len = len - 1 - sizeof(hdr);
 
-
-    printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu\n",
-           src_mip, hdr.src_port, hdr.dst_port, payload_len);
-    
-    // uint16_t seq = (hdr.seq_pad) >> 2; // hent 14-bit sekvens
-    // uint8_t pad = hdr.seq_pad & 0x3; //brukes senere for padding controll
-
+    // Hent sekvensnummer og padding fra feltet (14 + 2 bit)
     uint16_t seq;
     uint8_t pad;
-
     unpack_seq_pad(ntohs(hdr.seq_pad), &seq, &pad);
 
-    printf("[MIPTPD] Got packet seq=%u src_port=%d dst_port=%d len=%zu\n",
-       seq, hdr.src_port, hdr.dst_port, payload_len);
+    printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu seq=%u pad=%u\n",
+           src_mip, hdr.src_port, hdr.dst_port, payload_len, seq, pad);
 
-    // ACK pdu
-    if (pad == 1) {
-        int fd = get_fd_from_port(hdr.dst_port); //henter hvilken app tilkobling acken hører til
+    // ------------------------------------------
+    //  ACK-PDU (ingen payload)
+    // ------------------------------------------
+    if (payload_len == 0) {
+        int fd = get_fd_from_port(hdr.dst_port);
         if (fd >= 0) {
-            int idx = get_index(fd); //henter indexen appen har i app_connections tabellen
-          
+            int idx = get_index(fd);
             if (idx >= 0) {
                 app_connection *connection = &app_connections[idx];
                 uint16_t ack_seq = seq;
 
                 printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
-                    seq, hdr.dst_port);
+                       seq, hdr.dst_port);
 
-                // marker pakken som ACKet
-                int slot = ack_seq % MIPTP_WINDOW_SIZE; // Finner posisjonen i vinduet (mod MIPTP_WINDOW_SIZE for sirkulær buffer)
+                int slot = ack_seq % MIPTP_WINDOW_SIZE;
+
                 if (connection->window[slot].acked) {
                     printf("[DEBUG] Duplicate ACK ignored (seq=%u)\n", ack_seq);
-                    return; // vi trenger ikke gjøre mer
+                    return;
                 }
 
-                connection->window[slot].acked = 1; //markerer pakken som mottatt
+                connection->window[slot].acked = 1;
 
-                // flytter base_seq frem hvis mulig (ruller frem vinduet)
-                while (connection->base_seq != connection->next_seq && // det finnes usendte eller uackede pakker
-                    connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) { // // og den eldste (base_seq) er ACK-et
-
-                    connection->base_seq = (connection->base_seq + 1) % MIPTP_MAX_SEQ; // flytter base_seq ett steg frem (vindusstart flyttes)
-                    connection->window_count--; // reduser antall pakker i vinduet (frigjør plass)
+                // Flytt base_seq fremover hvis mulig
+                while (connection->base_seq != connection->next_seq &&
+                       connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) {
+                    connection->base_seq = (connection->base_seq + 1) % MIPTP_MAX_SEQ;
+                    connection->window_count--;
                 }
-
-                return; 
+                return;
             }
         }
+
         printf("[MIPTPD] ACK received but no matching connection found (dst_port=%d)\n",
                hdr.dst_port);
         return;
     }
-    
-    //data pdu
+
+    // ------------------------------------------
+    //  DATA-PDU (har payload)
+    // ------------------------------------------
     int app_fd = get_fd_from_port(hdr.dst_port);
     if (app_fd < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr.dst_port);
         return;
     }
-    
+    if (payload_len >= pad) payload_len -= pad;
+
+    // Lever meldingen til appen (format: [src_mip][src_port][payload])
     uint8_t msg[2 + payload_len];
     msg[0] = src_mip;
     msg[1] = hdr.src_port;
     memcpy(msg + 2, payload, payload_len);
 
     ssize_t sent = write(app_fd, msg, sizeof(msg));
+
+    // Send ACK tilbake
     send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, seq);
- 
+
     if (sent > 0) {
-    printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n",
-           sent, hdr.dst_port, app_fd);
+        printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n",
+               sent, hdr.dst_port, app_fd);
     } else {
         perror("[MIPTPD] write to app failed");
         fprintf(stderr, "[DEBUG] Current connection table:\n");
@@ -249,45 +214,88 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     }
 }
 
+uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
+                        uint16_t seq, const uint8_t *sdu, size_t sdu_len,
+                        size_t *out_len)
+{
+    // Finn hvor mange bytes som må til for 32-bit alignment
+    uint8_t padlen = (4 - ((sizeof(miptp_hdr_t) + sdu_len) % 4)) % 4;
 
-void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq) {
-    miptp_hdr_t hdr = {0};
-    hdr.src_port = dst_port; // egen port er nå source
-    hdr.dst_port = src_port; // sender tilbake ack til source
+    // Alloker buffer: header + SDU + pad
+    size_t total = sizeof(miptp_hdr_t) + sdu_len + padlen;
+    uint8_t *buf = malloc(total);
+    if (!buf) {
+        perror("malloc build_data_pdu");
+        exit(EXIT_FAILURE);
+    }
 
-    // padlen=1 (ACK-type), sekvensnummer settes som vanlig
-    uint16_t sp_host = pack_seq_pad(seq, 1);
-    hdr.seq_pad = htons(sp_host);   
+    miptp_hdr_t hdr;
+    hdr.src_port = src_port;
+    hdr.dst_port = dst_port;
+    hdr.seq_pad  = htons(pack_seq_pad(seq, padlen)); // packer 14-bit seq + 2-bit padlen
 
-    // Bygg pakken
-    uint8_t packet[1 + sizeof(hdr)];
-    packet[0] = dst_mip;
-    memcpy(packet + 1, &hdr, sizeof(hdr));
+    memcpy(buf, &hdr, sizeof(hdr));
 
-    ssize_t sent = write(MIP_FD, packet, sizeof(packet));
-    if (sent < 0)
-        perror("[MIPTPD] write ACK to mipd");
-    else
-        printf("[MIPTPD] Sent ACK (seq=%u) to MIP %d, port=%d\n", seq, dst_mip, dst_port);
+    if (sdu_len > 0)
+        memcpy(buf + sizeof(hdr), sdu, sdu_len);
+
+    if (padlen > 0)
+        memset(buf + sizeof(hdr) + sdu_len, 0, padlen);
+
+    if (out_len) *out_len = total;
+    return buf;
 }
 
+uint8_t *build_ack_pdu(uint8_t src_port, uint8_t dst_port,
+                       uint16_t seq, size_t *out_len)
+{
+    uint8_t padlen = (4 - (sizeof(miptp_hdr_t) % 4)) % 4;
 
+    size_t total = sizeof(miptp_hdr_t) + padlen;
+    uint8_t *buf = malloc(total);
+    if (!buf) { perror("malloc build_ack_pdu"); exit(EXIT_FAILURE); }
 
-// int init_mip_socket(const char *path);
-// void send_miptp_data(uint8_t dst_mip, uint8_t *pdu, size_t len);
-// void send_miptp_ack(uint8_t dst_mip, uint8_t dst_port, uint16_t seq);
-// void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
+    miptp_hdr_t hdr;
+    hdr.src_port = src_port;
+    hdr.dst_port = dst_port;
+    hdr.seq_pad  = htons(pack_seq_pad(seq, padlen));
 
+    memcpy(buf, &hdr, sizeof(hdr));
+    if (padlen > 0) memset(buf + sizeof(hdr), 0, padlen);
 
-// // Fra miptp_mip.c
-// void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
-// void send_miptp_data(int app_fd, uint8_t *data, size_t len);
+    if (out_len) *out_len = total;
+    return buf;
+}
 
+void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len) {
+    uint8_t ttl = 10; // kan være standard
+    uint8_t buffer[2 + pdu_len];
+
+    buffer[0] = dst_mip; // destinasjons-MIP, mipd bruker denne for routing
+    buffer[1] = ttl;     // TTL-felt som mipd legger i MIP-headeren
+    memcpy(buffer + 2, miptp_pdu, pdu_len);
+
+    ssize_t sent = write(MIP_FD, buffer, sizeof(buffer));
+    if (sent < 0)
+        perror("[MIPTPD] write to mipd");
+    else
+        printf("[MIPTPD] Sent %zd bytes to mipd (dst=%d)\n", sent, dst_mip);
+}
 
 /*
   Sender en MIPTP-ACK tilbake til avsender.
-  - dst_mip: MIP-adressen pakken skal til
-  - src_port: porten som sender ACK (vår port)
-  - dst_port: porten vi svarer til
-  - seq: sekvensnummeret vi bekrefter
+
 */
+
+void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq) {
+    size_t pdu_len;
+    uint8_t *pdu = build_ack_pdu(dst_port, src_port, seq, &pdu_len); // bare MIPTP-laget
+
+    // send til mipd som UNIX-klient
+    send_miptp_pdu(dst_mip, pdu, pdu_len);
+    free(pdu);
+
+    printf("[MIPTPD] Sent ACK (seq=%u) to MIP %d, port=%d\n", seq, dst_mip, dst_port);
+}
+
+

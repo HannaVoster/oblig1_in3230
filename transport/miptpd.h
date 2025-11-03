@@ -91,7 +91,11 @@ void handle_app_message(int app_fd);
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
 void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq);
-
+uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
+                        uint16_t seq, const uint8_t *sdu, size_t sdu_len,
+                        size_t *out_len);
+uint8_t *build_ack_pdu(uint8_t src_port, uint8_t dst_port,
+                       uint16_t seq, size_t *out_len);
 
 // // Fra miptp_utils.c
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
