@@ -96,6 +96,7 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
                         size_t *out_len);
 uint8_t *build_ack_pdu(uint8_t src_port, uint8_t dst_port,
                        uint16_t seq, size_t *out_len);
+void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len);
 
 // // Fra miptp_utils.c
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
