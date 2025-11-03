@@ -251,7 +251,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     }
 
 
-    // ------------------------------------------
+        // ------------------------------------------
     //  DATA-PDU (har payload)
     // ------------------------------------------
     int app_fd = get_fd_from_port(hdr.dst_port);
@@ -264,16 +264,34 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     if (idx >= 0) {
         app_connection *connection = &app_connections[idx];
 
-        // --- Første pakke mottatt: synkroniser expected_seq ---
+        // --- Første pakke mottatt: synkroniser expected_seq og lever pakken ---
         if (!connection->synced) {
-        connection->expected_seq = seq; // lever første pakke
-        connection->synced = 1;
-        printf("[MIPTPD][INIT] Syncing expected_seq=%u (first seq=%u)\n",
-            connection->expected_seq, seq);
-        }
-        uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
+            connection->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
+            connection->synced = 1;
+            printf("[MIPTPD][INIT] First packet seq=%u → setting expected_seq=%u\n",
+                seq, connection->expected_seq);
 
-        // Beregn hvor langt frem pakken ligger i forhold til expected (mod 2^14)
+            // Lever første pakke umiddelbart
+            if (payload_len >= pad) payload_len -= pad;
+
+            uint8_t msg[2 + payload_len];
+            msg[0] = src_mip;
+            msg[1] = hdr.src_port;
+            memcpy(msg + 2, payload, payload_len);
+
+            ssize_t sent = write(app_fd, msg, sizeof(msg));
+            if (sent > 0)
+                printf("[MIPTPD] Delivered first %zd bytes to app port %d (fd=%d)\n",
+                    sent, hdr.dst_port, app_fd);
+            else
+                perror("[MIPTPD] write to app failed");
+
+            // Send ACK for denne første pakken
+            send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, seq);
+            return; // ferdig for første pakke
+        }
+
+        uint16_t expected = connection->expected_seq;
         uint16_t ahead = (seq + MIPTP_MAX_SEQ - expected) % MIPTP_MAX_SEQ;
 
         // CASE 1: Pakke er for gammel / duplikat
@@ -291,21 +309,12 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 seq, expected);
             return;
         }
-    }       
-// Hvis vi kommer hit: pakken er innenfor mottaksvinduet
 
-    
-    // Gyldig pakke innenfor mottaksvinduet — sjekk om den er in-order
-    if (payload_len >= pad) payload_len -= pad;
-
-    // Etter levering: finn connection for å oppdatere expected_seq
-    int idx2 = get_index(app_fd);
-    if (idx2 >= 0) {
-        app_connection *connection = &app_connections[idx2];
+        // --- In-order / out-of-order håndtering ---
+        if (payload_len >= pad) payload_len -= pad;
 
         if (seq == connection->expected_seq) {
             // --- IN-ORDER pakke ---
-            // Lever meldingen til appen (format: [src_mip][src_port][payload])
             uint8_t msg[2 + payload_len];
             msg[0] = src_mip;
             msg[1] = hdr.src_port;
@@ -313,36 +322,26 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
             ssize_t sent = write(app_fd, msg, sizeof(msg));
 
-            // Oppdater forventet sekvensnummer (venter nå på neste)
             connection->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
-
-            // Send ACK tilbake for denne pakken
             send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, seq);
 
-            if (sent > 0) {
+            if (sent > 0)
                 printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n",
                     sent, hdr.dst_port, app_fd);
-            } else {
+            else
                 perror("[MIPTPD] write to app failed");
-                fprintf(stderr, "[DEBUG] Current connection table:\n");
-                for (int i = 0; i < MAX_APPS; i++)
-                    if (app_connections[i].app_fd)
-                        fprintf(stderr, "  [%d] fd=%d port=%d\n",
-                                i, app_connections[i].app_fd, app_connections[i].port);
-            }
 
         } else {
             // --- OUT-OF-ORDER pakke ---
             printf("[MIPTPD][RX] Out-of-order packet (seq=%u expected=%u) ignored.\n",
                 seq, connection->expected_seq);
 
-            // Send ACK for forrige korrekt mottatte pakke
             send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port,
                         (connection->expected_seq - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
             return;
         }
     }
-}
+
 
 uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
                         uint16_t seq, const uint8_t *sdu, size_t sdu_len,
