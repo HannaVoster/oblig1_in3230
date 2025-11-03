@@ -20,43 +20,37 @@
 */
 
 void check_retransmissions() {
-    time_t now = time(NULL); // Henter nåværende tid
+    time_t now = time(NULL);
 
-    for (int i = 0; i < MAX_APPS; i++) { // Går gjennom alle registrerte applikasjoner
+    for (int i = 0; i < MAX_APPS; i++) {
         app_connection *connection = &app_connections[i];
         if (connection->app_fd <= 0)
-            continue; // Hopper over inaktive forbindelser
+            continue;
 
         uint16_t base = connection->base_seq;
         if (base == connection->next_seq)
-            continue; // Ingen pakker i vinduet akkurat nå
+            continue; // ingen uackede pakker
 
-        // Hent første (eldste) pakke i vinduet — kun denne som har aktiv timer
         packet_entry *p = &connection->window[base % MIPTP_WINDOW_SIZE];
         if (p->acked || p->len == 0)
-            continue; // Hopper over tom eller allerede ACKet plass
+            continue;
 
-        // Sjekker om timeout har inntruffet (her etter 2 sekunder)
         if (difftime(now, p->sent_time) > 2.0) {
             printf("[MIPTPD][TIMEOUT] base_seq=%u timed out (port=%d) — resending window\n",
                    base, connection->port);
 
-            // Starter retransmisjon fra base_seq til next_seq - 1
             uint16_t seq = base;
-
-            while (seq != connection->next_seq) { // Sender alle pakker i aktivt vindu
+            while (seq != connection->next_seq) {
                 int slot = seq % MIPTP_WINDOW_SIZE;
                 packet_entry *r = &connection->window[slot];
 
-                // Sender kun pakker som fortsatt venter på ACK
                 if (!r->acked && r->len > 0) {
-                    ssize_t resent = write(MIP_FD, r->data, r->len);
-                    if (resent > 0) {
-                        r->sent_time = now; // Oppdaterer tidspunkt for ny sending
-                        printf("[MIPTPD] Resent seq=%u (%zd bytes)\n", seq, resent);
-                    }
+                    // ✅ Bruk korrekt funksjon slik at MIP-header legges på
+                    send_miptp_pdu(connection->peer_mip, r->data, r->len);
+                    r->sent_time = now;
+                    printf("[MIPTPD][RTX] Resent seq=%u (%zu bytes) to MIP %u\n",
+                           seq, r->len, connection->peer_mip);
                 }
-                // Øker sekvensnummer (med wrap-around)
                 seq = (seq + 1) % MIPTP_MAX_SEQ;
             }
         }
