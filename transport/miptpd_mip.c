@@ -232,7 +232,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
 
             connection->queue_head++;
             connection->queue_count--;
-            connection->window_count++;
         }
 
         // ------------------------------------------------------------
@@ -266,35 +265,35 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         app_connection *connection = &app_connections[idx];
 
         // --- Første pakke mottatt: synkroniser expected_seq ---
-        if (!connection->synced) {
-            connection->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
+         if (!connection->synced) {
+            connection->expected_seq = seq; // lever første pakke
             connection->synced = 1;
-            printf("[MIPTPD][INIT] Syncing expected_seq=%u (after first received seq=%u)\n",
+            printf("[MIPTPD][INIT] Syncing expected_seq=%u (first seq=%u)\n",
                 connection->expected_seq, seq);
-        }
 
         uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
 
-        // Beregner "avstand" mellom seq og expected i 14-bit-verden
-        int16_t diff_seq_exp = (int16_t)((seq - expected + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+        // Beregn hvor langt frem pakken ligger i forhold til expected (mod 2^14)
+        uint16_t ahead = (seq + MIPTP_MAX_SEQ - expected) % MIPTP_MAX_SEQ;
 
-        // CASE 1: Pakke er gammel (duplikat)
-        if (diff_seq_exp < 0) {
+        // CASE 1: Pakke er for gammel / duplikat
+        if (ahead >= MIPTP_MAX_SEQ - MIPTP_WINDOW_SIZE) {
             printf("[MIPTPD][RX] Duplicate or old DATA packet ignored (seq=%u expected=%u)\n",
                 seq, expected);
-            // Send ACK igjen slik at sender vet vi allerede har denne
-            // acker den siste gyldige pakken
-            send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, 
-               (expected - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+            send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port,
+                        (expected - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
             return;
         }
 
-        // CASE 2: Pakke er utenfor mottaksvinduet (for langt frem)
-        if (diff_seq_exp >= MIPTP_WINDOW_SIZE) {
+        // CASE 2: Pakke er for langt frem (utenfor mottaksvinduet)
+        if (ahead >= MIPTP_WINDOW_SIZE) {
             printf("[MIPTPD][RX] Out-of-window DATA ignored (seq=%u expected=%u)\n",
                 seq, expected);
             return;
         }
+
+// Hvis vi kommer hit: pakken er innenfor mottaksvinduet
+
     }
     // Gyldig pakke innenfor mottaksvinduet — sjekk om den er in-order
     if (payload_len >= pad) payload_len -= pad;
