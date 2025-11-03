@@ -23,7 +23,12 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#include "miptpd.h"   // felles header for MIPTP
+#include "miptpd.h"
+#include "miptpd_utils.h"
+#include "miptpd_send.h"
+#include "miptpd_incoming.h"
+#include "miptpd_retransmit.h"
+
 
 #define MAX_EVENTS 32
 int debug_mode = 0;

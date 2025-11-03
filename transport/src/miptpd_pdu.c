@@ -6,7 +6,8 @@
  *  - Returnere ferdige byte-buffere klare for sending til mipd
  */
 
-#include "miptpd.h"
+#include "miptpd_send.h"
+#include "miptpd_utils.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>

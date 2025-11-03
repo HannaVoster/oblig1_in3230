@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "miptpd_retransmit.h"
+#include "miptpd_send.h"
 
 
 //sjekker at pakker som ikke er blitt acked innen en viss tid sendes på nytt
