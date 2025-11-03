@@ -212,8 +212,11 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         printf("[MIPTPD][GBN] base_seq advanced %u → %u\n", old_base, connection->base_seq);
 
         // Oppdater antall pakker i vinduet
-        connection->window_count =
-            (connection->next_seq + MIPTP_MAX_SEQ - connection->base_seq) % MIPTP_MAX_SEQ;
+        // Oppdater antall pakker i vinduet
+        uint16_t in_flight = (connection->next_seq + MIPTP_MAX_SEQ - connection->base_seq) % MIPTP_MAX_SEQ;
+        if (in_flight > MIPTP_WINDOW_SIZE)
+            in_flight = MIPTP_WINDOW_SIZE;
+        connection->window_count = in_flight;
 
         // ------------------------------------------------------------
         // Send køede meldinger hvis det er ledig plass i vinduet
