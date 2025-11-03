@@ -1,29 +1,24 @@
-
+# =====================================
 # Makefile for mipd_and_routing
+# =====================================
 
-
-# Kompilator og flagg
 CC      = gcc
-CFLAGS  = -Wall -Wextra -g -Isrc -Iinclude
+CFLAGS  = -Wall -Wextra -g -Iinclude -Isrc
 
-# Mapper
 BIN_DIR = ../bin
 SRC_DIR = src
 
-# Programmer som skal bygges
 TARGETS = $(BIN_DIR)/mipd \
            $(BIN_DIR)/ping_client \
            $(BIN_DIR)/ping_server \
            $(BIN_DIR)/routingd
 
-# Standardregel
 all: $(BIN_DIR) $(TARGETS)
 
-# Opprett bin/ hvis den ikke finnes
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-# Bygg MIP-daemon (nettverkslaget)
+# Bygg MIP-daemon
 $(BIN_DIR)/mipd: $(SRC_DIR)/mipd.c \
                  $(SRC_DIR)/pdu.c \
                  $(SRC_DIR)/arp.c \

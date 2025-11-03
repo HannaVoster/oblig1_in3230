@@ -1,10 +1,11 @@
 # ================================
-# Kompileringsvalg
+# Makefile for transport-laget (MIPTP)
 # ================================
+
 CC      = gcc
-CFLAGS  = -Wall -Wextra -g -I../include
+CFLAGS  = -Wall -Wextra -g -Iinclude
 BIN_DIR = ../bin
-SRC_DIR = .
+SRC_DIR = src
 
 TARGETS = $(BIN_DIR)/miptpd \
            $(BIN_DIR)/miptpd_client \
@@ -18,6 +19,7 @@ all: $(BIN_DIR) $(TARGETS)
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
+# Kilde­filene til MIPTP-daemon
 MIPTPD_SRC = $(SRC_DIR)/miptpd.c \
               $(SRC_DIR)/miptpd_unix.c \
               $(SRC_DIR)/miptpd_mip_incoming.c \
@@ -26,26 +28,31 @@ MIPTPD_SRC = $(SRC_DIR)/miptpd.c \
               $(SRC_DIR)/miptpd_pdu.c \
               $(SRC_DIR)/miptpd_utils.c
 
-
 # MIPTP daemon
-$(BIN_DIR)/miptpd: $(MIPTPD_SRC) ../include/miptpd.h
+$(BIN_DIR)/miptpd: $(MIPTPD_SRC)
 	$(CC) $(CFLAGS) -o $@ $(MIPTPD_SRC)
 
 # Klient
-$(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c ../include/miptpd.h
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_client.c
+$(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c
+	$(CC) $(CFLAGS) -o $@ $^
 
 # Server
-$(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c ../include/miptpd.h
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/miptpd_server.c
+$(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c
+	$(CC) $(CFLAGS) -o $@ $^
 
 # Tester
-$(BIN_DIR)/test_app: $(SRC_DIR)/test_app.c ../include/miptpd.h
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/test_app.c
+$(BIN_DIR)/test_app: $(SRC_DIR)/test_app.c
+	$(CC) $(CFLAGS) -o $@ $^
 
-$(BIN_DIR)/test_server: $(SRC_DIR)/test_server.c ../include/miptpd.h
-	$(CC) $(CFLAGS) -o $@ $(SRC_DIR)/test_server.c
+$(BIN_DIR)/test_server: $(SRC_DIR)/test_server.c
+	$(CC) $(CFLAGS) -o $@ $^
 
+# Rydd opp
 clean:
-	rm -f $(BIN_DIR)/*
+	rm -f $(BIN_DIR)/miptpd \
+	      $(BIN_DIR)/miptpd_client \
+	      $(BIN_DIR)/miptpd_server \
+	      $(BIN_DIR)/test_app \
+	      $(BIN_DIR)/test_server
+
 
