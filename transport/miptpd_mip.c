@@ -54,6 +54,8 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     int idx = get_index(app_fd);
     if (idx < 0) return;
     app_connection *connection = &app_connections[idx];
+    connection->peer_mip = dst_mip;
+
 
     // --- Sjekk at vinduet ikke er fullt ---
     if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {

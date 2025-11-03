@@ -65,6 +65,7 @@ typedef struct {
     int queue_head;
     int queue_tail;
     int queue_count;
+    uint8_t peer_mip;
 
     uint16_t expected_seq;
     int synced; //

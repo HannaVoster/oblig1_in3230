@@ -1,14 +1,4 @@
-//Håndtering av Go-Back-N, tidsstyring og vindu
 
-/*
-**Ansvar:**
-
-- Holde oversikt over sendervinduet (16 pakker)
-- Starte og resette timer ved send/ACK
-- Gjenutsending av tapte pakker
-- Fjerne ACKede pakker fra bufferen
-
-*/
 
 #include <time.h>
 #include <unistd.h>
