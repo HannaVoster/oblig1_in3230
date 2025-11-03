@@ -95,6 +95,3 @@ int create_app_socket(const char *path) {
     return fd;
 }
 
-
-void handle_new_app_connection(int unix_fd);
-void handle_app_message(int app_fd);
