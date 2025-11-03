@@ -57,9 +57,24 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
 
     // --- Sjekk at vinduet ikke er fullt ---
     if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {
-        printf("[MIPTPD] Window full for port %d — cannot send yet\n", connection->port);
+    if (connection->queue_count >= MIPTP_MAX_QUEUE) {
+        fprintf(stderr, "[MIPTPD] Send queue overflow — closing app connection\n");
+        close(app_fd);
         return;
     }
+
+    // Legger meldingen i kø
+    int pos = connection->queue_tail % MIPTP_MAX_QUEUE;
+    memcpy(connection->queue[pos].data, data, len);
+    connection->queue[pos].len = len;
+    connection->queue_tail++;
+    connection->queue_count++;
+
+    printf("[MIPTPD][QUEUE] Window full — queued SDU (total queued=%d)\n",
+           connection->queue_count);
+    return;
+}
+
 
     // --- Sett sekvensnummer ---
     uint16_t seq = connection->next_seq;
@@ -166,13 +181,34 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 connection->window[slot].acked = 1;
 
                 // Flytt base_seq fremover hvis mulig
+                // Flytt base_seq fremover hvis mulig
                 while (connection->base_seq != connection->next_seq &&
-                       connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) {
+                    connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) {
+
                     connection->base_seq = (connection->base_seq + 1) % MIPTP_MAX_SEQ;
-                    connection->window_count--;
+                    if (connection->window_count > 0) connection->window_count--;
 
                     printf("[MIPTPD][GBN] base_seq advanced to %u\n", connection->base_seq);
                 }
+
+                // Etter at base_seq er flyttet frem, se om vi har plass i vinduet
+                while (connection->queue_count > 0 &&
+                    (connection->next_seq - connection->base_seq) < MIPTP_WINDOW_SIZE) {
+
+                    int pos = connection->queue_head % MIPTP_MAX_QUEUE;
+                    uint8_t *next_data = connection->queue[pos].data;
+                    size_t next_len = connection->queue[pos].len;
+
+                    printf("[MIPTPD][QUEUE] Sending queued packet (remaining=%d)\n",
+                        connection->queue_count - 1);
+
+                    // Bruker eksisterende app_fd fra denne connection
+                    send_miptp_data(connection->app_fd, next_data, next_len);
+
+                    connection->queue_head++;
+                    connection->queue_count--;
+                }
+
                 // Hvis alt er ACKet
                 if (connection->base_seq == connection->next_seq) {
                     printf("[MIPTPD][GBN] ✅ All packets ACKed — window now empty (base_seq=%u)\n",
@@ -181,6 +217,9 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                     printf("[MIPTPD][GBN] Waiting for more ACKs (base_seq=%u, next_seq=%u)\n",
                         connection->base_seq, connection->next_seq);
                 }
+                if (connection->queue_count == 0)
+                printf("[MIPTPD][QUEUE] ✅ Queue empty — all queued SDUs sent.\n");
+                
                 return;
             }
         }

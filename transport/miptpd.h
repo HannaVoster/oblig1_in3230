@@ -10,6 +10,7 @@
 #define MIPTP_MAX_PAYLOAD 1400
 #define MIPTP_WINDOW_SIZE 16
 #define MIPTP_MAX_SEQ 16384  // 14 bits
+#define MIPTP_MAX_QUEUE 64
 
 #define MAX_APPS 20
 
@@ -43,16 +44,27 @@ typedef struct {
     int acked;
 } packet_entry;
 
+typedef struct {
+    uint8_t data[1500];
+    size_t len;
+} queued_packet;
+
+
 // støtter go back n logikk, retransmisjon, sliding window og ack håndtering
 typedef struct {
     int app_fd;
     uint8_t port;
-
     uint16_t base_seq; // første uackede sekvens
     uint16_t next_seq;  // neste som skal sendes
-    packet_entry window[MIPTP_WINDOW_SIZE]; // pakke-buffer
 
+    packet_entry window[MIPTP_WINDOW_SIZE]; // pakke-buffer
     uint8_t window_count; // antall aktive i vinduet
+
+    // kø:
+    queued_packet queue[MIPTP_MAX_QUEUE];
+    int queue_head;
+    int queue_tail;
+    int queue_count;
 } app_connection;
 
 extern app_connection app_connections[MAX_APPS];
