@@ -289,7 +289,7 @@ void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len) {
 
 void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq) {
     size_t pdu_len;
-    uint8_t *pdu = build_ack_pdu(src_port, dst_port, seq, &pdu_len); // bare MIPTP-laget
+    uint8_t *pdu = build_ack_pdu(src_port, src_port, seq, &pdu_len); // bare MIPTP-laget
 
     // send til mipd som UNIX-klient
     send_miptp_pdu(dst_mip, pdu, pdu_len);
