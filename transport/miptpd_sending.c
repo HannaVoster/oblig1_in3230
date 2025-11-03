@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 /*
   Sender en ferdigbygget MIPTP-PDU til MIP-daemonen

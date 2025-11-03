@@ -113,13 +113,13 @@ int connect_to_mipd(const char *path);
 int create_app_socket(const char *path);
 
 
-// // Fra miptp_mip.c
+// Fra miptp_mip_incoming.c
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
 void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip);
 void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
                           uint16_t seq, uint8_t pad, uint8_t src_mip);
 
-
+// 
 void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq);
 uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
