@@ -180,8 +180,11 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 int16_t diff_base_ack = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
                 int16_t diff_ack_next = (int16_t)((next - ack_seq + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
 
-                // Hvis ack_seq er for gammel eller for langt fremme -> ignorer
-                if (diff_base_ack < 0 || diff_ack_next <= 0 || diff_base_ack >= MIPTP_WINDOW_SIZE) {
+                // Beregn hvor langt ACK ligger fra base_seq
+                int16_t diff = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+
+                // Gyldig ACK må ligge i intervallet [0, window_size)
+                if (diff < 0 || diff >= MIPTP_WINDOW_SIZE) {
                     printf("[MIPTPD][GBN] Ignored out-of-window ACK (seq=%u base=%u next=%u)\n",
                         ack_seq, base, next);
                     return;
