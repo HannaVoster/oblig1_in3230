@@ -18,7 +18,6 @@ int main(int argc, char *argv[]) {
     }
 
     const char *socket_arg = argv[1];
-    const char *message = argv[2];
     uint8_t dst_mip = atoi(argv[3]);
     const uint8_t dst_port = DST_PORT;
 
@@ -51,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     printf("Connected to MIPTP daemon at %s\n", socket_path);
 
-    // 1️⃣ Send portnummeret først (registrering)
+    // Send portnummeret først (registrering)
     if (write(fd, &my_port, 1) != 1) {
         perror("write port");
         close(fd);
@@ -82,7 +81,6 @@ int main(int argc, char *argv[]) {
         printf("[CLIENT] Sent message %d (%zd bytes)\n", i, sent);
 
     }
-
 
     printf("[CLIENT] All messages sent, waiting for potential responses...\n");
 
