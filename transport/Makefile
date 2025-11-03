@@ -20,9 +20,11 @@ $(BIN_DIR):
 # Kilde­filene til transport-daemon
 MIPTPD_SRC = $(SRC_DIR)/miptpd.c \
               $(SRC_DIR)/miptpd_unix.c \
-              $(SRC_DIR)/miptpd_mip.c \
+              $(SRC_DIR)/miptpd_mip_incoming.c \
               $(SRC_DIR)/miptpd_retransmit.c \
-              $(SRC_DIR)/miptpd_utils.c
+			  $(SRC_DIR)/miptpd_sending.c \
+			  $(SRC_DIR)/miptpd_pdu.c \
+              $(SRC_DIR)/miptpd_utils.
 
 # Bygger selve MIPTP-daemonen
 $(BIN_DIR)/miptpd: $(MIPTPD_SRC) $(SRC_DIR)/miptpd.h

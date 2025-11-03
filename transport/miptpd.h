@@ -115,6 +115,11 @@ int create_app_socket(const char *path);
 
 // // Fra miptp_mip.c
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
+void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip);
+void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
+                          uint16_t seq, uint8_t pad, uint8_t src_mip);
+
+
 void send_miptp_data(int app_fd, uint8_t *data, size_t len);
 void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_t seq);
 uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
@@ -126,14 +131,15 @@ void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len);
 
 // // Fra miptp_utils.c
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
-void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
+void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *pad);
+
 uint8_t get_port_from_fd(int fd);
 int remove_app_connection(int fd);
 int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd); //brukes denne?
-uint16_t get_next_seq(int fd);
-//void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len);
+
+
 
 
 //fra mipdtps_retransmit.c

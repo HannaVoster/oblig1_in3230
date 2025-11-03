@@ -5,7 +5,6 @@
 
 - Sekvensnummer-logikk (inkl. wrap-around)
 - Paddingberegning (for 32-bit justering)
-- Logging/debug-print
 - Generelle verktøy som brukes av flere filer
 */
 
@@ -18,21 +17,28 @@
 
 #include "miptpd.h"
 
-app_connection app_connections[MAX_APPS] = {0}; //liste over app connections
+app_connection app_connections[MAX_APPS] = {0}; //liste over aktive app forbinndelser
 
-// 16 bits total: [type(2 bits)][sequence(14 bits)]
-uint16_t pack_seq_pad(uint16_t seq, uint8_t type) {
-    // type legges i de to høyeste bitene
-    return ((type & 0x03) << 14) | (seq & 0x3FFF);
+/*
+  Pakker sammen sekvensnummer og pad-lengde i ett 16-bit-felt.
+  Øverste 2 bits brukes til pad, nederste 14 til sekvensnummer.
+*/
+uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen) {
+    return ((padlen & 0x03) << 14) | (seq & 0x3FFF);
 }
 
-void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *type) {
-    *type = (seq_pad >> 14) & 0x03;   // hent de to øverste bitene
+/*
+  Dekomprimerer et 16-bit-felt til sekvensnummer og pad-lengde.
+  Brukes ved mottak av MIPTP-pakker
+*/
+void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *pad) {
+    *pad = (seq_pad >> 14) & 0x03;   // hent de to øverste bitene
     *seq  = seq_pad & 0x3FFF;         // hent de nederste 14 bitene
 }
 
 /*
   Registrerer en ny applikasjon i tabellen
+  Tildeler port, initierer Go-Back-N-tilstand og tomt sendevindu
   Returnerer 0 ved suksess, -1 hvis tabellen er full
 */
 int new_app_connection(int fd, uint8_t port) {
@@ -67,10 +73,10 @@ int new_app_connection(int fd, uint8_t port) {
     return -1;
 }
 
-
 /*
   Fjerner en app fra tabellen når socketen lukkes
- */
+  Nullstiller all tilstand slik at plassen kan brukes på nytt
+*/
 int remove_app_connection(int fd) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == fd) {
@@ -84,9 +90,9 @@ int remove_app_connection(int fd) {
 }
 
 /*
-  Henter portnummeret for en gitt app_fd
-  Returnerer 0 hvis ikke funnet (0 er reservert/ugyldig port)
- */
+  Returnerer portnummeret som er knyttet til en gitt app_fd
+  Returnerer 0 hvis forbindelsen ikke finnes (0 er ugyldig port)
+*/
 uint8_t get_port_from_fd(int fd) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == fd)
@@ -97,9 +103,9 @@ uint8_t get_port_from_fd(int fd) {
 }
 
 /*
-  Henter filbeskrivelsen (app_fd) for en gitt port
-  Returnerer -1 hvis ingen app er registrert på den porten
- */
+  Finner filbeskrivelsen (socket-fd) som hører til en gitt port
+  Returnerer -1 hvis ingen app er registrert på porten
+*/
 int get_fd_from_port(uint8_t port) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].port == port)
@@ -109,11 +115,10 @@ int get_fd_from_port(uint8_t port) {
     return -1;
 }
 
-// uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
-// void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
-// uint8_t calc_padding(size_t sdu_len);
-// int seq_less(uint16_t a, uint16_t b);
-
+/*
+  Finner indexen i app_connections-tabellen for en gitt fd.
+  Returnerer -1 hvis ingen match finnes.
+*/
 int get_index(int fd){
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == fd)
@@ -123,25 +128,4 @@ int get_index(int fd){
     return -1;
 }
 
-uint16_t get_next_seq(int fd) {
-    for (int i = 0; i < MAX_APPS; i++) {
-        if (app_connections[i].app_fd == fd) {
-            return app_connections[i].next_seq++;
-        }
-    }
-    return 0;
-}
 
-// void update_last_packet_from_fd(int fd, uint8_t *packet, ssize_t len) {
-//     for (int i = 0; i < MAX_APPS; i++) {
-//         if (app_connections[i].app_fd == fd){
-//             memcpy(app_connections[i].last_packet, packet, len);
-//             app_connections[i].last_len = len;
-//             app_connections[i].last_sent_time = time(NULL);
-//             app_connections[i].waiting_for_ack = 1;
-//             return;
-//         }   
-//     }
-//     fprintf(stderr, "[MIPTPD] No connection found for fd=%d (update_last_packet_from_fd)\n", fd);
-//     return;
-// }
