@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "if_ether.h": "c",
-        "routingd.h": "c"
+        "routingd.h": "c",
+        "time.h": "c"
     }
 }

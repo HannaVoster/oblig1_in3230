@@ -9,14 +9,12 @@
 - Dele opp logikken mellom “data” og “ACK”-pakker
 
 */
-#include "miptpd.h"
+#include "miptpd_incoming.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-
 #include <time.h>
-
 
 
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {

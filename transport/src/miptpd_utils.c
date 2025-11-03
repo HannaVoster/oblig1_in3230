@@ -15,7 +15,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "miptpd.h"
+#include "miptpd_utils.h"
 
 app_connection app_connections[MAX_APPS] = {0}; //liste over aktive app forbinndelser
 
