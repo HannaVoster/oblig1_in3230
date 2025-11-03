@@ -1,45 +1,54 @@
+
+# Makefile for mipd_and_routing
+
+
 # Kompilator og flagg
-# -Wall og -Wextra: viser nyttige advarsler
-# -g: inkluderer feilsøkingsinformasjon
-# -I../include: ser etter header-filer i felles include-mappen
 CC      = gcc
-CFLAGS  = -Wall -Wextra -g -I../include
+CFLAGS  = -Wall -Wextra -g -Isrc -Iinclude
 
-# Mappe for binærfiler (en felles for hele prosjektet)
+# Mapper
 BIN_DIR = ../bin
+SRC_DIR = src
 
-# Programnavn som skal bygges
+# Programmer som skal bygges
 TARGETS = $(BIN_DIR)/mipd \
            $(BIN_DIR)/ping_client \
            $(BIN_DIR)/ping_server \
            $(BIN_DIR)/routingd
 
-# Standardregel: bygg alle programmer
-# Lager også bin/ hvis den ikke finnes
+# Standardregel
 all: $(BIN_DIR) $(TARGETS)
 
-# Oppretter bin/-mappen dersom den ikke finnes
+# Opprett bin/ hvis den ikke finnes
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 # Bygg MIP-daemon (nettverkslaget)
-# Her lenkes alle nødvendige .c-filer sammen
-$(BIN_DIR)/mipd: mipd.c pdu.c arp.c iface.c queue.c raw_handler.c unix.c
+$(BIN_DIR)/mipd: $(SRC_DIR)/mipd.c \
+                 $(SRC_DIR)/pdu.c \
+                 $(SRC_DIR)/arp.c \
+                 $(SRC_DIR)/iface.c \
+                 $(SRC_DIR)/queue.c \
+                 $(SRC_DIR)/raw_handler.c \
+                 $(SRC_DIR)/unix.c
 	$(CC) $(CFLAGS) -o $@ $^
 
-# Bygg ping_client (testapplikasjon for MIP)
-$(BIN_DIR)/ping_client: ping_client.c
+# Bygg ping_client
+$(BIN_DIR)/ping_client: $(SRC_DIR)/ping_client.c
 	$(CC) $(CFLAGS) -o $@ $^
 
-# Bygg ping_server (mottar meldinger fra ping_client)
-$(BIN_DIR)/ping_server: ping_server.c
+# Bygg ping_server
+$(BIN_DIR)/ping_server: $(SRC_DIR)/ping_server.c
 	$(CC) $(CFLAGS) -o $@ $^
 
-# Bygg routingd (routingtjeneste)
-$(BIN_DIR)/routingd: routingd.c routing_socket.c routing_table.c routing_protocol.c
+# Bygg routingd
+$(BIN_DIR)/routingd: $(SRC_DIR)/routingd.c \
+                     $(SRC_DIR)/routing_socket.c \
+                     $(SRC_DIR)/routing_table.c \
+                     $(SRC_DIR)/routing_protocol.c
 	$(CC) $(CFLAGS) -o $@ $^
 
-# Rydd opp (fjerner kompilerte binærfiler)
+# Rydd opp
 clean:
 	rm -f $(BIN_DIR)/mipd \
 	      $(BIN_DIR)/ping_client \
