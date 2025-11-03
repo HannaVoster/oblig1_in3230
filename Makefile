@@ -3,7 +3,7 @@
 .PHONY: all clean install
 
 all:
-	$(MAKE) -C src
+	$(MAKE) -C mipd
 	$(MAKE) -C transport
 	$(MAKE) install
 
@@ -19,7 +19,7 @@ install:
 	cp -u bin/test_app .
 	cp -u bin/test_server .
 clean:
-	$(MAKE) -C src clean
+	$(MAKE) -C mipd clean
 	$(MAKE) -C transport clean
 	rm -f mipd miptpd miptpd_client miptpd_server ping_client ping_server routingd
 
