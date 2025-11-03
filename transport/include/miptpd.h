@@ -6,6 +6,11 @@
 #include <time.h>
 #include <sys/types.h>
 
+#include "miptpd_utils.h"
+#include "miptpd_send.h"
+#include "miptpd_incoming.h"
+#include "miptpd_retransmit.h"
+
 /*
 
  *  miptpd.h
