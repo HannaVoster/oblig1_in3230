@@ -132,7 +132,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         fprintf(stderr, "[MIPTPD] Incoming packet too short (%zu bytes)\n", len);
         return;
     }
-
     printf("[DEBUG][RX<-MIPD] First 10 bytes: ");
     for (size_t i = 0; i < len && i < 10; i++) printf("%02X ", buf[i]);
     printf("\n");
@@ -171,6 +170,24 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
                        seq, hdr.dst_port);
 
+                //Sjekker for out of window pakker
+                // Hvispakker er for gamle eller for langt fremme
+                //beskytter mot duplikater eller uventede acks
+                uint16_t base = connection->base_seq;
+                uint16_t next = connection->next_seq;
+
+                // Beregner "avstand" mellom to sekvensnumre i 14-bit-verden
+                int16_t diff_base_ack = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+                int16_t diff_ack_next = (int16_t)((next - ack_seq + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+
+                // Hvis ack_seq er for gammel eller for langt fremme -> ignorer
+                if (diff_base_ack < 0 || diff_ack_next <= 0 || diff_base_ack >= MIPTP_WINDOW_SIZE) {
+                    printf("[MIPTPD][GBN] Ignored out-of-window ACK (seq=%u base=%u next=%u)\n",
+                        ack_seq, base, next);
+                    return;
+                }
+
+                //--ACK gyldig --
                 int slot = ack_seq % MIPTP_WINDOW_SIZE;
 
                 if (connection->window[slot].acked) {
@@ -219,7 +236,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 }
                 if (connection->queue_count == 0)
                 printf("[MIPTPD][QUEUE] ✅ Queue empty — all queued SDUs sent.\n");
-                
+
                 return;
             }
         }
@@ -237,29 +254,80 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr.dst_port);
         return;
     }
+
+    int idx = get_index(app_fd);
+    if (idx >= 0) {
+        app_connection *connection = &app_connections[idx];
+        uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
+        uint16_t max_accept = (expected + MIPTP_WINDOW_SIZE) % MIPTP_MAX_SEQ;
+
+        // Beregner "avstand" mellom seq og expected i 14-bit-verden
+        int16_t diff_seq_exp = (int16_t)((seq - expected + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+
+        // CASE 1: Pakke er gammel (duplikat)
+        if (diff_seq_exp < 0) {
+            printf("[MIPTPD][RX] Duplicate or old DATA packet ignored (seq=%u expected=%u)\n",
+                seq, expected);
+            // Send ACK igjen slik at sender vet vi allerede har denne
+            // acker den siste gyldige pakken
+            send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, 
+               (expected - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+            return;
+        }
+
+        // CASE 2: Pakke er utenfor mottaksvinduet (for langt frem)
+        if (diff_seq_exp >= MIPTP_WINDOW_SIZE) {
+            printf("[MIPTPD][RX] Out-of-window DATA ignored (seq=%u expected=%u)\n",
+                seq, expected);
+            return;
+        }
+    }
+    // Gyldig pakke innenfor mottaksvinduet — sjekk om den er in-order
     if (payload_len >= pad) payload_len -= pad;
 
-    // Lever meldingen til appen (format: [src_mip][src_port][payload])
-    uint8_t msg[2 + payload_len];
-    msg[0] = src_mip;
-    msg[1] = hdr.src_port;
-    memcpy(msg + 2, payload, payload_len);
+    // Etter levering: finn connection for å oppdatere expected_seq
+    int idx2 = get_index(app_fd);
+    if (idx2 >= 0) {
+        app_connection *connection = &app_connections[idx2];
 
-    ssize_t sent = write(app_fd, msg, sizeof(msg));
+        if (seq == connection->expected_seq) {
+            // --- IN-ORDER pakke ---
+            // Lever meldingen til appen (format: [src_mip][src_port][payload])
+            uint8_t msg[2 + payload_len];
+            msg[0] = src_mip;
+            msg[1] = hdr.src_port;
+            memcpy(msg + 2, payload, payload_len);
 
-    // Send ACK tilbake
-    send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, seq);
+            ssize_t sent = write(app_fd, msg, sizeof(msg));
 
-    if (sent > 0) {
-        printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n",
-               sent, hdr.dst_port, app_fd);
-    } else {
-        perror("[MIPTPD] write to app failed");
-        fprintf(stderr, "[DEBUG] Current connection table:\n");
-        for (int i = 0; i < MAX_APPS; i++)
-            if (app_connections[i].app_fd)
-                fprintf(stderr, "  [%d] fd=%d port=%d\n",
-                        i, app_connections[i].app_fd, app_connections[i].port);
+            // Oppdater forventet sekvensnummer (venter nå på neste)
+            connection->expected_seq = (seq + 1) % MIPTP_MAX_SEQ;
+
+            // Send ACK tilbake for denne pakken
+            send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port, seq);
+
+            if (sent > 0) {
+                printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n",
+                    sent, hdr.dst_port, app_fd);
+            } else {
+                perror("[MIPTPD] write to app failed");
+                fprintf(stderr, "[DEBUG] Current connection table:\n");
+                for (int i = 0; i < MAX_APPS; i++)
+                    if (app_connections[i].app_fd)
+                        fprintf(stderr, "  [%d] fd=%d port=%d\n",
+                                i, app_connections[i].app_fd, app_connections[i].port);
+            }
+
+        } else {
+            // --- OUT-OF-ORDER pakke ---
+            printf("[MIPTPD][RX] Out-of-order packet (seq=%u expected=%u) ignored.\n",
+                seq, connection->expected_seq);
+
+            // Send ACK for forrige korrekt mottatte pakke
+            send_miptp_ack(src_mip, hdr.dst_port, hdr.src_port,
+                        (connection->expected_seq - 1 + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
+            return;
+        }
     }
 }
 

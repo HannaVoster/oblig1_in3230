@@ -188,7 +188,6 @@ int main(int argc, char *argv[]) {
                     perror("epoll_ctl: new_fd");
             }
 
-
             // Meldinger fra applikasjoner
             else if (events[i].events & EPOLLIN) {
                 uint8_t buf[1500];
@@ -211,7 +210,6 @@ int main(int argc, char *argv[]) {
 
         check_retransmissions();
 
-        // TODO: kall check_retransmissions() her senere
     }
 
 cleanup:

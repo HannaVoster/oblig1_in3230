@@ -65,6 +65,8 @@ typedef struct {
     int queue_head;
     int queue_tail;
     int queue_count;
+
+    uint16_t expected_seq; //
 } app_connection;
 
 extern app_connection app_connections[MAX_APPS];

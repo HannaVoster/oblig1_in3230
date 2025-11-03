@@ -31,7 +31,6 @@ void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *type) {
     *seq  = seq_pad & 0x3FFF;         // hent de nederste 14 bitene
 }
 
-
 /*
   Registrerer en ny applikasjon i tabellen
   Returnerer 0 ved suksess, -1 hvis tabellen er full
@@ -43,9 +42,12 @@ int new_app_connection(int fd, uint8_t port) {
             app_connections[i].port = port;
 
             // Initialiser Go-Back-N tilstand
-            app_connections[i].base_seq = rand() % MIPTP_MAX_SEQ; // starter med tilfeldig sekvensnummer
+            app_connections[i].base_seq = rand() % MIPTP_MAX_SEQ; // starter med tilfeldig sekvensnummer, gitt oppgaven
             app_connections[i].next_seq = app_connections[i].base_seq;
             app_connections[i].window_count = 0;
+
+            // Initialiser mottaker-tilstand
+            app_connections[i].expected_seq = 0; // venter på første pakke med seq=0
 
             // Nullstill vinduet
             for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) {
