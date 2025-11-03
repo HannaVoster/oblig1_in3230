@@ -96,12 +96,22 @@ extern app_connection app_connections[MAX_APPS];
 // uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
 // void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 
+//miptpd.c
+void parse_socket_paths(char *mipd_arg, char *app_arg, char *mipd_path, char *app_path);
+void handle_flags(int argc, char *argv[]);
+int setup_mip_connection(const char *mipd_path);
+int setup_epoll(int mip_fd, int app_listen_fd);
+void run_event_loop(int epollfd, int mip_fd, int app_listen_fd);
+void handle_mip_event(int mip_fd);
+void handle_new_app_connection(int app_listen_fd, int epollfd);
+void handle_app_message(int fd);
+void cleanup(int epollfd, int mip_fd, int app_listen_fd);
+
 //miptpd_unix.c
 void wait_for_socket(const char *path);
 int connect_to_mipd(const char *path);
 int create_app_socket(const char *path);
-void handle_new_app_connection(int unix_fd);
-void handle_app_message(int app_fd);
+
 
 // // Fra miptp_mip.c
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
