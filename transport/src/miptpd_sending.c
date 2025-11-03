@@ -7,7 +7,8 @@
  *  - Utføre selve sendingen av data og ACKs (ikke retransmisjon)
  */
 
-#include "miptpd.h"
+#include "miptpd_send.h"
+#include "miptpd_utils.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
