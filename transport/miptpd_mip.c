@@ -170,6 +170,16 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                        connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) {
                     connection->base_seq = (connection->base_seq + 1) % MIPTP_MAX_SEQ;
                     connection->window_count--;
+
+                    printf("[MIPTPD][GBN] base_seq advanced to %u\n", connection->base_seq);
+                }
+                // Hvis alt er ACKet
+                if (connection->base_seq == connection->next_seq) {
+                    printf("[MIPTPD][GBN] ✅ All packets ACKed — window now empty (base_seq=%u)\n",
+                        connection->base_seq);
+                } else {
+                    printf("[MIPTPD][GBN] Waiting for more ACKs (base_seq=%u, next_seq=%u)\n",
+                        connection->base_seq, connection->next_seq);
                 }
                 return;
             }
