@@ -265,12 +265,12 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         app_connection *connection = &app_connections[idx];
 
         // --- Første pakke mottatt: synkroniser expected_seq ---
-         if (!connection->synced) {
-            connection->expected_seq = seq; // lever første pakke
-            connection->synced = 1;
-            printf("[MIPTPD][INIT] Syncing expected_seq=%u (first seq=%u)\n",
-                connection->expected_seq, seq);
-
+        if (!connection->synced) {
+        connection->expected_seq = seq; // lever første pakke
+        connection->synced = 1;
+        printf("[MIPTPD][INIT] Syncing expected_seq=%u (first seq=%u)\n",
+            connection->expected_seq, seq);
+        }
         uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
 
         // Beregn hvor langt frem pakken ligger i forhold til expected (mod 2^14)
@@ -291,10 +291,10 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 seq, expected);
             return;
         }
-
+    }       
 // Hvis vi kommer hit: pakken er innenfor mottaksvinduet
 
-    }
+    
     // Gyldig pakke innenfor mottaksvinduet — sjekk om den er in-order
     if (payload_len >= pad) payload_len -= pad;
 
