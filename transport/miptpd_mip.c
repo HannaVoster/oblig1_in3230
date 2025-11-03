@@ -159,95 +159,98 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     // ------------------------------------------
     //  ACK-PDU (ingen payload)
     // ------------------------------------------
+// ------------------------------------------
+//  ACK-PDU (ingen payload)
+// ------------------------------------------
     if (payload_len == 0) {
         int fd = get_fd_from_port(hdr.dst_port);
-        if (fd >= 0) {
-            int idx = get_index(fd);
-            if (idx >= 0) {
-                app_connection *connection = &app_connections[idx];
-                uint16_t ack_seq = seq;
-
-                printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
-                       seq, hdr.dst_port);
-
-                //Sjekker for out of window pakker
-                // Hvispakker er for gamle eller for langt fremme
-                //beskytter mot duplikater eller uventede acks
-                uint16_t base = connection->base_seq;
-                uint16_t next = connection->next_seq;
-
-                // Beregner "avstand" mellom to sekvensnumre i 14-bit-verden
-                // int16_t diff_base_ack = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
-                // int16_t diff_ack_next = (int16_t)((next - ack_seq + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
-
-                // Beregn hvor langt ACK ligger fra base_seq
-                int16_t diff = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
-
-                // Gyldig ACK må ligge i intervallet [0, window_size)
-                if (diff < 0 || diff > MIPTP_WINDOW_SIZE) {
-                    printf("[MIPTPD][GBN] Ignored out-of-window ACK (seq=%u base=%u next=%u)\n",
-                        ack_seq, base, next);
-                    return;
-                }
-
-                //--ACK gyldig --
-                int slot = ack_seq % MIPTP_WINDOW_SIZE;
-
-                if (connection->window[slot].acked) {
-                    printf("[DEBUG] Duplicate ACK ignored (seq=%u)\n", ack_seq);
-                    return;
-                }
-
-                connection->window[slot].acked = 1;
-
-                // Flytt base_seq fremover hvis mulig
-                // Flytt base_seq fremover hvis mulig
-                while (connection->base_seq != connection->next_seq &&
-                    connection->window[connection->base_seq % MIPTP_WINDOW_SIZE].acked) {
-
-                    connection->base_seq = (connection->base_seq + 1) % MIPTP_MAX_SEQ;
-                    if (connection->window_count > 0) connection->window_count--;
-
-                    printf("[MIPTPD][GBN] base_seq advanced to %u\n", connection->base_seq);
-                }
-
-                // Etter at base_seq er flyttet frem, se om vi har plass i vinduet
-                while (connection->queue_count > 0 &&
-                    (connection->next_seq - connection->base_seq) < MIPTP_WINDOW_SIZE) {
-
-                    int pos = connection->queue_head % MIPTP_MAX_QUEUE;
-                    uint8_t *next_data = connection->queue[pos].data;
-                    size_t next_len = connection->queue[pos].len;
-
-                    printf("[MIPTPD][QUEUE] Sending queued packet (remaining=%d)\n",
-                        connection->queue_count - 1);
-
-                    // Bruker eksisterende app_fd fra denne connection
-                    send_miptp_data(connection->app_fd, next_data, next_len);
-
-                    connection->queue_head++;
-                    connection->queue_count--;
-                }
-
-                // Hvis alt er ACKet
-                if (connection->base_seq == connection->next_seq) {
-                    printf("[MIPTPD][GBN] ✅ All packets ACKed — window now empty (base_seq=%u)\n",
-                        connection->base_seq);
-                } else {
-                    printf("[MIPTPD][GBN] Waiting for more ACKs (base_seq=%u, next_seq=%u)\n",
-                        connection->base_seq, connection->next_seq);
-                }
-                if (connection->queue_count == 0)
-                printf("[MIPTPD][QUEUE] ✅ Queue empty — all queued SDUs sent.\n");
-
-                return;
-            }
+        if (fd < 0) {
+            printf("[MIPTPD] ACK for unknown app port=%d (ignored)\n", hdr.dst_port);
+            return;
         }
 
-        printf("[MIPTPD] ACK received but no matching connection found (dst_port=%d)\n",
-               hdr.dst_port);
+        int idx = get_index(fd);
+        if (idx < 0) return;
+
+        app_connection *connection = &app_connections[idx];
+        uint16_t ack_seq = seq;
+
+        printf("[MIPTPD] ACK received for seq=%u (port=%d)\n",
+            ack_seq, hdr.dst_port);
+
+        // ------------------------------------------------------------
+        // Out-of-window-sjekk (beskytter mot gamle ACKs)
+        // ------------------------------------------------------------
+        uint16_t base = connection->base_seq;
+        uint16_t next = connection->next_seq;
+
+        // Hvor langt ack_seq ligger foran base (mod 2^14)
+        uint16_t diff = (ack_seq + MIPTP_MAX_SEQ - base) % MIPTP_MAX_SEQ;
+        uint16_t inflight = (next + MIPTP_MAX_SEQ - base) % MIPTP_MAX_SEQ;
+
+        // ACK utenfor vinduet (for gammel eller for langt frem)
+        if (diff >= MIPTP_WINDOW_SIZE || diff >= inflight) {
+            printf("[MIPTPD][GBN] Ignored out-of-window ACK (ack=%u base=%u next=%u)\n",
+                ack_seq, base, next);
+            return;
+        }
+
+        // ------------------------------------------------------------
+        // Gyldig ACK → flytt base_seq frem til ack_seq + 1
+        // ------------------------------------------------------------
+        uint16_t old_base = connection->base_seq;
+        uint16_t new_base = (ack_seq + 1) % MIPTP_MAX_SEQ;
+
+        // Nullstill pakker mellom old_base og new_base
+        for (uint16_t s = old_base; s != new_base; s = (s + 1) % MIPTP_MAX_SEQ) {
+            int slot = s % MIPTP_WINDOW_SIZE;
+            connection->window[slot].acked = 1;
+            connection->window[slot].len = 0;
+        }
+
+        connection->base_seq = new_base;
+        printf("[MIPTPD][GBN] base_seq advanced %u → %u\n", old_base, connection->base_seq);
+
+        // Oppdater antall pakker i vinduet
+        connection->window_count =
+            (connection->next_seq + MIPTP_MAX_SEQ - connection->base_seq) % MIPTP_MAX_SEQ;
+
+        // ------------------------------------------------------------
+        // Send køede meldinger hvis det er ledig plass i vinduet
+        // ------------------------------------------------------------
+        while (connection->queue_count > 0 &&
+            connection->window_count < MIPTP_WINDOW_SIZE) {
+
+            int pos = connection->queue_head % MIPTP_MAX_QUEUE;
+            uint8_t *next_data = connection->queue[pos].data;
+            size_t next_len = connection->queue[pos].len;
+
+            printf("[MIPTPD][QUEUE] Sending queued packet (remaining=%d)\n",
+                connection->queue_count - 1);
+
+            send_miptp_data(connection->app_fd, next_data, next_len);
+
+            connection->queue_head++;
+            connection->queue_count--;
+            connection->window_count++;
+        }
+
+        // ------------------------------------------------------------
+        // Logg vindustilstanden etter oppdatering
+        // ------------------------------------------------------------
+        if (connection->base_seq == connection->next_seq)
+            printf("[MIPTPD][GBN] ✅ All packets ACKed — window empty (base=%u)\n",
+                connection->base_seq);
+        else
+            printf("[MIPTPD][GBN] Waiting for more ACKs (base=%u, next=%u)\n",
+                connection->base_seq, connection->next_seq);
+
+        if (connection->queue_count == 0)
+            printf("[MIPTPD][QUEUE] ✅ Queue empty — all queued SDUs sent.\n");
+
         return;
     }
+
 
     // ------------------------------------------
     //  DATA-PDU (har payload)
