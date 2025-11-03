@@ -70,8 +70,17 @@ int main(int argc, char *argv[]) {
         packet[1] = dst_port;
         memcpy(packet + 2, msg, strlen(msg));
 
-        write(fd, packet, sizeof(packet));
-        printf("[CLIENT] Sent message %d\n", i);
+        ssize_t sent = write(fd, packet, sizeof(packet));
+        if (sent < 0) {
+            perror("[CLIENT] write failed");
+            break;
+        } else if (sent == 0) {
+            printf("[CLIENT] write returned 0 — socket closed\n");
+            break;
+        }
+
+        printf("[CLIENT] Sent message %d (%zd bytes)\n", i, sent);
+
     }
 
 
