@@ -258,6 +258,12 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     int idx = get_index(app_fd);
     if (idx >= 0) {
         app_connection *connection = &app_connections[idx];
+
+        // --- Første pakke mottatt: synkroniser expected_seq ---
+        if (connection->expected_seq == 0 && seq > 0) {
+            connection->expected_seq = seq;
+            printf("[MIPTPD][INIT] Syncing expected_seq to first received seq=%u\n", seq);
+        }
         uint16_t expected = connection->expected_seq;   // neste sekvens vi venter på
 
         // Beregner "avstand" mellom seq og expected i 14-bit-verden
