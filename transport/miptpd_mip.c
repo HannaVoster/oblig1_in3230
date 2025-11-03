@@ -184,7 +184,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
                 int16_t diff = (int16_t)((ack_seq - base + MIPTP_MAX_SEQ) % MIPTP_MAX_SEQ);
 
                 // Gyldig ACK må ligge i intervallet [0, window_size)
-                if (diff < 0 || diff >= MIPTP_WINDOW_SIZE) {
+                if (diff < 0 || diff > MIPTP_WINDOW_SIZE) {
                     printf("[MIPTPD][GBN] Ignored out-of-window ACK (seq=%u base=%u next=%u)\n",
                         ack_seq, base, next);
                     return;
