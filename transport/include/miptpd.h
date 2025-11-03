@@ -1,5 +1,4 @@
 
-
 #ifndef MIPTP_H
 #define MIPTP_H
 
@@ -49,7 +48,6 @@ typedef struct {
     size_t len;
 } queued_packet;
 
-
 // støtter go back n logikk, retransmisjon, sliding window og ack håndtering
 typedef struct {
     int app_fd;
@@ -73,28 +71,6 @@ typedef struct {
 
 extern app_connection app_connections[MAX_APPS];
 
-// Oppstart og initiering
-
-// void init_unix_socket(const char *path);
-// void init_mip_socket(const char *path);
-
-// // Håndtering av applikasjoner
-// void handle_new_app_connection();
-// void handle_app_message(int app_fd);
-
-// // Håndtering av mottatte MIPTP-pakker
-// void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
-
-// // Sendefunksjoner
-// void send_miptp_data(...);
-// void send_miptp_ack(...);
-
-// // Tidsstyring / retransmisjon
-// void check_retransmissions();
-
-// // Hjelpefunksjoner
-// uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen);
-// void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *padlen);
 
 //miptpd.c
 void parse_socket_paths(char *mipd_arg, char *app_arg, char *mipd_path, char *app_path);
@@ -111,7 +87,6 @@ void cleanup(int epollfd, int mip_fd, int app_listen_fd);
 void wait_for_socket(const char *path);
 int connect_to_mipd(const char *path);
 int create_app_socket(const char *path);
-
 
 // Fra miptp_mip_incoming.c
 void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip);
@@ -138,9 +113,6 @@ int remove_app_connection(int fd);
 int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd); //brukes denne?
-
-
-
 
 //fra mipdtps_retransmit.c
 void check_retransmissions();
