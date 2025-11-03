@@ -128,7 +128,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
         }
 
         case MIPTP_SDU_TYPE: {
-            handle_miptp_message(src, dest, payload, length); //HJEMMEEKSAMEN 2
+            handle_miptp_message(my_mip_address, dest, src, ttl, payload, length); //HJEMMEEKSAMEN 2
             break;
         }
            
@@ -356,43 +356,45 @@ int forward_packet(int my_mip_address,
     return 1;
 }
 //HJEMMEEKSAMEN 2
-void handle_miptp_message(uint8_t src, uint8_t dest, const uint8_t *payload, size_t length) {
+// kall dette fra handle_raw_packet():
+// case MIPTP_SDU_TYPE: { handle_miptp_message(my_mip_address, dest, src, ttl, payload, length); break; }
 
+void handle_miptp_message(int my_mip_address,
+                          uint8_t dest, uint8_t src, uint8_t ttl,
+                          const uint8_t *payload, size_t length)
+{
+    // 1) Prøv forwarding hvis ikke til meg
     int fwd_result = forward_packet(my_mip_address,
                                     dest, src, ttl,
-                                    SDU_TYPE_PONG, payload, length);
-
+                                    MIPTP_SDU_TYPE, payload, (ssize_t)length);
     if (fwd_result != 0) {
-        // 1 = forwarded, -1 = droppet → ferdig
+        //  1 = forwarded (lagt i kø + route request sendt)
+        // -1 = droppet (TTL utløpt)
         return;
     }
 
-    if (debug_mode) printf("[RAW] MIPTPD melding %u: %.*s\n\n",
-           src, (int)length, (char*)payload);
+    // 2) Til meg: lever opp til MIPTPD via UNIX (IKKE legg til noe, send nøyaktig det formatet MIPTPD forventer)
+    if (debug_mode) {
+        printf("[DEBUG][MIPD->MIPTPD] Forwarding %zu bytes to MIPTPD (local delivery)\n", length);
+        for (size_t i = 0; i < length && i < 32; i++) printf("%02X ", payload[i]);
+        printf("\n");
+    }
 
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
-        if (unix_clients[i].active &&
-            unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
-            
-            printf("[DEBUG][MIPD->MIPTPD] Forwarding %zd bytes to MIPTPD:\n", length);
-            for (size_t i = 0; i < length && i < 32; i++) printf("%02X ", payload[i]);
-            printf("\n");
-
-
+        if (unix_clients[i].active && unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
             ssize_t n = write(unix_clients[i].fd, payload, length);
-            if (n < 0){
+            if (n < 0) {
                 perror("[MIPD] write to MIPTPD failed");
-            }
-            else {
-                printf("[MIPD] Forwarded %zd bytes to MIPTPD (fd=%d) src = %d, dest = %d\n",
-                        n, unix_clients[i].fd, src, dest);
-                print_payload_hex(payload, length);
+            } else {
+                printf("[MIPD] Delivered %zd bytes to MIPTPD (fd=%d) src=%u dest=%u\n",
+                       n, unix_clients[i].fd, src, dest);
             }
             return;
         }
     }
     printf("[MIPD] No active MIPTPD client found for SDU type 0x05\n");
 }
+
 
 
 
