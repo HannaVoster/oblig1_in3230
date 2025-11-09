@@ -100,6 +100,10 @@ int main(int argc, char *argv[]) {
         ssize_t n = read(fd, buf, sizeof(buf));
         if (n <= 0) break;
 
+        printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x...\n",
+        n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+
+
         uint8_t src_mip = buf[0];
         uint8_t src_port = buf[1];
         uint8_t *payload = buf + 2;
