@@ -50,6 +50,8 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
         memset(buf + sizeof(hdr) + sdu_len, 0, padlen);
 
     if (out_len) *out_len = total;
+
+    
     return buf;
 }
 
