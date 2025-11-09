@@ -99,6 +99,9 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq) {
     // --- Marker vindusplasser som ACKet ---
     for (uint16_t s = old_base; s != conn->base_seq; s = (s + 1) % MIPTP_MAX_SEQ) {
         int slot = s % MIPTP_WINDOW_SIZE; // Finner posisjon (sirkulært vindu)
+        if (!conn->window[slot].acked && conn->window[slot].len > 0) {
+            conn->window_count--; // REDUSER vindusteller
+        }
         conn->window[slot].acked = 1; //markerer som acket
         conn->window[slot].len = 0;
     }
