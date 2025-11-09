@@ -27,8 +27,11 @@ void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len) {
     buffer[1] = ttl;     // TTL-felt som mipd legger i MIP-headeren
     memcpy(buffer + 2, miptp_pdu, pdu_len); //selve pdu data
 
+
     // skriver til mipd-socket (MIP_FD)
-    ssize_t sent = write(MIP_FD, buffer, sizeof(buffer));
+    ssize_t sent = write(MIP_FD, buffer, 2 + pdu_len);
+    printf("[MIPTPD] Sent %zd/%zu bytes to mipd (dst=%u, ttl=%u)\n", sent, 2 + pdu_len, dst_mip, ttl);
+
     if (sent < 0)
         perror("[MIPTPD] write to mipd");
     else
