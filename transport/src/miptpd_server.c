@@ -108,9 +108,6 @@ int main(int argc, char *argv[]) {
        (unsigned int)buf[5],
        (unsigned int)buf[6]);
 
-
-
-
         uint8_t src_mip = buf[0];
         uint8_t src_port = buf[1];
         uint8_t *payload = buf + 2;
