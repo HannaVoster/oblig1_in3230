@@ -31,7 +31,7 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
 
     size_t sdu_aligned = len_words * 4;
 
-    // Total faktisk lengde (header + ekte data, ingen padding)
+    // Total faktisk lengde (header + SDU, med padding til 4-byte alignment)
     size_t total = 4 + sdu_aligned;
     uint8_t *buf = malloc(total);
     if (!buf) {
@@ -101,7 +101,19 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
     size_t sdu_bytes = (size_t)len_words * 4;
 
     // Sjekk at bufferen faktisk er stor nok til å inneholde alt
-    if (rcv_len < 4 + sdu_bytes) return -1;
+    // Sjekk at bufferen faktisk er stor nok til å inneholde alt
+    size_t available = rcv_len - 4;
+    if (sdu_bytes != available) {
+        if (available > sdu_bytes) {
+            // Avsender sendte med padding — bruk faktisk lengde
+            printf("[WARN][PARSE] available=%zu > sdu_bytes=%zu → using available\n", available, sdu_bytes);
+            sdu_bytes = available;
+        } else {
+            // Avsender annonserte for mye — trunkér
+            printf("[WARN][PARSE] available=%zu < sdu_bytes=%zu → truncating\n", available, sdu_bytes);
+            sdu_bytes = available;
+        }
+    }
 
     // Sett peker til starten av SDU-delen (etter headeren)
     if (sdu_out) *sdu_out = rcv + 4;
