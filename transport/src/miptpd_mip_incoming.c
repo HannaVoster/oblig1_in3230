@@ -189,11 +189,8 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     // msg[0] = src_mip;           // mip addressen til avsender
     // msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
     // memcpy(msg + 2, payload, len);
-
-    ssize_t sent = write(app_fd, payload, len);
-    if (sent != (ssize_t)sizeof(payload))
-    printf("[MIPTPD][WARN] Partial write: %zd/%zu bytes delivered to app fd=%d\n",
-           sent, sizeof(payload), app_fd);
+    if (len >= pad) len -= pad;
+    ssize_t sent = write(app_fd, payload, len);  
 
     if (sent > 0)
         printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n", sent, hdr->dst_port, app_fd);
