@@ -21,6 +21,7 @@ typedef struct {
 
 transfer_t transfers[MAX_TRANSFERS];
 
+
 transfer_t *find_or_create_transfer(const char *dir) {
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (transfers[i].active) {
@@ -54,33 +55,6 @@ transfer_t *find_or_create_transfer(const char *dir) {
     return NULL;
 }
 
-
-transfer_t *find_or_create_transfer(const char *dir) {
-    // Finn en inaktiv slot
-    for (int i = 0; i < MAX_TRANSFERS; i++) {
-        if (!transfers[i].active) {
-            transfers[i].active = 1;
-            transfers[i].received = 0;
-            transfers[i].expected_size = 0;
-
-            char filename[256];
-            snprintf(filename, sizeof(filename), "%s/incoming", dir);
-
-            transfers[i].fp = fopen(filename, "wb"); // åpne ny fil hver gang
-            if (!transfers[i].fp) {
-                perror("fopen");
-                transfers[i].active = 0;
-                return NULL;
-            }
-
-            printf("[SERVER] New file: %s\n", filename);
-            return &transfers[i];
-        }
-    }
-
-    fprintf(stderr, "[SERVER] No available transfer slots!\n");
-    return NULL;
-}
 
 
 
