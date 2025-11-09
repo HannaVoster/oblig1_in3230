@@ -21,24 +21,47 @@ typedef struct {
 
 transfer_t transfers[MAX_TRANSFERS];
 
-transfer_t *find_or_create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) {
-    // Try find existing
-    for (int i = 0; i < MAX_TRANSFERS; i++) {
-        if (transfers[i].active && transfers[i].src_mip == src_mip && transfers[i].src_port == src_port)
-            return &transfers[i];
-    }
+// transfer_t *find_or_create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) {
+//     // Try find existing
+//     for (int i = 0; i < MAX_TRANSFERS; i++) {
+//         if (transfers[i].active && transfers[i].src_mip == src_mip && transfers[i].src_port == src_port)
+//             return &transfers[i];
+//     }
 
-    // Otherwise create new
+//     // Otherwise create new
+//     for (int i = 0; i < MAX_TRANSFERS; i++) {
+//         if (!transfers[i].active) {
+//             transfers[i].src_mip = src_mip;
+//             transfers[i].src_port = src_port;
+//             transfers[i].received = 0;
+//             transfers[i].expected_size = 0;
+//             transfers[i].active = 1;
+
+//             char filename[256];
+//             snprintf(filename, sizeof(filename), "%s/incoming_%d_%d", dir, src_mip, src_port);
+//             transfers[i].fp = fopen(filename, "wb");
+//             if (!transfers[i].fp) {
+//                 perror("fopen");
+//                 transfers[i].active = 0;
+//                 return NULL;
+//             }
+//             printf("[SERVER] New file: %s\n", filename);
+//             return &transfers[i];
+//         }
+//     }
+//     fprintf(stderr, "[SERVER] No available transfer slots!\n");
+//     return NULL;
+// }
+
+transfer_t *find_or_create_transfer(const char *dir) {
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (!transfers[i].active) {
-            transfers[i].src_mip = src_mip;
-            transfers[i].src_port = src_port;
+            transfers[i].active = 1;
             transfers[i].received = 0;
             transfers[i].expected_size = 0;
-            transfers[i].active = 1;
 
             char filename[256];
-            snprintf(filename, sizeof(filename), "%s/incoming_%d_%d", dir, src_mip, src_port);
+            snprintf(filename, sizeof(filename), "%s/incoming", dir);
             transfers[i].fp = fopen(filename, "wb");
             if (!transfers[i].fp) {
                 perror("fopen");
@@ -52,6 +75,7 @@ transfer_t *find_or_create_transfer(uint8_t src_mip, uint8_t src_port, const cha
     fprintf(stderr, "[SERVER] No available transfer slots!\n");
     return NULL;
 }
+
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
@@ -106,15 +130,15 @@ int main(int argc, char *argv[]) {
         printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x %02x %02x...\n",
         n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
-        uint8_t src_mip = buf[0];
-        uint8_t src_port = buf[1];
+        // uint8_t src_mip = buf[0];
+        // uint8_t src_port = buf[1];
         uint8_t *payload = buf + 2;
         size_t payload_len = n - 2;
 
         transfer_t *t = find_or_create_transfer(src_mip, src_port, out_dir);
         if (!t) continue;
 
-        if (t->expected_size == 0 && t->received == 0 && payload_len >= 4) {
+        if (t->expected_size == 0 && t->received == 0 && payload_len == 4) {
             memcpy(&t->expected_size, payload, 4);
             t->expected_size = ntohl(t->expected_size);
             printf("[SERVER] File size from %d:%d = %u bytes\n", src_mip, src_port, t->expected_size);
