@@ -273,7 +273,7 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
   Ellers sendes dataen videre via MIPTP (send_miptp_data)
 */
 void handle_app_message(int fd) {
-    uint8_t buf[1500];
+    uint8_t buf[4090];
     ssize_t len = read(fd, buf, sizeof(buf));
 
     if (len <= 0) {
@@ -311,7 +311,7 @@ void handle_app_message(int fd) {
         printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
 
     printf("[MIPTPD] Message received from app fd=%d\n", fd);
-    
+
     if(len > 0){
         hex_debug("[MIPTPD][APP->MIPTP]", buf, len);
         send_miptp_data(fd, buf, len);

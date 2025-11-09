@@ -150,18 +150,13 @@ int main(int argc, char *argv[]) {
         if (!t) continue;
 
         if (t->expected_size == 0 && t->received == 0) {
-            if (payload_len < 4) {
-                fprintf(stderr, "[SERVER] Size header too short");
+             // Første pakke = filstørrelse
+            if (payload_len == 4) {
+                memcpy(&t->expected_size, payload, 4);
+                t->expected_size = ntohl(t->expected_size);
+                printf("[SERVER] File size = %u bytes\n", t->expected_size);
+                continue; // gå til neste read()
             }
-            memcpy(&t->expected_size, payload, 4);
-            t->expected_size = ntohl(t->expected_size);
-            printf("[SERVER]  %u bytes\n",  t->expected_size);
-
-            if (payload_len > 4) {
-                fwrite(payload + 4, 1, payload_len - 4, t->fp);
-                t->received += payload_len - 4;
-            }
-            continue;
         }
 
         fwrite(payload, 1, payload_len, t->fp);
