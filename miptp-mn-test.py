@@ -40,9 +40,9 @@ def init_miptp(self, line):
     B = net.get('B')
 
     print("\n=== Starting MIP daemons ===")
-    terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 42"))
+    terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 1"))
     time.sleep(1)
-    terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 99"))
+    terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 2"))
     time.sleep(3)
 
     print("\n=== Starting routing daemons ===")
