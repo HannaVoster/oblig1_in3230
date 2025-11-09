@@ -191,9 +191,9 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     // memcpy(msg + 2, payload, len);
 
     ssize_t sent = write(app_fd, payload, len);
-    if (sent != (ssize_t)sizeof(msg))
+    if (sent != (ssize_t)sizeof(payload))
     printf("[MIPTPD][WARN] Partial write: %zd/%zu bytes delivered to app fd=%d\n",
-           sent, sizeof(msg), app_fd);
+           sent, sizeof(payload), app_fd);
 
     if (sent > 0)
         printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n", sent, hdr->dst_port, app_fd);
