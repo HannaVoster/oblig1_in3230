@@ -112,12 +112,17 @@ int main(int argc, char *argv[]) {
         transfer_t *t = find_or_create_transfer(src_mip, src_port, out_dir);
         if (!t) continue;
 
-        if (t->expected_size == 0 && payload_len == 4) {
+        if (t->expected_size == 0 && t->received == 0 && payload_len >= 4) {
             memcpy(&t->expected_size, payload, 4);
             t->expected_size = ntohl(t->expected_size);
             printf("[SERVER] File size from %d:%d = %u bytes\n", src_mip, src_port, t->expected_size);
+
+            if (payload_len > 4) {
+                fwrite(payload + 4, 1, payload_len - 4, t->fp);
+                t->received += payload_len - 4;
+            }
             continue;
-        }
+    }
 
         fwrite(payload, 1, payload_len, t->fp);
         t->received += payload_len;
