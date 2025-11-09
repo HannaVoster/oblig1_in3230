@@ -18,7 +18,7 @@
 #include <sys/un.h>
 #include <time.h>
 
-#include "miptpd.h"   // felles header for MIPTP
+#include "miptpd.h"   
 
 /*
   Venter til en gitt socket-fil eksisterer (opprettes av mipd)
