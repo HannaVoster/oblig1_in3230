@@ -43,7 +43,7 @@ void check_retransmissions() {
             continue; // hopper over tomme eller ackede plasser i vinduet
 
         // sjekker for timeout (2 sek) har utløpt
-        if (difftime(now, p->sent_time) > 2.0) {
+        if (difftime(now, p->sent_time) > 0.2) {
             printf("[MIPTPD][TIMEOUT] base_seq=%u timed out (port=%d) — resending window\n",
                    base, connection->port);
 

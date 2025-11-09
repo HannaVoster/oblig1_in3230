@@ -275,22 +275,46 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
 void handle_app_message(int fd) {
     uint8_t buf[1500];
     ssize_t len = read(fd, buf, sizeof(buf));
+
     if (len <= 0) {
         if (debug_mode)
-            printf("[MIPTPD] App fd=%d closed.\n", fd);
+            printf("[MIPTPD][CLOSE] App fd=%d closed — checking outstanding packets...\n", fd);
+
+        int idx = get_index(fd);
+        if (idx >= 0) {
+            app_connection *conn = &app_connections[idx];
+
+            if (conn->window_count > 0) {
+                printf("[MIPTPD][CLOSE] Waiting for %u unacked packets (port=%u)...\n",
+                       conn->window_count, conn->port);
+
+                // Vent i inntil 500 ms for at ACKs skal komme inn
+                struct timespec ts = {0, 500 * 1000000};
+                nanosleep(&ts, NULL);
+
+                // Etter venting, sjekk igjen (valgfritt)
+                if (conn->window_count > 0)
+                    printf("[MIPTPD][CLOSE] Warning: %u packets still unacked after wait\n",
+                           conn->window_count);
+            }
+
+            printf("[MIPTPD][CLOSE] Closing connection for port %u (fd=%d)\n",
+                   conn->port, fd);
+            remove_connection(fd); // hvis du har en funksjon for dette
+        }
+
         close(fd);
         return;
     }
 
     printf("[DEBUG][MIPTPD] ------UNIX read len=%zd\n", len);
-
-
     if (debug_mode)
         printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
 
     printf("[MIPTPD] Message received from app fd=%d\n", fd);
     send_miptp_data(fd, buf, len);
 }
+
 
 /*
   Lukker alle åpne file descriptors og skriver ut en avslutningsmelding.

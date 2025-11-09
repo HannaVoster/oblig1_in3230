@@ -94,10 +94,13 @@ int main(int argc, char *argv[]) {
     }
 
     printf("[SERVER] Listening on port %d, saving to %s\n", my_port, out_dir);
+    printf("[SERVER] Starting recv loop...\n");
 
     while (1) {
         uint8_t buf[1500];
         ssize_t n = read(fd, buf, sizeof(buf));
+        printf("[SERVER][RX] n=%zd\n", n);
+
         if (n <= 0) break;
 
         printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x %02x %02x...\n",
