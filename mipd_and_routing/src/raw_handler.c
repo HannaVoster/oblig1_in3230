@@ -90,7 +90,7 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
 
     // --- VLAN / Q-tag-sjekk ---
     if (proto == 0x8100 || proto == 0x88A8) {
-        if (len < eth_hdr_len + 4) return; // for kort for VLAN
+        if ((size_t)len < eth_hdr_len + 4) return; // for kort for VLAN
         uint16_t inner_proto = ntohs(*(uint16_t *)(buffer + eth_hdr_len + 2));
         printf("[DBG][RAW] VLAN detected, inner proto=0x%04x (adjusting offset +4)\n", inner_proto);
         proto = inner_proto;
