@@ -412,7 +412,12 @@ void handle_miptp_message(int my_mip_address,
 
     for (int i = 0; i < MAX_UNIX_CLIENT; i++) {
         if (unix_clients[i].active && unix_clients[i].sdu_type == MIPTP_SDU_TYPE) {
-            ssize_t n = write(unix_clients[i].fd, payload, length);
+            uint8_t outbuf[1 + length];
+            outbuf[0] = src;                            
+            memcpy(outbuf + 1, payload, length);
+
+            ssize_t n = write(unix_clients[i].fd, outbuf, sizeof(outbuf));
+
             if (n < 0) {
                 perror("[MIPD] write to MIPTPD failed");
             } else {

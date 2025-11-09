@@ -220,11 +220,14 @@ void handle_mip_event(int mip_fd) {
         printf("[MIPTPD] Disconnected from mipd.\n");
         exit(EXIT_FAILURE);
     }
+    uint8_t src_mip = buf[0]; 
+    uint8_t *payload = buf + 1;
+    size_t payload_len = len - 1;
 
     if (debug_mode)
         printf("[MIPTPD] Received %zd bytes from mipd\n", len);
 
-    handle_incoming_miptp_packet(buf, len, MIP_FD);
+    handle_incoming_miptp_packet(payload, payload_len, MIP_FD);
 }
 
 /*
