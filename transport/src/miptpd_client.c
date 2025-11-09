@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 
 #define MAX_RETRIES 3
-#define CHUNK_SIZE 1400
+#define CHUNK_SIZE 512
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
@@ -64,7 +64,8 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
     uint8_t my_port;
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        my_port = rand() % 256;
+        //my_port = rand() % 256;
+        do { my_port = (rand() % 255) + 1; } while (my_port == dst_port);
         if (write(fd, &my_port, 1) == 1) {
             printf("[CLIENT] Registered port %d\n", my_port);
             break;
@@ -91,6 +92,9 @@ int main(int argc, char *argv[]) {
         fclose(file);
         return EXIT_FAILURE;
     }
+
+    // Etter å ha sendt size_msg:
+    usleep(200 * 1000); // 200 ms
 
     // Sender fil contents in 1400-byte chunks
     uint8_t buffer[CHUNK_SIZE];
