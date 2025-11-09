@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         if (n <= 0) break;
 
         printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x %02x %02x...\n",
-        n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
+        n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
         uint8_t src_mip = buf[0];
         uint8_t src_port = buf[1];
