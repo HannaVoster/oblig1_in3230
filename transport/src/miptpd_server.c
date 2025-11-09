@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
         }
 
         printf("[SERVER][DATA] Writing %zu bytes to file\n", payload_len);
-        for (int i = 0; i < (payload_len < 16 ? payload_len : 16); i++)
+        for (int i = 0; i < (int)(payload_len < 16 ? payload_len : 16); i++)
             printf("%02x ", payload[i]);
         printf("\n");
 
