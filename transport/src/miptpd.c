@@ -224,7 +224,7 @@ void handle_mip_event(int mip_fd) {
     if (debug_mode)
         printf("[MIPTPD] Received %zd bytes from mipd\n", len);
 
-    handle_incoming_miptp_packet(buf, len, buf[0]);
+    handle_incoming_miptp_packet(buf, len, MIP_FD);
 }
 
 /*
