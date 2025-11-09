@@ -183,14 +183,14 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
         return; // Ignorerer denne pakken (venter på riktig sekvens)
     }
 
-    // In-order pakke, leveres til applikasjonen
-    if (len >= pad) len -= pad; // fjerner padding som ble lagt til ved sending
-    uint8_t msg[2 + len];       // buffer for å sende opp til appen, 2 ekstra byte til metadata
-    msg[0] = src_mip;           // mip addressen til avsender
-    msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
-    memcpy(msg + 2, payload, len);
+    // // In-order pakke, leveres til applikasjonen
+    // if (len >= pad) len -= pad; // fjerner padding som ble lagt til ved sending
+    // uint8_t msg[2 + len];       // buffer for å sende opp til appen, 2 ekstra byte til metadata
+    // msg[0] = src_mip;           // mip addressen til avsender
+    // msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
+    // memcpy(msg + 2, payload, len);
 
-    ssize_t sent = write(app_fd, msg, sizeof(msg));
+    ssize_t sent = write(app_fd, payload, len);
     if (sent != (ssize_t)sizeof(msg))
     printf("[MIPTPD][WARN] Partial write: %zd/%zu bytes delivered to app fd=%d\n",
            sent, sizeof(msg), app_fd);
