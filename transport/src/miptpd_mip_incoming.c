@@ -155,11 +155,10 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
 
     // Init synkronisering på første mottatte pakke
     if (!conn->synced) {
-        conn->expected_seq = (seq + 1) % MIPTP_MAX_SEQ; // Setter forventet sekvensnummer til neste etter den som nettopp ble mottatt
+        conn->expected_seq = seq; // Setter forventet sekvensnummer til neste etter den som nettopp ble mottatt
         conn->synced = 1;                               // Merker forbindelsen som “synkronisert” (klar for Go-Back-N)
 
-        printf("[MIPTPD][INIT] First packet seq=%u → expected_seq=%u\n",
-               seq, conn->expected_seq);
+         printf("[MIPTPD][INIT] First packet seq=%u → synced\n", seq);
     }
 
     uint16_t expected = conn->expected_seq;
