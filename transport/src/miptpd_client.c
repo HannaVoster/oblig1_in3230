@@ -81,10 +81,12 @@ int main(int argc, char *argv[]) {
 
     // Sender fil størrelse (4 bytes, network byte order)
     uint32_t net_size = htonl(filesize);
-    uint8_t size_msg[2 + sizeof(net_size)];
+   // type 0 = metadata, 1 = filedata
+    uint8_t size_msg[3 + sizeof(net_size)];
     size_msg[0] = dst_mip;
     size_msg[1] = dst_port;
-    memcpy(size_msg + 2, &net_size, sizeof(net_size));
+    size_msg[2] = 0; // metadata
+    memcpy(size_msg + 3, &net_size, sizeof(net_size));
 
     if (write(fd, size_msg, sizeof(size_msg)) < 0) {
         perror("write filesize");

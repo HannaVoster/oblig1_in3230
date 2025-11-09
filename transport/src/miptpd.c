@@ -282,6 +282,9 @@ void handle_app_message(int fd) {
         return;
     }
 
+    printf("[DEBUG][MIPTPD] ------UNIX read len=%zd\n", len);
+
+
     if (debug_mode)
         printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
 
