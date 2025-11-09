@@ -6,8 +6,7 @@
  *  - Returnere ferdige byte-buffere klare for sending til mipd
  */
 
-#include "miptpd_send.h"
-#include "miptpd_utils.h"
+#include "miptpd.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -32,6 +31,7 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
     size_t total = sizeof(miptp_hdr_t) + sdu_len + padlen;
     uint8_t *buf = malloc(total);
     if (!buf) {
+      
         perror("malloc build_data_pdu");
         exit(EXIT_FAILURE);
     }
@@ -50,8 +50,6 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
         memset(buf + sizeof(hdr) + sdu_len, 0, padlen);
 
     if (out_len) *out_len = total;
-
-    
     return buf;
 }
 

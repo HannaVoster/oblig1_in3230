@@ -146,6 +146,8 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq) {
 void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
                           uint16_t seq, uint8_t pad, uint8_t src_mip) {
 
+    hex_debug("[MIPTPD][FROM MIPD] Raw payload", payload, len);
+
     int app_fd = get_fd_from_port(hdr->dst_port);// Finner file descriptor (socket) til applikasjonen som har registrert denne destinasjonsporten
     if (app_fd < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr->dst_port);
@@ -189,6 +191,9 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     // msg[0] = src_mip;           // mip addressen til avsender
     // msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
     // memcpy(msg + 2, payload, len);
+
+    hex_debug("[MIPTPD][TO APP] Deliver", payload, len);
+
     if (len >= pad) len -= pad;
     ssize_t sent = write(app_fd, payload, len);  
 

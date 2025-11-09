@@ -11,5 +11,5 @@ int remove_app_connection(int fd);
 int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd);
-
+void hex_debug(const char *prefix, const uint8_t *buf, size_t len);
 #endif

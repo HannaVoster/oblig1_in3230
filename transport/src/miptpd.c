@@ -306,13 +306,17 @@ void handle_app_message(int fd) {
         close(fd);
         return;
     }
-
     printf("[DEBUG][MIPTPD] ------UNIX read len=%zd\n", len);
     if (debug_mode)
         printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
 
     printf("[MIPTPD] Message received from app fd=%d\n", fd);
-    send_miptp_data(fd, buf, len);
+    
+    if(len > 0){
+        hex_debug("[MIPTPD][APP->MIPTP]", buf, len);
+        send_miptp_data(fd, buf, len);
+    }
+    
 }
 
 

@@ -53,7 +53,7 @@ int new_app_connection(int fd, uint8_t port) {
             // Initialiser mottaker-tilstand
             app_connections[i].expected_seq = 0; // venter på første pakke med seq=0
             app_connections[i].synced = 0;
-            
+
             app_connections[i].queue_head = 0;
             app_connections[i].queue_tail = 0;
             app_connections[i].queue_count = 0;
@@ -133,3 +133,11 @@ int get_index(int fd){
 }
 
 
+void hex_debug(const char *prefix, const uint8_t *buf, size_t len) {
+    printf("%s (len=%zu): ", prefix, len);
+    size_t show = len < 16 ? len : 16;
+    for (size_t i = 0; i < show; i++)
+        printf("%02x ", buf[i]);
+    if (len > 16) printf("...");
+    printf("\n");
+}

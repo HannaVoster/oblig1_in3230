@@ -126,6 +126,8 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     connection->window[slot].acked = 0;
     connection->window_count++;
 
+    hex_debug("[MIPTPD][SEND->MIPD] Payload", payload, payload_len);
+
     // ----- Sender pdu til mipd -----
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu);
