@@ -21,49 +21,17 @@ typedef struct {
 
 transfer_t transfers[MAX_TRANSFERS];
 
-// transfer_t *find_or_create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) {
-//     // Try find existing
-//     for (int i = 0; i < MAX_TRANSFERS; i++) {
-//         if (transfers[i].active && transfers[i].src_mip == src_mip && transfers[i].src_port == src_port)
-//             return &transfers[i];
-//     }
-
-//     // Otherwise create new
-//     for (int i = 0; i < MAX_TRANSFERS; i++) {
-//         if (!transfers[i].active) {
-//             transfers[i].src_mip = src_mip;
-//             transfers[i].src_port = src_port;
-//             transfers[i].received = 0;
-//             transfers[i].expected_size = 0;
-//             transfers[i].active = 1;
-
-//             char filename[256];
-//             snprintf(filename, sizeof(filename), "%s/incoming_%d_%d", dir, src_mip, src_port);
-//             transfers[i].fp = fopen(filename, "wb");
-//             if (!transfers[i].fp) {
-//                 perror("fopen");
-//                 transfers[i].active = 0;
-//                 return NULL;
-//             }
-//             printf("[SERVER] New file: %s\n", filename);
-//             return &transfers[i];
-//         }
-//     }
-//     fprintf(stderr, "[SERVER] No available transfer slots!\n");
-//     return NULL;
-// }
-
 transfer_t *find_or_create_transfer(const char *dir) {
-    // 1) Hvis det allerede finnes en aktiv transfer, bruk den
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (transfers[i].active) {
+            printf("[DEBUG] Reusing active transfer slot %d — NOT reopening file!\n", i);
             return &transfers[i];
         }
     }
 
-    // 2) Ellers: opprett ny
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (!transfers[i].active) {
+            printf("[DEBUG] Creating new transfer slot %d — opening file now!\n", i);
             transfers[i].active = 1;
             transfers[i].received = 0;
             transfers[i].expected_size = 0;
@@ -76,6 +44,7 @@ transfer_t *find_or_create_transfer(const char *dir) {
                 transfers[i].active = 0;
                 return NULL;
             }
+
             printf("[SERVER] New file: %s\n", filename);
             return &transfers[i];
         }
@@ -84,6 +53,35 @@ transfer_t *find_or_create_transfer(const char *dir) {
     fprintf(stderr, "[SERVER] No available transfer slots!\n");
     return NULL;
 }
+
+
+transfer_t *find_or_create_transfer(const char *dir) {
+    // Finn en inaktiv slot
+    for (int i = 0; i < MAX_TRANSFERS; i++) {
+        if (!transfers[i].active) {
+            transfers[i].active = 1;
+            transfers[i].received = 0;
+            transfers[i].expected_size = 0;
+
+            char filename[256];
+            snprintf(filename, sizeof(filename), "%s/incoming", dir);
+
+            transfers[i].fp = fopen(filename, "wb"); // åpne ny fil hver gang
+            if (!transfers[i].fp) {
+                perror("fopen");
+                transfers[i].active = 0;
+                return NULL;
+            }
+
+            printf("[SERVER] New file: %s\n", filename);
+            return &transfers[i];
+        }
+    }
+
+    fprintf(stderr, "[SERVER] No available transfer slots!\n");
+    return NULL;
+}
+
 
 
 
@@ -178,9 +176,11 @@ int main(int argc, char *argv[]) {
 
 
         if (t->received >= t->expected_size && t->expected_size > 0) {
+            fflush(t->fp);
             printf("[SERVER] Transfer complete (%u bytes)\n", t->received);
             fclose(t->fp);
-            t->active = 0;
+            t->fp = NULL;
+            t->active = 0;   
         }
     }
     sleep(1);
