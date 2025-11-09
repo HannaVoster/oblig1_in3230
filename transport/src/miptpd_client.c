@@ -115,6 +115,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("[CLIENT] File transmission complete.\n");
+    sleep(1);
     fclose(file);
     close(fd);
     return EXIT_SUCCESS;

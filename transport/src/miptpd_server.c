@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
             t->active = 0;
         }
     }
-
+    sleep(1);
     close(fd);
     return EXIT_SUCCESS;
 }
