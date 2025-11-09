@@ -140,6 +140,11 @@ int main(int argc, char *argv[]) {
         printf("[SERVER][RX] len=%zd first_bytes=%02x %02x %02x %02x %02x %02x %02x %02x...\n",
        n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
+        printf("[SERVER][RX] len=%zd first_bytes=", n);
+        for (int i = 0; i < (n < 16 ? n : 16); i++)
+            printf("%02x ", buf[i]);
+        printf("\n");
+
 
         // uint8_t src_mip = buf[0];
         // uint8_t src_port = buf[1];
@@ -158,6 +163,12 @@ int main(int argc, char *argv[]) {
                 continue; // gå til neste read()
             }
         }
+
+        printf("[SERVER][DATA] Writing %zu bytes to file\n", payload_len);
+        for (int i = 0; i < (payload_len < 16 ? payload_len : 16); i++)
+            printf("%02x ", payload[i]);
+        printf("\n");
+
 
         fwrite(payload, 1, payload_len, t->fp);
         t->received += payload_len;
