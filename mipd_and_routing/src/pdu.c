@@ -49,6 +49,9 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
 
     if (out_len)
         *out_len = total;
+        
+    printf("[DEBUG][BUILD] sdu_len_bytes=%u len_words=%u total=%zu\n",
+       sdu_len_bytes, len_words, total);
 
     if (debug_mode) {
         printf("[DEBUG] mip_build_pdu: dest=%u src=%u ttl=%u type=%u "
