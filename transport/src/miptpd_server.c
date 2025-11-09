@@ -100,8 +100,9 @@ int main(int argc, char *argv[]) {
         ssize_t n = read(fd, buf, sizeof(buf));
         if (n <= 0) break;
 
-        printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x...\n",
-        n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+        printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x %02x %02x...\n",
+       n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
+
 
 
         uint8_t src_mip = buf[0];
@@ -122,10 +123,14 @@ int main(int argc, char *argv[]) {
                 t->received += payload_len - 4;
             }
             continue;
-    }
+        }
 
         fwrite(payload, 1, payload_len, t->fp);
         t->received += payload_len;
+
+        printf("[SERVER][RX] total_received=%u/%u\n",
+       t->received, t->expected_size);
+
 
         if (t->received >= t->expected_size && t->expected_size > 0) {
             printf("[SERVER] Transfer complete (%u bytes)\n", t->received);
