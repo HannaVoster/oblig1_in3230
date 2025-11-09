@@ -53,6 +53,12 @@ int new_app_connection(int fd, uint8_t port) {
             // Initialiser mottaker-tilstand
             app_connections[i].expected_seq = 0; // venter på første pakke med seq=0
             app_connections[i].synced = 0;
+            
+            app_connections[i].queue_head = 0;
+            app_connections[i].queue_tail = 0;
+            app_connections[i].queue_count = 0;
+            app_connections[i].peer_mip = 0;
+
 
             // Nullstill vinduet
             for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) {
