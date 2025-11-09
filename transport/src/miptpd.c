@@ -300,7 +300,7 @@ void handle_app_message(int fd) {
 
             printf("[MIPTPD][CLOSE] Closing connection for port %u (fd=%d)\n",
                    conn->port, fd);
-            remove_connection(fd); // hvis du har en funksjon for dette
+            remove_app_connection(fd);
         }
 
         close(fd);
