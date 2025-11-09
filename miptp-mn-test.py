@@ -58,13 +58,30 @@ def init_miptp(self, line):
     time.sleep(3)
 
     print("\n=== Launching applications ===")
-    # Start server (port 99) på B
-    terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+440",
-                          "./test_server miptp_appB.sock"))
+
+    print("\n=== Launching file transfer test ===")
+
+    # Start server (port 99) på B – lagrer mottatte filer i /tmp
+    terms.append(openTerm(self, B, "MIPTP SERVER [B:99]", "80x20+1110+440",
+                        "cd bin && sudo ./miptpd_server 99 miptp_appB.sock /tmp"))
+    time.sleep(3)
+
+    # Lag testfil på A
+    terms.append(openTerm(self, A, "PREPARE FILE [A]", "80x10+0+660",
+                        "cd bin && dd if=/dev/urandom of=testfile.dat bs=1K count=32 && echo 'File ready on A'"))
     time.sleep(2)
-    # Start klient (port 42) på A – sender til MIP 99
-    terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+660",
-                          "./test_app miptp_appA.sock 'Hello from A' 99"))
+
+    # Start klienten som sender filen
+    terms.append(openTerm(self, A, "MIPTP CLIENT [A]", "80x20+0+880",
+                        "cd bin && sudo ./miptpd_client testfile.dat 2 99 miptp_appA.sock"))
+
+    # # Start server (port 99) på B
+    # terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+440",
+    #                       "./test_server miptp_appB.sock"))
+    # time.sleep(2)
+    # # Start klient (port 42) på A – sender til MIP 99
+    # terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+660",
+    #                       "./test_app miptp_appA.sock 'Hello from A' 99"))
 
     print("\n✅ MIPTP test setup complete.")
     print("Use the Mininet CLI to monitor logs or type 'exit' to stop.")
