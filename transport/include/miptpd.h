@@ -8,9 +8,8 @@
 
 
 /*
-
  *  miptpd.h
- *  Sentral header for MIPTP-daemonen.
+ *  Sentral header for MIPTP-daemonen
  *
  *  Inneholder:
  *   - Globale konstanter
@@ -18,18 +17,17 @@
  *   - Globale variabler (extern)
  */
 
-
 // Konstanter og begrensninger
 #define MIPTP_SDU_TYPE       0x05
 #define MIPTP_MAX_PAYLOAD    1400
 #define MIPTP_WINDOW_SIZE    16
-#define MIPTP_MAX_SEQ        16384   // 14-bit sekvensnummer
+#define MIPTP_MAX_SEQ        16384 // 14-bit sekvensnummer
 #define MIPTP_MAX_QUEUE      64
 #define MAX_APPS             20
 
 
 // Globale variabler
-extern int debug_mode;   // styrer ekstra logging
+extern int debug_mode;   // styrer logging, settes som flagg til main
 extern int MIP_FD;       // file descriptor til mipd-socket
 
 
@@ -59,13 +57,13 @@ typedef struct {
 
 // Forbindelsesinformasjon mellom app og MIPTP
 typedef struct {
-    int       app_fd;       // socket mot appen
-    uint8_t   port;         // portnummer
-    uint16_t  base_seq;     // første uackede sekvens
-    uint16_t  next_seq;     // neste sekvens som skal sendes
+    int app_fd;             // socket mot appen
+    uint8_t port;           // portnummer
+    uint16_t base_seq;      // første uackede sekvens
+    uint16_t next_seq;      // neste sekvens som skal sendes
 
     packet_entry window[MIPTP_WINDOW_SIZE];
-    uint8_t      window_count;
+    uint8_t window_count;
 
     // Kø for ventende meldinger
     queued_packet queue[MIPTP_MAX_QUEUE];
@@ -73,15 +71,15 @@ typedef struct {
     int queue_tail;
     int queue_count;
 
-    uint8_t  peer_mip;      // mottakers MIP-adresse
+    uint8_t peer_mip;       // mottakers MIP-adresse
     uint16_t expected_seq;  // neste sekvens som forventes fra mottaker
-    int      synced;        // om mottaker er initialisert
+    int synced;             // om mottaker er initialisert
 } app_connection;
 
 // Global tabell for aktive app-tilkoblinger
 extern app_connection app_connections[MAX_APPS];
 
-//   Grunnfunksjoner fra miptpd.c
+// Grunnfunksjoner fra miptpd.c
 
 void parse_socket_paths(char *mipd_arg, char *app_arg,
                         char *mipd_path, char *app_path);
@@ -94,7 +92,7 @@ void handle_new_app_connection(int app_listen_fd, int epollfd);
 void handle_app_message(int fd);
 void cleanup(int epollfd, int mip_fd, int app_listen_fd);
 
-// UNIX-sockets
+// UNIX-sockets, miptpd_unix.c
 void wait_for_socket(const char *path);
 int  connect_to_mipd(const char *path);
 int  create_app_socket(const char *path);

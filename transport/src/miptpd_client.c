@@ -1,73 +1,117 @@
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <arpa/inet.h>
 #include <time.h>
+#include <arpa/inet.h>
 
-/*
-
-Registrere porten den skal lytte på (f.eks. 99)
-Motta data-PDUs fra miptpd
-Når ny (src_mip, src_port) dukker opp → åpne fil
-Første melding inneholder 4-byte fil-lengde
-Deretter mottas 1400-bytes chunks til filen er komplett
-
-*/
-
-#define APP_SOCKET_PATH "/tmp/miptp_app.sock"
-#define CHUNK 1400
+#define MAX_RETRIES 3
+#define CHUNK_SIZE 1400
 
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s <file> <dst_mip> <dst_port>\n", argv[0]);
-        exit(EXIT_FAILURE);
+    if (argc < 5) {
+        fprintf(stderr, "Usage: %s <file_to_send> <dst_mip> <dst_port> <app_socket>\n", argv[0]);
+        return EXIT_FAILURE;
     }
+
     const char *filename = argv[1];
-    uint8_t dst_mip  = atoi(argv[2]);
+    uint8_t dst_mip = atoi(argv[2]);
     uint8_t dst_port = atoi(argv[3]);
+    const char *socket_arg = argv[4];
 
-    srand(time(NULL));
-    uint8_t my_port = 20 + rand()%200; // tilfeldig app-port
+    // binder UNIX socket path
+    char socket_path[108];
+    if (socket_arg[0] != '/')
+        snprintf(socket_path, sizeof(socket_path), "/tmp/%s", socket_arg);
+    else
+        strncpy(socket_path, socket_arg, sizeof(socket_path) - 1);
 
+    // åpner filen
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        perror("fopen");
+        return EXIT_FAILURE;
+    }
+
+    fseek(file, 0, SEEK_END);
+    uint32_t filesize = ftell(file);
+    rewind(file);
+    printf("[CLIENT] File size: %u bytes\n", filesize);
+
+    // lager UNIX socket
     int fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+    if (fd < 0) {
+        perror("socket");
+        fclose(file);
+        return EXIT_FAILURE;
+    }
+
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, APP_SOCKET_PATH, sizeof(addr.sun_path)-1);
-    connect(fd, (struct sockaddr*)&addr, sizeof(addr));
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
-    write(fd, &my_port, 1);
-    printf("[CLIENT] Using port %d\n", my_port);
-
-    FILE *f = fopen(filename, "rb");
-    if (!f) { perror("fopen"); exit(1); }
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    // send lengde
-    uint32_t len_net = htonl((uint32_t)fsize);
-    uint8_t hdr[2 + 4];
-    hdr[0] = dst_mip;
-    hdr[1] = dst_port;
-    memcpy(hdr+2, &len_net, 4);
-    write(fd, hdr, sizeof(hdr));
-
-    // send innhold
-    uint8_t buf[CHUNK];
-    size_t n;
-    while ((n = fread(buf, 1, CHUNK, f)) > 0) {
-        uint8_t pkt[2 + n];
-        pkt[0] = dst_mip;
-        pkt[1] = dst_port;
-        memcpy(pkt+2, buf, n);
-        write(fd, pkt, sizeof(pkt));
-        usleep(1000); // liten pause
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("connect");
+        close(fd);
+        fclose(file);
+        return EXIT_FAILURE;
     }
-    fclose(f);
-    printf("[CLIENT] File sent (%ld bytes)\n", fsize);
+
+    // prøver random porter opp til 3 ganger
+    srand(time(NULL));
+    uint8_t my_port;
+    for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        my_port = rand() % 256;
+        if (write(fd, &my_port, 1) == 1) {
+            printf("[CLIENT] Registered port %d\n", my_port);
+            break;
+        }
+        printf("[CLIENT] Port %d rejected, retrying...\n", my_port);
+        if (attempt == MAX_RETRIES) {
+            fprintf(stderr, "[CLIENT] Failed to register port after %d attempts\n", MAX_RETRIES);
+            close(fd);
+            fclose(file);
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Sender fil størrelse (4 bytes, network byte order)
+    uint32_t net_size = htonl(filesize);
+    uint8_t size_msg[2 + sizeof(net_size)];
+    size_msg[0] = dst_mip;
+    size_msg[1] = dst_port;
+    memcpy(size_msg + 2, &net_size, sizeof(net_size));
+
+    if (write(fd, size_msg, sizeof(size_msg)) < 0) {
+        perror("write filesize");
+        close(fd);
+        fclose(file);
+        return EXIT_FAILURE;
+    }
+
+    // Sender fil contents in 1400-byte chunks
+    uint8_t buffer[CHUNK_SIZE];
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        uint8_t packet[2 + bytes_read];
+        packet[0] = dst_mip;
+        packet[1] = dst_port;
+        memcpy(packet + 2, buffer, bytes_read);
+        ssize_t sent = write(fd, packet, sizeof(packet));
+        if (sent < 0) {
+            perror("write data");
+            break;
+        }
+        printf("[CLIENT] Sent %zd bytes\n", sent - 2);
+        usleep(5000); // small delay for readability
+    }
+
+    printf("[CLIENT] File transmission complete.\n");
+    fclose(file);
     close(fd);
+    return EXIT_SUCCESS;
 }
+
