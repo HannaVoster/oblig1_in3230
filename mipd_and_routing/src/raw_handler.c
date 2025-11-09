@@ -90,11 +90,27 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
     size_t mip_len = len - sizeof(struct ethhdr);
 
+    uint16_t eth_proto = ntohs(eh->h_proto);
+    printf("[DBG][RAW] frame_len=%d, eth_proto=0x%04x, mip_offset=%zu, mip_len=%zu\n",
+        len, eth_proto, sizeof(struct ethhdr), mip_len);
+
+    // Sjekk for VLAN / 802.1Q
+    if (eth_proto == 0x8100 || eth_proto == 0x88A8) {
+        printf("[DBG][RAW] VLAN header detected — adjusting offset +4\n");
+        mip_start += 4;
+        mip_len -= 4;
+        eth_proto = ntohs(*(uint16_t *)(buffer + sizeof(struct ethhdr) + 2));
+        printf("[DBG][RAW] inner ethertype=0x%04x, adjusted mip_len=%zu\n", eth_proto, mip_len);
+    }
+
+
     uint8_t dest, src, ttl, sdu_type;
     const uint8_t *payload;
 
     // Pakk ut og tolk MIP-headeren
     ssize_t length = mip_parse(mip_start, mip_len, &dest, &src, &ttl, &sdu_type, &payload);
+
+    printf("[DBG][RAW->PARSE] mip_len=%zu, mip_parse returned=%zd\n", mip_len, length);
 
     if (length < 0) {
         printf("[ERROR][RAW] ugyldig MIP PDU (len=%d)\n", len);
