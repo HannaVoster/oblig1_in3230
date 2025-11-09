@@ -52,7 +52,7 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu seq=%u pad=%u\n",
            src_mip, hdr.src_port, hdr.dst_port, payload_len, seq, pad);
 
-    // skiller mellom ACK og DATA 
+    // skiller mellom ACK og DATA s
     if (payload_len == 0)
         handle_incoming_ack(&hdr, seq);
     else
@@ -155,7 +155,7 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
 
     // Init synkronisering på første mottatte pakke
     if (!conn->synced) {
-        conn->expected_seq = (seq + 1) % MIPTP_MAX_SEQ; // Setter forventet sekvensnummer til neste etter den vi nettopp mottok
+        conn->expected_seq = (seq + 1) % MIPTP_MAX_SEQ; // Setter forventet sekvensnummer til neste etter den som nettopp ble mottatt
         conn->synced = 1;                               // Merker forbindelsen som “synkronisert” (klar for Go-Back-N)
 
         printf("[MIPTPD][INIT] First packet seq=%u → expected_seq=%u\n",

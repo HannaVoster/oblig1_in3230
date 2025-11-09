@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 
 #define MAX_RETRIES 3
-#define CHUNK_SIZE 512
+#define CHUNK_SIZE 1400
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
