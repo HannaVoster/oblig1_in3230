@@ -224,8 +224,8 @@ void handle_mip_event(int mip_fd) {
     uint8_t *payload = buf + 1;
     size_t payload_len = len - 1;
 
-    if (debug_mode)
-        printf("[MIPTPD] Received %zd bytes from mipd\n", len);
+   
+    printf("[MIPTPD] -----Received %zd bytes from mipd\n", len);
 
     handle_incoming_miptp_packet(payload, payload_len, src_mip);
 }
