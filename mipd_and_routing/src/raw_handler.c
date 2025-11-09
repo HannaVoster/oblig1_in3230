@@ -74,21 +74,35 @@ void handle_raw_packet(int raw_sock, int my_mip_address) {
     struct ethhdr *eh = (struct ethhdr *)buffer;
 
     // Leser ut protokollfeltet (skal være MIP)
-    uint16_t proto = htons(eh->h_proto);
+    //uint16_t proto = htons(eh->h_proto);
 
     int if_index = src_addr.sll_ifindex;
     char if_name[IFNAMSIZ];
     if_indextoname(if_index, if_name); // oversett til navn (f.eks. "A-eth0")
 
     // Sjekker at pakken faktisk er av MIP-type
-    if (proto != ETH_P_MIP) {
-        printf("[ERROR][RAW] PROTO ER FEIL (ikke MIP)\n\n");
-        return;
+    // if (proto != ETH_P_MIP) {
+    //     printf("[ERROR][RAW] PROTO ER FEIL (ikke MIP)\n\n");
+    //     return;
+    // }
+    uint16_t proto = ntohs(eh->h_proto);
+    size_t eth_hdr_len = sizeof(struct ethhdr);
+
+    // --- VLAN / Q-tag-sjekk ---
+    if (proto == 0x8100 || proto == 0x88A8) {
+        if (len < eth_hdr_len + 4) return; // for kort for VLAN
+        uint16_t inner_proto = ntohs(*(uint16_t *)(buffer + eth_hdr_len + 2));
+        printf("[DBG][RAW] VLAN detected, inner proto=0x%04x (adjusting offset +4)\n", inner_proto);
+        proto = inner_proto;
+        eth_hdr_len += 4;
     }
-    
-    //Mip pakken starter etter ethernet header
-    const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
-    size_t mip_len = len - sizeof(struct ethhdr);
+
+    const uint8_t *mip_start = buffer + eth_hdr_len;
+    size_t mip_len = len - eth_hdr_len;
+
+    // //Mip pakken starter etter ethernet header
+    // const uint8_t *mip_start = buffer + sizeof(struct ethhdr);
+    // size_t mip_len = len - sizeof(struct ethhdr);
 
     uint16_t eth_proto = ntohs(eh->h_proto);
     printf("[DBG][RAW] frame_len=%d, eth_proto=0x%04x, mip_offset=%zu, mip_len=%zu\n",
