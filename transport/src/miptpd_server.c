@@ -23,13 +23,7 @@ transfer_t transfers[MAX_TRANSFERS];
 
 
 transfer_t *find_or_create_transfer(const char *dir) {
-    for (int i = 0; i < MAX_TRANSFERS; i++) {
-        if (transfers[i].active) {
-            printf("[DEBUG] Reusing active transfer slot %d — NOT reopening file!\n", i);
-            return &transfers[i];
-        }
-    }
-
+    // Finn en inaktiv slot (ikke aktiv = kan brukes)
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (!transfers[i].active) {
             printf("[DEBUG] Creating new transfer slot %d — opening file now!\n", i);
@@ -54,7 +48,6 @@ transfer_t *find_or_create_transfer(const char *dir) {
     fprintf(stderr, "[SERVER] No available transfer slots!\n");
     return NULL;
 }
-
 
 
 
@@ -152,9 +145,10 @@ int main(int argc, char *argv[]) {
         if (t->received >= t->expected_size && t->expected_size > 0) {
             fflush(t->fp);
             printf("[SERVER] Transfer complete (%u bytes)\n", t->received);
+            t->active = 0; 
             fclose(t->fp);
             t->fp = NULL;
-            t->active = 0;   
+              
         }
     }
     sleep(1);
