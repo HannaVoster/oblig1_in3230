@@ -29,8 +29,10 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
     // Beregn antall 32-bits ord (avrund opp)
     uint16_t len_words = (sdu_len_bytes + 3) / 4;
 
+    size_t sdu_aligned = len_words * 4;
+
     // Total faktisk lengde (header + ekte data, ingen padding)
-    size_t total = 4 + sdu_len_bytes;
+    size_t total = 4 + sdu_aligned;
     uint8_t *buf = malloc(total);
     if (!buf) {
         perror("malloc mip_build_pdu");
@@ -46,6 +48,10 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
     // Kopier SDU (ingen padding!)
     if (sdu && sdu_len_bytes)
         memcpy(buf + 4, sdu, sdu_len_bytes);
+    
+    // Nullfyll hvis SDU ble avrundet opp
+    if (sdu_aligned > sdu_len_bytes)
+        memset(buf + 4 + sdu_len_bytes, 0, sdu_aligned - sdu_len_bytes);
 
     if (out_len)
         *out_len = total;
