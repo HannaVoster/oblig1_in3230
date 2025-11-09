@@ -133,7 +133,7 @@ Kalles av main i mipd.c til å håndtere klient meldinger som kommer over UNIX s
 
 void handle_unix_request(int client_fd, int raw_sock, int my_mip_address) {
 
-    char buffer[256];
+    char buffer[4096];
     int bytes_read = read(client_fd, buffer, sizeof(buffer)); // leser data fra UNIX-klienten
 
     if (bytes_read <= 0) {
