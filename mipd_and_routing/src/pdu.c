@@ -159,6 +159,29 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
 //     return (ssize_t)sdu_bytes;
 // }
 
+// ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
+//                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
+//                   uint8_t *sdu_type, const uint8_t **sdu_out)
+// {
+//     if (rcv_len < 4) return -1;
+
+//     *dest = rcv[0];
+//     *src  = rcv[1];
+//     *ttl  = (rcv[2] >> 4) & 0x0F;
+
+//     uint16_t len_words = ((rcv[2] & 0x0F) << 5) | ((rcv[3] >> 3) & 0x1F);
+//     *sdu_type = rcv[3] & 0x07;
+
+//     size_t sdu_bytes = len_words * 4;
+//     if (rcv_len < 4 + sdu_bytes)
+//         sdu_bytes = rcv_len - 4; // fallback hvis pakken faktisk er kortere
+
+//     if (sdu_out)
+//         *sdu_out = rcv + 4;
+
+//     return (ssize_t)sdu_bytes;
+// }
+
 ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
                   uint8_t *dest, uint8_t *src, uint8_t *ttl,
                   uint8_t *sdu_type, const uint8_t **sdu_out)
@@ -167,17 +190,23 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
 
     *dest = rcv[0];
     *src  = rcv[1];
-    *ttl  = (rcv[2] >> 4) & 0x0F;
 
-    uint16_t len_words = ((rcv[2] & 0x0F) << 5) | ((rcv[3] >> 3) & 0x1F);
-    *sdu_type = rcv[3] & 0x07;
+    uint8_t ttl_len  = rcv[2];
+    uint8_t len_type = rcv[3];
+
+    *ttl = (ttl_len >> 4) & 0x0F;          // øvre 4 bit
+    uint16_t len_words = ((ttl_len & 0x0F) << 4) | ((len_type >> 4) & 0x0F);
+    *sdu_type = len_type & 0x0F;           // nedre 4 bit
 
     size_t sdu_bytes = len_words * 4;
     if (rcv_len < 4 + sdu_bytes)
-        sdu_bytes = rcv_len - 4; // fallback hvis pakken faktisk er kortere
+        sdu_bytes = rcv_len - 4;           // fallback
 
     if (sdu_out)
         *sdu_out = rcv + 4;
+
+    printf("[MIPD][PARSE] dest=%u src=%u ttl=%u len_words=%u bytes=%zu type=%u\n",
+           *dest, *src, *ttl, len_words, sdu_bytes, *sdu_type);
 
     return (ssize_t)sdu_bytes;
 }
