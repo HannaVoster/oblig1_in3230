@@ -67,6 +67,9 @@ uint8_t *mip_build_pdu(uint8_t dest, uint8_t src, uint8_t ttl,
                "sdu_len=%u words=%u total=%zu\n",
                dest, src, ttl, sdu_type, sdu_len_bytes, len_words, total);
     }
+    printf("[DBG][BUILD-END] sdu_len=%u -> len_words=%u (total=%zu)\n",
+       sdu_len_bytes, len_words, total);
+
 
     return buf; // caller må free()
 }
@@ -107,6 +110,10 @@ ssize_t mip_parse(const uint8_t *rcv, size_t rcv_len,
         printf("[DEBUG][PDU] mip_parse decoded: dest=%u src=%u ttl=%u len_words=%u sdu_type=%u\n\n",
             *dest, *src, *ttl, len_words, *sdu_type);
     }
+
+    printf("[DBG][PARSE-END] len_words=%u sdu_bytes=%zu rcv_len=%zu (expected=%zu)\n",
+       len_words, sdu_bytes, rcv_len, rcv_len - 4);
+
     // Returner hvor mange bytes SDU-delen er på
     return (ssize_t)sdu_bytes;
 }
