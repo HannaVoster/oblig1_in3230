@@ -54,6 +54,14 @@ transfer_t transfers[MAX_TRANSFERS];
 // }
 
 transfer_t *find_or_create_transfer(const char *dir) {
+    // 1) Hvis det allerede finnes en aktiv transfer, bruk den
+    for (int i = 0; i < MAX_TRANSFERS; i++) {
+        if (transfers[i].active) {
+            return &transfers[i];
+        }
+    }
+
+    // 2) Ellers: opprett ny
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (!transfers[i].active) {
             transfers[i].active = 1;
@@ -72,9 +80,11 @@ transfer_t *find_or_create_transfer(const char *dir) {
             return &transfers[i];
         }
     }
+
     fprintf(stderr, "[SERVER] No available transfer slots!\n");
     return NULL;
 }
+
 
 
 int main(int argc, char *argv[]) {
@@ -127,8 +137,9 @@ int main(int argc, char *argv[]) {
 
         if (n <= 0) break;
 
-        printf("[SERVER][RX] len=%zd src_mip=%u src_port=%u first_bytes=%02x %02x %02x %02x %02x %02x...\n",
-        n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+        printf("[SERVER][RX] len=%zd first_bytes=%02x %02x %02x %02x %02x %02x %02x %02x...\n",
+       n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+
 
         // uint8_t src_mip = buf[0];
         // uint8_t src_port = buf[1];
@@ -138,7 +149,10 @@ int main(int argc, char *argv[]) {
         transfer_t *t = find_or_create_transfer(out_dir);
         if (!t) continue;
 
-        if (t->expected_size == 0 && t->received == 0 && payload_len == 4) {
+        if (t->expected_size == 0 && t->received == 0) {
+            if (payload_len < 4) {
+                fprintf(stderr, "[SERVER] Size header too short");
+            }
             memcpy(&t->expected_size, payload, 4);
             t->expected_size = ntohl(t->expected_size);
             printf("[SERVER]  %u bytes\n",  t->expected_size);
