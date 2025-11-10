@@ -143,9 +143,9 @@ int main(int argc, char *argv[]) {
 
         // === Her er vi midt i overføringen ===
         if (active_transfer && active_transfer->active) {
-            // Hopp over metadata (2 byte)
-            uint8_t *filedata = payload + 2;
-            size_t data_len = payload_len - 2;
+        
+            uint8_t *filedata = payload;
+            size_t data_len = payload_len;
 
             fwrite(filedata, 1, data_len, active_transfer->fp);
             active_transfer->received += data_len;
