@@ -108,13 +108,15 @@ int main(int argc, char *argv[]) {
             printf("%02x ", buf[i]);
         printf("\n");
 
+        size_t file_size_message_payload_len = n;
+
         uint8_t *payload = buf + 2;
         size_t payload_len = n - 2;
 
         // Dersom vi ikke har startet en overføring enda:
         if (!active_transfer) {
             // Forvent at dette er meldingen med filstørrelse
-            if (payload_len == 6) { //  4 størrelse
+            if (n == 4) { //  4 størrelse
                 uint32_t net_size;
                 memcpy(&net_size, payload, 4);
                 uint32_t filesize = ntohl(net_size);
