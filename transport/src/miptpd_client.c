@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
         memcpy(packet + 2, buffer, bytes_read);
 
         printf("[CLIENT][PAYLOAD] len=%zu first_bytes=", bytes_read);
-        for (int i = 0; i < (bytes_read < 16 ? bytes_read : 16); i++)
+        for (int i = 0; i < (int)(bytes_read < 16 ? bytes_read : 16); i++)
             printf("%02x ", buffer[i]);
         printf("\n");
 
