@@ -82,6 +82,9 @@ typedef struct {
     uint8_t src_mip;
     uint16_t expected_seq;  // neste sekvens som forventes fra mottaker
     int synced;             // om mottaker er initialisert
+
+    transfer_key active_transfers[MAX_TRANSFERS_PER_APP];
+    int num_transfers;
 } app_connection;
 
 // Global tabell for aktive app-tilkoblinger
