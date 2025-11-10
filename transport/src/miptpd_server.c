@@ -100,13 +100,16 @@ int main(int argc, char *argv[]) {
         ssize_t n = read(fd, buf, sizeof(buf));
         if (n <= 0) break;
 
+        uint8_t src_mip = buf[0];
+        uint8_t src_port = buf[1];
+
         printf("[CLIENT][RX] len=%zd first_bytes=", n);
         for (int i = 0; i < (n < 16 ? n : 16); i++)
             printf("%02x ", buf[i]);
         printf("\n");
 
-        uint8_t *payload = buf;
-        size_t payload_len = n;
+        uint8_t *payload = buf + 2;
+        size_t payload_len = n - 2;
 
         // Dersom vi ikke har startet en overføring enda:
         if (!active_transfer) {
