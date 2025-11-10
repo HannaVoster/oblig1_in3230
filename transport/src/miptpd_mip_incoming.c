@@ -111,6 +111,7 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq) {
           ((conn->next_seq + MIPTP_MAX_SEQ - conn->base_seq) % MIPTP_MAX_SEQ) < MIPTP_WINDOW_SIZE) { // er det pakker i kø og er vindu ikke fullt
 
         int pos = conn->queue_head % MIPTP_MAX_QUEUE;
+    
         send_miptp_data(conn->app_fd, conn->queue[pos].data, conn->queue[pos].len); // tømmer kø
 
         conn->queue_head++; // Flytter køhode fremover
@@ -148,15 +149,29 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
 
     hex_debug("[MIPTPD][FROM MIPD] Raw payload", payload, len);
 
-    int app_fd = get_fd_from_port(hdr->dst_port);// Finner file descriptor (socket) til applikasjonen som har registrert denne destinasjonsporten
-    if (app_fd < 0) {
+    uint8_t src_port = hdr->src_port;
+    uint8_t dst_port = hdr->dst_port;
+
+    int app = get_fd_from_port(hdr->dst_port);// Finner file descriptor (socket) til applikasjonen som har registrert denne destinasjonsporten
+    if (app < 0) {
         fprintf(stderr, "[MIPTPD] No app registered on port %d\n", hdr->dst_port);
         return;
     }
 
-    int idx = get_index(app_fd); // Finner indeksen i app_connections[] som tilsvarer denne applikasjonen
+    int idx = get_index(app); // Finner indeksen i app_connections[] som tilsvarer denne applikasjonen
     if (idx < 0) return;
     app_connection *conn = &app_connections[idx];
+
+    // sjekk om ny (src_mip, src_port)
+    if (!transfer_exists(app, src_mip, src_port)) {
+        register_new_transfer(app, src_mip, src_port);
+
+        uint8_t ctrl_msg[3] = {0xFF, src_mip, src_port};
+        write(conn->app_fd, ctrl_msg, sizeof(ctrl_msg));
+
+        printf("[MIPTPD][NEW TRANSFER] src=%u:%u -> dst_port=%u\n",
+               src_mip, src_port, dst_port);
+    }
 
     // Init synkronisering på første mottatte pakke
     if (!conn->synced) {
@@ -195,10 +210,10 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     hex_debug("[MIPTPD][TO APP] Deliver", payload, len);
 
     if (len >= pad) len -= pad;
-    ssize_t sent = write(app_fd, payload, len);  
+    ssize_t sent = write(app, payload, len);  
 
     if (sent > 0)
-        printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n", sent, hdr->dst_port, app_fd);
+        printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n", sent, hdr->dst_port, app);
     else
         perror("[MIPTPD] write to app failed");
 
