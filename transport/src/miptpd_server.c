@@ -111,11 +111,9 @@ int main(int argc, char *argv[]) {
         // Dersom vi ikke har startet en overføring enda:
         if (!active_transfer) {
             // Forvent at dette er meldingen med filstørrelse
-            if (payload_len == 4) { // 2 metadata + 4 størrelse
-                uint8_t dst_mip = payload[0];
-                uint8_t dst_port = payload[1];
+            if (payload_len == 4) { //  4 størrelse
                 uint32_t net_size;
-                memcpy(&net_size, payload + 2, 4);
+                memcpy(&net_size, payload, 4);
                 uint32_t filesize = ntohl(net_size);
 
                 active_transfer = &transfers[0];
@@ -141,7 +139,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
         }
-        
+
 
         // === Her er vi midt i overføringen ===
         if (active_transfer && active_transfer->active) {
