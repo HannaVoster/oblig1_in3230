@@ -29,6 +29,10 @@ int main(int argc, char *argv[]) {
     else
         strncpy(socket_path, socket_arg, sizeof(socket_path) - 1);
 
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "md5sum %s", filename);
+    printf("[CLIENT] Checking source file hash:\n");
+    system(cmd);
     // åpner filen
     FILE *file = fopen(filename, "rb");
     if (!file) {
