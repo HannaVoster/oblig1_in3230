@@ -105,6 +105,12 @@ int main(int argc, char *argv[]) {
         packet[0] = dst_mip;
         packet[1] = dst_port;
         memcpy(packet + 2, buffer, bytes_read);
+
+        printf("[CLIENT][PAYLOAD] len=%zu first_bytes=", bytes_read);
+        for (int i = 0; i < (bytes_read < 16 ? bytes_read : 16); i++)
+            printf("%02x ", buffer[i]);
+        printf("\n");
+
         ssize_t sent = write(fd, packet, sizeof(packet));
         if (sent < 0) {
             perror("write data");
