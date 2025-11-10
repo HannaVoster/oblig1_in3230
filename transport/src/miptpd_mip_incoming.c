@@ -163,8 +163,8 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     app_connection *conn = &app_connections[idx];
 
     // sjekk om ny (src_mip, src_port)
-    if (!transfer_exists(app, src_mip, src_port)) {
-        register_new_transfer(app, src_mip, src_port);
+    if (!transfer_exists(conn, src_mip, src_port)) {
+        register_new_transfer(conn, src_mip, src_port);
 
         uint8_t ctrl_msg[3] = {0xFF, src_mip, src_port};
         write(conn->app_fd, ctrl_msg, sizeof(ctrl_msg));
