@@ -20,7 +20,7 @@ typedef struct {
 } transfer_t;
 
 transfer_t transfers[MAX_TRANSFERS];
-
+transfer_t *active_transfer = NULL;
 
 transfer_t *find_or_create_transfer(const char *dir) {
     // Finn en inaktiv slot (ikke aktiv = kan brukes)
@@ -98,59 +98,134 @@ int main(int argc, char *argv[]) {
     while (1) {
         uint8_t buf[1500];
         ssize_t n = read(fd, buf, sizeof(buf));
-        printf("[SERVER][RX] n=%zd\n", n);
-
         if (n <= 0) break;
-
-        printf("[SERVER][RX] len=%zd first_bytes=%02x %02x %02x %02x %02x %02x %02x %02x...\n",
-       n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
         printf("[SERVER][RX] len=%zd first_bytes=", n);
         for (int i = 0; i < (n < 16 ? n : 16); i++)
             printf("%02x ", buf[i]);
         printf("\n");
 
-
-        // uint8_t src_mip = buf[0];
-        // uint8_t src_port = buf[1];
         uint8_t *payload = buf;
         size_t payload_len = n;
 
-        transfer_t *t = find_or_create_transfer(out_dir);
-        if (!t) continue;
+        // Dersom vi ikke har startet en overføring enda:
+        if (!active_transfer) {
+            // Forvent at dette er meldingen med filstørrelse
+            if (payload_len == 6) { // 2 metadata + 4 størrelse
+                uint8_t dst_mip = payload[0];
+                uint8_t dst_port = payload[1];
+                uint32_t net_size;
+                memcpy(&net_size, payload + 2, 4);
+                uint32_t filesize = ntohl(net_size);
 
-        if (t->expected_size == 0 && t->received == 0) {
-             // Første pakke = filstørrelse
-            if (payload_len == 4) {
-                memcpy(&t->expected_size, payload, 4);
-                t->expected_size = ntohl(t->expected_size);
-                printf("[SERVER] File size = %u bytes\n", t->expected_size);
-                continue; // gå til neste read()
+                active_transfer = &transfers[0];
+                active_transfer->expected_size = filesize;
+                active_transfer->received = 0;
+                active_transfer->active = 1;
+
+                char filename[256];
+                snprintf(filename, sizeof(filename), "%s/incoming_%d_%d", out_dir, dst_mip, dst_port);
+                active_transfer->fp = fopen(filename, "wb");
+                if (!active_transfer->fp) {
+                    perror("fopen");
+                    active_transfer->active = 0;
+                    active_transfer = NULL;
+                    continue;
+                }
+
+                printf("[SERVER] New file: %s\n", filename);
+                printf("[SERVER] File size = %u bytes\n", filesize);
+                continue; // vent på neste pakke
+            } else {
+                printf("[SERVER][WARN] Got data before size message — ignoring\n");
+                continue;
             }
         }
 
-        printf("[SERVER][DATA] Writing %zu bytes to file\n", payload_len);
-        for (int i = 0; i < (int)(payload_len < 16 ? payload_len : 16); i++)
-            printf("%02x ", payload[i]);
-        printf("\n");
+        // === Her er vi midt i overføringen ===
+        if (active_transfer && active_transfer->active) {
+            // Hopp over metadata (2 byte)
+            uint8_t *filedata = payload + 2;
+            size_t data_len = payload_len - 2;
 
+            fwrite(filedata, 1, data_len, active_transfer->fp);
+            active_transfer->received += data_len;
 
-        fwrite(payload, 1, payload_len, t->fp);
-        t->received += payload_len;
+            printf("[SERVER][DATA] Wrote %zu bytes (%u/%u total)\n",
+                data_len, active_transfer->received, active_transfer->expected_size);
 
-        printf("[SERVER][RX] total_received=%u/%u\n",
-       t->received, t->expected_size);
-
-
-        if (t->received >= t->expected_size && t->expected_size > 0) {
-            fflush(t->fp);
-            printf("[SERVER] Transfer complete (%u bytes)\n", t->received);
-            t->active = 0; 
-            fclose(t->fp);
-            t->fp = NULL;
-              
+            // Fullført?
+            if (active_transfer->received >= active_transfer->expected_size) {
+                printf("[SERVER] Transfer complete (%u bytes)\n", active_transfer->received);
+                fclose(active_transfer->fp);
+                active_transfer->active = 0;
+                active_transfer = NULL;
+            }
         }
     }
+
+    // while (1) {
+    //     uint8_t buf[1500];
+    //     ssize_t n = read(fd, buf, sizeof(buf));
+    //     printf("[SERVER][RX] n=%zd\n", n);
+
+    //     if (n <= 0) break;
+
+    //     printf("[SERVER][RX] len=%zd first_bytes=%02x %02x %02x %02x %02x %02x %02x %02x...\n",
+    //    n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+
+    //     printf("[SERVER][RX] len=%zd first_bytes=", n);
+    //     for (int i = 0; i < (n < 16 ? n : 16); i++)
+    //         printf("%02x ", buf[i]);
+    //     printf("\n");
+
+
+    //     uint8_t src_mip = buf[0];
+    //     uint8_t src_port = buf[1];
+    //     uint8_t *payload = buf;
+    //     size_t payload_len = n;
+
+    //     transfer_t t = {};
+
+    //     if (payload_len == 4){
+    //         transfer_t *t = find_or_create_transfer(src_mip, src_port, out_dir);
+    //     }
+
+    //     if (!t) continue;
+
+    //     if (t->expected_size == 0 && t->received == 0) {
+    //          // Første pakke = filstørrelse
+    //         if (payload_len == 4) {
+    //             memcpy(&t->expected_size, payload, 4);
+            
+    //             t->expected_size = ntohl(t->expected_size);
+    //             printf("[SERVER] File size = %u bytes\n", t->expected_size);
+    //             continue; // gå til neste read()
+    //         }
+    //     }
+
+    //     printf("[SERVER][DATA] Writing %zu bytes to file\n", payload_len);
+    //     for (int i = 0; i < (int)(payload_len < 16 ? payload_len : 16); i++)
+    //         printf("%02x ", payload[i]);
+    //     printf("\n");
+
+
+    //     fwrite(payload, 1, payload_len, t->fp);
+    //     t->received += payload_len;
+
+    //     printf("[SERVER][RX] total_received=%u/%u\n",
+    //    t->received, t->expected_size);
+
+
+    //     if (t->received >= t->expected_size && t->expected_size > 0) {
+    //         fflush(t->fp);
+    //         printf("[SERVER] Transfer complete (%u bytes)\n", t->received);
+    //         t->active = 0; 
+    //         fclose(t->fp);
+    //         t->fp = NULL;
+              
+    //     }
+    // }
     sleep(1);
     close(fd);
     return EXIT_SUCCESS;
