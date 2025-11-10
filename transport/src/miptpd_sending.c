@@ -75,8 +75,8 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     // ---- Pakker ut felter fra app-meldingen ---
     uint8_t dst_mip  = data[0];  // destinasjons-MIP
     uint8_t dst_port = data[1];  // mottakerens port
-    uint8_t *payload = data + 2; // selve nyttelasten
-    size_t payload_len = len - 2;
+    uint8_t *payload = data; // selve nyttelasten - sender som den er så servern kan holde styr på ulike connections/tranfers
+    size_t payload_len = len;
 
     // ---- Finner avsenderport og connection ---
     uint8_t src_port = get_port_from_fd(app_fd);

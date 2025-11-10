@@ -33,6 +33,13 @@ extern int MIP_FD;       // file descriptor til mipd-socket
 
 // Datastrukturer
 
+#define MAX_TRANSFERS_PER_APP 64
+
+typedef struct {
+    uint8_t src_mip;
+    uint8_t src_port;
+} transfer_key;
+
 // MIPTP-header (brukes både ved bygging og parsing)
 typedef struct {
     uint8_t  src_port;

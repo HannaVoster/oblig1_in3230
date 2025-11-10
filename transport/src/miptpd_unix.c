@@ -93,3 +93,6 @@ int create_app_socket(const char *path) {
 
     return fd; // socketen er klar til bruk
 }
+
+
+
