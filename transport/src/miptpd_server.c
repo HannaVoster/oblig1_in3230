@@ -124,6 +124,8 @@ int main(int argc, char *argv[]) {
                 char filename[256];
                 snprintf(filename, sizeof(filename), "%s/incoming", out_dir);
                 active_transfer->fp = fopen(filename, "wb");
+                printf("[DEBUG] fopen() called — new file descriptor!\n");
+
                 if (!active_transfer->fp) {
                     perror("fopen");
                     active_transfer->active = 0;
@@ -156,6 +158,7 @@ int main(int argc, char *argv[]) {
             // Fullført?
             if (active_transfer->received >= active_transfer->expected_size) {
                 printf("[SERVER] Transfer complete (%u bytes)\n", active_transfer->received);
+                fflush(active_transfer->fp);
                 fclose(active_transfer->fp);
                 active_transfer->active = 0;
                 active_transfer = NULL;
