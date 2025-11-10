@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
         // Dersom vi ikke har startet en overføring enda:
         if (!active_transfer) {
             // Forvent at dette er meldingen med filstørrelse
-            if (n == 4) { //  4 størrelse
+            if (n == 6) { //  4 størrelse
                 uint32_t net_size;
                 memcpy(&net_size, payload, 4);
                 uint32_t filesize = ntohl(net_size);
