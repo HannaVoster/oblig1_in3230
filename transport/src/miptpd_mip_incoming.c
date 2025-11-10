@@ -202,15 +202,16 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
 
     // // In-order pakke, leveres til applikasjonen
     // if (len >= pad) len -= pad; // fjerner padding som ble lagt til ved sending
-    // uint8_t msg[2 + len];       // buffer for å sende opp til appen, 2 ekstra byte til metadata
-    // msg[0] = src_mip;           // mip addressen til avsender
-    // msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
-    // memcpy(msg + 2, payload, len);
+    uint8_t msg[2 + len];       // buffer for å sende opp til appen, 2 ekstra byte til metadata
+    msg[0] = src_mip;           // mip addressen til avsender
+    msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
+    memcpy(msg + 2, payload, len);
 
     hex_debug("[MIPTPD][TO APP] Deliver", payload, len);
 
     if (len >= pad) len -= pad;
-    ssize_t sent = write(app, payload, len);  
+    //ssize_t sent = write(app, payload, len);  
+    ssize_t sent = write(app, msg, len + 2);  
 
     if (sent > 0)
         printf("[MIPTPD] Delivered %zd bytes to app port %d (fd=%d)\n", sent, hdr->dst_port, app);
