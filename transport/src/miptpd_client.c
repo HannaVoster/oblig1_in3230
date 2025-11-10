@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 
             // Vis hva som sendes (uten de to første bytene)
         printf("[CLIENT][SEND] len=%zu first_bytes=", bytes_read);
-        for (int i = 0; i < (bytes_read < 16 ? bytes_read : 16); i++)
+        for (int i = 0; i < (int)(bytes_read < 16 ? bytes_read : 16); i++)
             printf("%02x ", packet[i + 2]);
         printf("\n");
 
