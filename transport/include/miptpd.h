@@ -72,6 +72,7 @@ typedef struct {
     int queue_count;
 
     uint8_t peer_mip;       // mottakers MIP-adresse
+    uint8_t src_mip;
     uint16_t expected_seq;  // neste sekvens som forventes fra mottaker
     int synced;             // om mottaker er initialisert
 } app_connection;

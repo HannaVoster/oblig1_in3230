@@ -110,13 +110,16 @@ int main(int argc, char *argv[]) {
 
         size_t file_size_message_payload_len = n;
 
-        uint8_t *payload = buf + 2;
-        size_t payload_len = n - 2;
+        uint8_t *payload = buf;
+        size_t payload_len = n;
+
+        // uint8_t *payload = buf + 2;
+        // size_t payload_len = n - 2;
 
         // Dersom vi ikke har startet en overføring enda:
         if (!active_transfer) {
             // Forvent at dette er meldingen med filstørrelse
-            if (n == 6) { //  4 størrelse
+            if (n == 4) { //  4 størrelse
                 uint32_t net_size;
                 memcpy(&net_size, payload, 4);
                 uint32_t filesize = ntohl(net_size);
@@ -171,68 +174,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // while (1) {
-    //     uint8_t buf[1500];
-    //     ssize_t n = read(fd, buf, sizeof(buf));
-    //     printf("[SERVER][RX] n=%zd\n", n);
-
-    //     if (n <= 0) break;
-
-    //     printf("[SERVER][RX] len=%zd first_bytes=%02x %02x %02x %02x %02x %02x %02x %02x...\n",
-    //    n, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
-
-    //     printf("[SERVER][RX] len=%zd first_bytes=", n);
-    //     for (int i = 0; i < (n < 16 ? n : 16); i++)
-    //         printf("%02x ", buf[i]);
-    //     printf("\n");
-
-
-    //     uint8_t src_mip = buf[0];
-    //     uint8_t src_port = buf[1];
-    //     uint8_t *payload = buf;
-    //     size_t payload_len = n;
-
-    //     transfer_t t = {};
-
-    //     if (payload_len == 4){
-    //         transfer_t *t = find_or_create_transfer(src_mip, src_port, out_dir);
-    //     }
-
-    //     if (!t) continue;
-
-    //     if (t->expected_size == 0 && t->received == 0) {
-    //          // Første pakke = filstørrelse
-    //         if (payload_len == 4) {
-    //             memcpy(&t->expected_size, payload, 4);
-            
-    //             t->expected_size = ntohl(t->expected_size);
-    //             printf("[SERVER] File size = %u bytes\n", t->expected_size);
-    //             continue; // gå til neste read()
-    //         }
-    //     }
-
-    //     printf("[SERVER][DATA] Writing %zu bytes to file\n", payload_len);
-    //     for (int i = 0; i < (int)(payload_len < 16 ? payload_len : 16); i++)
-    //         printf("%02x ", payload[i]);
-    //     printf("\n");
-
-
-    //     fwrite(payload, 1, payload_len, t->fp);
-    //     t->received += payload_len;
-
-    //     printf("[SERVER][RX] total_received=%u/%u\n",
-    //    t->received, t->expected_size);
-
-
-    //     if (t->received >= t->expected_size && t->expected_size > 0) {
-    //         fflush(t->fp);
-    //         printf("[SERVER] Transfer complete (%u bytes)\n", t->received);
-    //         t->active = 0; 
-    //         fclose(t->fp);
-    //         t->fp = NULL;
-              
-    //     }
-    // }
     sleep(1);
     close(fd);
     return EXIT_SUCCESS;
