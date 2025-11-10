@@ -12,4 +12,7 @@ int new_app_connection(int fd, uint8_t port);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd);
 void hex_debug(const char *prefix, const uint8_t *buf, size_t len);
+
+int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port);
+void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port);
 #endif
