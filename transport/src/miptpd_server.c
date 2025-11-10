@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         ssize_t n = read(fd, buf, sizeof(buf));
         if (n <= 0) break;
 
-        printf("[SERVER][RX] len=%zd first_bytes=", n);
+        printf("[CLIENT][RX] len=%zd first_bytes=", n);
         for (int i = 0; i < (n < 16 ? n : 16); i++)
             printf("%02x ", buf[i]);
         printf("\n");
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
         // Dersom vi ikke har startet en overføring enda:
         if (!active_transfer) {
             // Forvent at dette er meldingen med filstørrelse
-            if (payload_len == 6) { // 2 metadata + 4 størrelse
+            if (payload_len == 4) { // 2 metadata + 4 størrelse
                 uint8_t dst_mip = payload[0];
                 uint8_t dst_port = payload[1];
                 uint32_t net_size;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
                 active_transfer->active = 1;
 
                 char filename[256];
-                snprintf(filename, sizeof(filename), "%s/incoming_%d_%d", out_dir, dst_mip, dst_port);
+                snprintf(filename, sizeof(filename), "%s/incoming", out_dir);
                 active_transfer->fp = fopen(filename, "wb");
                 if (!active_transfer->fp) {
                     perror("fopen");
