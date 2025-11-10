@@ -141,6 +141,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
         }
+        
 
         // === Her er vi midt i overføringen ===
         if (active_transfer && active_transfer->active) {
