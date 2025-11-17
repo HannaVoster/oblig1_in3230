@@ -252,3 +252,16 @@ find_or_create_outbound(app_connection *app,
     return t;
 }
 
+outbound_transfer_state *
+find_outbound(app_connection *app,
+              uint8_t dst_mip,
+              uint8_t dst_port)
+{
+    for (int i = 0; i < app->outbound_count; i++) {
+        outbound_transfer_state *t = &app->outbound[i];
+        if (t->dst_mip == dst_mip && t->dst_port == dst_port) {
+            return t;
+        }
+    }
+    return NULL;  // IMPORTANT: do NOT create
+}

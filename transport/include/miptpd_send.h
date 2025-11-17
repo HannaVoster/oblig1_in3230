@@ -13,4 +13,8 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
 uint8_t *build_ack_pdu(uint8_t src_port, uint8_t dst_port,
                        uint16_t seq, size_t *out_len);
 
+void send_miptp_data_on_transfer(app_connection *appc,
+                                 outbound_transfer_state *t,
+                                 uint8_t *payload,
+                                 size_t payload_len);
 #endif

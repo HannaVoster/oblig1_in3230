@@ -83,7 +83,7 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip) {
     if (idx < 0) return;
     app_connection *app= &app_connections[idx]; // Peker til applikasjonens forbindelsesstruktur
 
-    transfer_state *t = find_transfer(app, src_mip, hdr->src_port);
+    outbound_transfer_state *t = find_or_create_outbound(app, src_mip, hdr->src_port);
     if (!t) {
         printf("[MIPTPD] ACK for unknown transfer %d:%d -> port %d\n",
             src_mip, hdr->src_port, hdr->dst_port);
