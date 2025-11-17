@@ -36,57 +36,57 @@ def openTerm(self, node, title, geometry, cmd="bash"):
 
 
 # ===== INIT COMMAND =====
-def init_miptp(self, line):
-    net = self.mn
-    A = net.get('A')
-    B = net.get('B')
+# def init_miptp(self, line):
+#     net = self.mn
+#     A = net.get('A')
+#     B = net.get('B')
 
-    print("\n=== Starting MIP daemons ===")
-    terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 1"))
-    time.sleep(1)
-    terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 2"))
-    time.sleep(3)
+#     print("\n=== Starting MIP daemons ===")
+#     terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 1"))
+#     time.sleep(1)
+#     terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 2"))
+#     time.sleep(3)
 
-    print("\n=== Starting routing daemons ===")
-    terms.append(openTerm(self, A, "ROUTING [A]", "80x14+0+220", "./routingd -d usockA"))
-    time.sleep(1)
-    terms.append(openTerm(self, B, "ROUTING [B]", "80x14+555+220", "./routingd -d usockB"))
-    time.sleep(3)
+#     print("\n=== Starting routing daemons ===")
+#     terms.append(openTerm(self, A, "ROUTING [A]", "80x14+0+220", "./routingd -d usockA"))
+#     time.sleep(1)
+#     terms.append(openTerm(self, B, "ROUTING [B]", "80x14+555+220", "./routingd -d usockB"))
+#     time.sleep(3)
 
-    print("\n=== Starting MIPTP daemons ===")
-    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd usockA miptp_appA.sock"))
-    time.sleep(1)
-    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd usockB miptp_appB.sock"))
-    time.sleep(3)
+#     print("\n=== Starting MIPTP daemons ===")
+#     terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd usockA miptp_appA.sock"))
+#     time.sleep(1)
+#     terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd usockB miptp_appB.sock"))
+#     time.sleep(3)
 
-    print("\n=== Launching applications ===")
+#     print("\n=== Launching applications ===")
 
-    print("\n=== Launching file transfer test ===")
+#     print("\n=== Launching file transfer test ===")
 
-    # Start server (port 99) på B – lagrer mottatte filer i /tmp
-    terms.append(openTerm(self, B, "MIPTP SERVER [B:99]", "80x20+1110+440",
-                        "cd bin && sudo ./miptpd_server 99 miptp_appB.sock /tmp"))
-    time.sleep(3)
+#     # Start server (port 99) på B – lagrer mottatte filer i /tmp
+#     terms.append(openTerm(self, B, "MIPTP SERVER [B:99]", "80x20+1110+440",
+#                         "cd bin && sudo ./miptpd_server 99 miptp_appB.sock /tmp"))
+#     time.sleep(3)
 
-    # Lag testfil på A
-    terms.append(openTerm(self, A, "PREPARE FILE [A]", "80x10+0+660",
-                        "cd bin && dd if=/dev/urandom of=testfile.dat bs=1K count=32 && echo 'File ready on A'"))
-    time.sleep(2)
+#     # Lag testfil på A
+#     terms.append(openTerm(self, A, "PREPARE FILE [A]", "80x10+0+660",
+#                         "cd bin && dd if=/dev/urandom of=testfile.dat bs=1K count=32 && echo 'File ready on A'"))
+#     time.sleep(2)
 
-    # Start klienten som sender filen
-    terms.append(openTerm(self, A, "MIPTP CLIENT [A]", "80x20+0+880",
-                        "cd bin && sudo ./miptpd_client testfile.dat 2 99 miptp_appA.sock"))
+#     # Start klienten som sender filen
+#     terms.append(openTerm(self, A, "MIPTP CLIENT [A]", "80x20+0+880",
+#                         "cd bin && sudo ./miptpd_client testfile.dat 2 99 miptp_appA.sock"))
 
-    # # Start server (port 99) på B
-    # terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+440",
-    #                       "./test_server miptp_appB.sock"))
-    # time.sleep(2)
-    # # Start klient (port 42) på A – sender til MIP 99
-    # terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+660",
-    #                       "./test_app miptp_appA.sock 'Hello from A' 99"))
+#     # # Start server (port 99) på B
+#     # terms.append(openTerm(self, B, "SERVER [B:99]", "80x20+1110+440",
+#     #                       "./test_server miptp_appB.sock"))
+#     # time.sleep(2)
+#     # # Start klient (port 42) på A – sender til MIP 99
+#     # terms.append(openTerm(self, A, "CLIENT [A:42]", "80x20+0+660",
+#     #                       "./test_app miptp_appA.sock 'Hello from A' 99"))
 
-    print("\n✅ MIPTP test setup complete.")
-    print("Use the Mininet CLI to monitor logs or type 'exit' to stop.")
+#     print("\n✅ MIPTP test setup complete.")
+#     print("Use the Mininet CLI to monitor logs or type 'exit' to stop.")
 
 def init_miptp_multi(self, line):
     net = self.mn
@@ -154,7 +154,7 @@ def check_multi_success(self, line):
     print("\n=== Checking transferred files on B (/tmp) ===")
 
     # Find incoming files on B by running ls remotely
-    ls_output = B.cmd("ls /tmp/miptp_* 2>/dev/null").strip()
+    ls_output = B.cmd("ls /tmp/incoming_* 2>/dev/null").strip()
     if not ls_output:
         print("❌ No received files found in /tmp on B.")
         return
@@ -177,8 +177,11 @@ def check_multi_success(self, line):
 
     for rf in received_files:
         # Copy file from B -> local /tmp for hashing
-        B.cmd(f"cp {rf} /tmp/local_copy.dat")
-        received_md5 = md5sum("/tmp/local_copy.dat")
+        local_copy = f"/tmp/local_copy_{os.path.basename(rf)}"
+        B.cmd(f"cp {rf} {local_copy}")
+        received_md5 = md5sum(local_copy)
+        os.remove(local_copy)
+
 
         matches = []
         for i in range(num_files):
