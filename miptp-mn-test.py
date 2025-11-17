@@ -43,7 +43,6 @@ def init_miptp_multi(self, line):
     print("=== Cleaning old files on B (/tmp) ===")
     B.cmd("rm -f /tmp/incoming_*")
 
-
     num_files = 8 # Hvor mange filer som skal sendes parallelt
 
     print("\n=== Starting MIP daemons ===")
