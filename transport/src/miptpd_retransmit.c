@@ -38,7 +38,6 @@ void check_retransmissions()
         for (int t_i = 0; t_i < appc->outbound_count; t_i++) {
 
             outbound_transfer_state *t = &appc->outbound[t_i];
-
             uint16_t base = t->base_seq;
 
             // ingen u-ACKede pakker
@@ -53,28 +52,20 @@ void check_retransmissions()
 
             // sjekker timeout (200 ms)
             if (difftime(now, p->sent_time) > 0.2) {
-
-                printf("[MIPTPD][TIMEOUT] Transfer %u:%u base=%u timed out → RTX\n",
+                if(debug_mode) printf("[MIPTPD][TIMEOUT] Transfer %u:%u base=%u timed out → RTX\n",
                        t->dst_mip, t->dst_port, base);
 
                 uint16_t seq = base;
 
                 // resend alle uackede i vinduet
                 while (seq != t->next_seq) {
-
                     int slot = seq % MIPTP_WINDOW_SIZE;
                     packet_entry *r = &t->window[slot];
 
                     if (!r->acked && r->len > 0) {
-
                         send_miptp_pdu(t->dst_mip, r->data, r->len);
                         r->sent_time = now;
-
-                        printf("[MIPTPD][RTX] resent seq=%u (%zu B) → %u:%u\n",
-                               seq, r->len,
-                               t->dst_mip, t->dst_port);
                     }
-
                     seq = (seq + 1) % MIPTP_MAX_SEQ;
                 }
             }

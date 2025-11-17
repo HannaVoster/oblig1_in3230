@@ -215,22 +215,6 @@ void hex_debug(const char *prefix, const uint8_t *buf, size_t len) {
     printf("\n");
 }
 
-// int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port) {
-//     for (int i = 0; i < conn->num_transfers; i++) {
-//         if (conn->active_transfers[i].src_mip == src_mip &&
-//             conn->active_transfers[i].src_port == src_port)
-//             return 1;
-//     }
-//     return 0;
-// }
-
-// void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port) {
-//     if (conn->num_transfers < MAX_TRANSFERS_PER_APP) {
-//         conn->active_transfers[conn->num_transfers].src_mip = src_mip;
-//         conn->active_transfers[conn->num_transfers].src_port = src_port;
-//         conn->num_transfers++;
-//     }
-// }
 
 transfer_state *create_transfer_state(app_connection *app,
                                       uint8_t src_mip,
@@ -304,7 +288,7 @@ find_or_create_outbound(app_connection *app,
     t->base_seq = rand() % MIPTP_MAX_SEQ;
     t->next_seq = t->base_seq;
 
-    printf("[MIPTPD][TX] Created outbound transfer to %u:%u (seq=%u)\n",
+    if(debug_mode) printf("[MIPTPD][TX] Created outbound transfer to %u:%u (seq=%u)\n",
            dst_mip, dst_port, t->base_seq);
 
     return t;

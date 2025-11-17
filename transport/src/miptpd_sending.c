@@ -47,7 +47,8 @@ void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu); //frigjør buffer
 
-    printf("[MIPTPD] Sent ACK (seq=%u) to MIP %d, port=%d\n", seq, dst_mip, dst_port);
+    if(debug_mode) printf("[MIPTPD][ACK] seq=%u to %d:%d\n", seq, dst_mip, dst_port);
+
 }
 
 
@@ -92,7 +93,7 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len)
         t->queue_tail++;
         t->queue_count++;
 
-        printf("[MIPTPD][QUEUE] Outbound SDU queued (%u:%u)\n", dst_mip, dst_port);
+        if(debug_mode) printf("[MIPTPD][QUEUE] Outbound SDU queued (%u:%u)\n", dst_mip, dst_port);
         return;
     }
 
@@ -108,7 +109,7 @@ void send_miptp_data_on_transfer(app_connection *appc,
     uint8_t dst_port = t->dst_port;
     uint8_t src_port = appc->port;
 
-    // --- vindu fullt bør aldri skje her ---
+    // vindu fullt bør aldri skje
     if ((t->next_seq - t->base_seq) >= MIPTP_WINDOW_SIZE) {
         printf("[MIPTPD][BUG] send_miptp_data_on_transfer() called but window full!\n");
         return;
@@ -128,6 +129,10 @@ void send_miptp_data_on_transfer(app_connection *appc,
     t->window[slot].acked = 0;
     t->window[slot].sent_time = time(NULL);
     t->window_count++;
+
+    if(debug_mode) printf("[MIPTPD][SEND] seq=%u → %d:%d (%zu bytes, slot=%d)\n",
+       seq, dst_mip, dst_port, payload_len, slot);
+
 
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu);
