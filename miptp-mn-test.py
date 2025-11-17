@@ -145,7 +145,7 @@ def check_multi_success(self, line):
     Checks whether all files transferred in init_miptp_multi were received correctly on B.
     Looks for files in /tmp on host B.
     """
-
+    B.cmd("rm -f /tmp/incoming_*")
     net = self.mn
     B = net.get('B')
 
