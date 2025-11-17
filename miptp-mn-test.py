@@ -13,6 +13,7 @@ import glob
 
 terms = []
 
+
 # ===== TOPOLOGY =====
 class MIPTPTopo(Topo):
     def __init__(self):
@@ -38,6 +39,10 @@ def init_miptp_multi(self, line):
     net = self.mn
     A = net.get('A')
     B = net.get('B')
+
+    print("=== Cleaning old files on B (/tmp) ===")
+    B.cmd("rm -f /tmp/incoming_*")
+
 
     num_files = 8 # Hvor mange filer som skal sendes parallelt
 
@@ -83,6 +88,8 @@ def init_miptp_multi(self, line):
     print("\nMULTI-FILE MIPTP stress test started.")
     print("Monitor the terminals and check using 'check_multi_success' when done")
 
+import hashlib
+import glob
 
 def check_multi_success(self, line):
     """
@@ -164,6 +171,7 @@ def do_EOF(self, line):
 CLI.do_EOF = do_EOF
 CLI.do_init_miptp_multi = init_miptp_multi
 CLI.do_check_multi_success = check_multi_success
+
 
 
 topos = {"miptp": (lambda: MIPTPTopo())}
