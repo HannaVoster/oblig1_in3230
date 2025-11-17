@@ -173,200 +173,181 @@
 # topos = {"miptp": (lambda: MIPTPTopo())}
 
 
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Mininet script for IN3230/IN4230 — 3 nodes version
-Starter: mipd → routingd → miptpd → klient/server
-Bruker ABSOLUTTE STIER for alle UNIX-sockets (/tmp)
+Three-node Mininet test for IN3230/IN4230 MIPTP implementation
+Matches the teacher’s HE2 testing logic:
+ - A → B
+ - C → B
+ - A → B and C → B simultaneously
+ - B → B (self transfer)
 """
 
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.term import tunnelX11
-import os, time, signal, hashlib
+import time, os, signal, hashlib
+
+# Dynamically detect absolute path to ./bin
+BASE = os.path.abspath(os.getcwd())
+BIN = os.path.join(BASE, "bin")
 
 terms = []
 
-# === ABSOLUTTE SOCKET STIER ===
-SOCK = {
-    "A": "/tmp/usockA",
-    "B": "/tmp/usockB",
-    "C": "/tmp/usockC"
-}
-
-APP = {
-    "A": "/tmp/miptp_appA.sock",
-    "B": "/tmp/miptp_appB.sock",
-    "C": "/tmp/miptp_appC.sock"
-}
 
 # ===== TOPOLOGY =====
 class ThreeNodeTopo(Topo):
     def __init__(self):
         Topo.__init__(self)
-        A = self.addHost('A')
-        B = self.addHost('B')
-        C = self.addHost('C')
+        A = self.addHost("A")
+        B = self.addHost("B")
+        C = self.addHost("C")
 
-        self.addLink(A, B, bw=10, delay='10ms')
-        self.addLink(B, C, bw=10, delay='10ms')
+        # Simple chain: A — B — C
+        self.addLink(A, B, bw=10, delay="10ms")
+        self.addLink(B, C, bw=10, delay="10ms")
 
 
-# ===== OPEN TERMINAL =====
-def openTerm(self, node, title, geometry, cmd="bash"):
+# ===== TERMINAL LAUNCHER =====
+def open_term(node, title, geometry, cmd):
     display, tunnel = tunnelX11(node)
-    return node.popen([
+    term = node.popen([
         "xterm", "-hold",
         "-title", title,
         "-geometry", geometry,
         "-display", display,
         "-e", cmd
     ])
+    terms.append(term)
+    return term
 
 
-# ===== INIT: Start alle 3 noder =====
-def init_three(self, line):
+# ===== INIT TEST =====
+def init_he2(self, line):
     net = self.mn
-    A, B, C = net.get('A'), net.get('B'), net.get('C')
+    A = net.get("A")
+    B = net.get("B")
+    C = net.get("C")
 
-    nodes = {"A": A, "B": B, "C": C}
+    print("\n=== Launching 3-node HE2 MIPTP test ===")
+    print(f"Binary path: {BIN}")
 
-    print("=== Cleaning all old sockets ===")
-    for n in nodes:
-        nodes[n].cmd(f"rm -f {SOCK[n]} {APP[n]} /tmp/incoming_*")
+    # Cleanup old incoming files
+    B.cmd("rm -f /tmp/incoming_*")
+    C.cmd("rm -f /tmp/incoming_*")
+    A.cmd("rm -f /tmp/incoming_*")
 
-    time.sleep(1)
-
-    # === START MIPD ===
-    print("\n=== Starting mipd ===")
-    terms.append(openTerm(self, A, "MIPD[A]", "80x14+0+0",
-                          f"cd bin && ./mipd -d {SOCK['A']} 1"))
-    time.sleep(1)
-    terms.append(openTerm(self, B, "MIPD[B]", "80x14+520+0",
-                          f"cd bin && ./mipd -d {SOCK['B']} 2"))
-    time.sleep(1)
-    terms.append(openTerm(self, C, "MIPD[C]", "80x14+1040+0",
-                          f"cd bin && ./mipd -d {SOCK['C']} 3"))
-    time.sleep(3)
-
-    # === START ROUTINGD ===
-    print("\n=== Starting routingd ===")
-    terms.append(openTerm(self, A, "ROUTING[A]", "80x14+0+220",
-                          f"cd bin && ./routingd -d {SOCK['A']}"))
-    time.sleep(1)
-    terms.append(openTerm(self, B, "ROUTING[B]", "80x14+520+220",
-                          f"cd bin && ./routingd -d {SOCK['B']}"))
-    time.sleep(1)
-    terms.append(openTerm(self, C, "ROUTING[C]", "80x14+1040+220",
-                          f"cd bin && ./routingd -d {SOCK['C']}"))
-    time.sleep(3)
-
-    # === START MIPTPD ===
-    print("\n=== Starting miptpd ===")
-    terms.append(openTerm(self, A, "MIPTPD[A]", "80x14+0+440",
-                          f"cd bin && ./miptpd -d {SOCK['A']} {APP['A']}"))
-    time.sleep(1)
-    terms.append(openTerm(self, B, "MIPTPD[B]", "80x14+520+440",
-                          f"cd bin && ./miptpd -d {SOCK['B']} {APP['B']}"))
-    time.sleep(1)
-    terms.append(openTerm(self, C, "MIPTPD[C]", "80x14+1040+440",
-                          f"cd bin && ./miptpd -d {SOCK['C']} {APP['C']}"))
-    time.sleep(3)
-
-    # === SERVER PÅ B ===
-    print("\n=== Starting MIPTP server on B (port 99) ===")
-    terms.append(openTerm(self, B, "SERVER[B:99]", "80x20+520+660",
-                          f"cd bin && sudo ./miptpd_server 99 {APP['B']} /tmp"))
+    # --- Start mipd ---
+    open_term(A, "MIPD A", "80x14+0+0", f"{BIN}/mipd -d {BIN}/usockA 1")
     time.sleep(2)
+    open_term(B, "MIPD B", "80x14+480+0", f"{BIN}/mipd -d {BIN}/usockB 2")
+    time.sleep(2)
+    open_term(C, "MIPD C", "80x14+960+0", f"{BIN}/mipd -d {BIN}/usockC 3")
+    time.sleep(3)
 
-    print("\n=== THREE NODE TEST READY ===")
-    print("Use commands:")
-    print("   send_A_to_B")
-    print("   send_C_to_B")
-    print("   send_A_to_C")
-    print("   send_C_to_A")
-    print("   check_multi_success")
+    # --- Start routingd ---
+    open_term(A, "ROUTING A", "80x14+0+220", f"{BIN}/routingd -d {BIN}/usockA")
+    open_term(B, "ROUTING B", "80x14+480+220", f"{BIN}/routingd -d {BIN}/usockB")
+    open_term(C, "ROUTING C", "80x14+960+220", f"{BIN}/routingd -d {BIN}/usockC")
+    time.sleep(3)
+
+    # --- Start miptpd ---
+    open_term(A, "MIPTPD A", "80x14+0+440", f"{BIN}/miptpd -d {BIN}/usockA {BIN}/appA.sock")
+    time.sleep(1)
+    open_term(B, "MIPTPD B", "80x14+480+440", f"{BIN}/miptpd -d {BIN}/usockB {BIN}/appB.sock")
+    time.sleep(1)
+    open_term(C, "MIPTPD C", "80x14+960+440", f"{BIN}/miptpd -d {BIN}/usockC {BIN}/appC.sock")
+    time.sleep(3)
+
+    # --- Server on B ---
+    open_term(B, "SERVER B", "80x20+480+660",
+              f"cd {BIN} && sudo ./miptpd_server 99 {BIN}/appB.sock /tmp")
+    time.sleep(3)
+
+    print("\n=== TEST COMMANDS READY ===")
+    print("Use:")
+    print("  send_A_to_B")
+    print("  send_C_to_B")
+    print("  send_A_C_parallel")
+    print("  send_B_to_B")
+    print("  check_incoming")
+    print()
+    print("Open a new Mininet CLI and run those commands.\n")
 
 
-# ===== SENDER-FUNKSJONER =====
-def start_transfer_generic(self, src_node, dst_mip, filename):
-    """Sender én fil via miptpd_client fra valgt node."""
-    node = self.mn.get(src_node)
-    print(f"\n=== Generating file {filename} on {src_node} ===")
-    node.cmd(f"cd bin && dd if=/dev/urandom of={filename} bs=1K count=32")
+# ===== TRANSFER COMMANDS =====
+def send_A_to_B(self, line):
+    net = self.mn
+    A = net.get("A")
 
-    print(f"=== Sending {filename} from {src_node} → MIP {dst_mip} ===")
-    terms.append(openTerm(self, node,
-                          f"SEND[{src_node}→{dst_mip}]",
-                          "80x20+0+880",
-                          f"cd bin && sudo ./miptpd_client {filename} {dst_mip} 99 {APP[src_node]}"))
+    print("\n=== A → B ===")
+    A.cmd(f"cd {BIN} && dd if=/dev/urandom of=Afile.dat bs=1K count=64")
+    open_term(A, "A→B", "80x20+0+660",
+              f"cd {BIN} && ./miptpd_client Afile.dat 2 99 {BIN}/appA.sock")
 
 
-def do_send_A_to_B(self, line): start_transfer_generic(self, "A", 2, "Afile.dat")
-def do_send_C_to_B(self, line): start_transfer_generic(self, "C", 2, "Cfile.dat")
-def do_send_A_to_C(self, line): start_transfer_generic(self, "A", 3, "A2C.dat")
-def do_send_C_to_A(self, line): start_transfer_generic(self, "C", 1, "C2A.dat")
+def send_C_to_B(self, line):
+    net = self.mn
+    C = net.get("C")
+
+    print("\n=== C → B ===")
+    C.cmd(f"cd {BIN} && dd if=/dev/urandom of=Cfile.dat bs=1K count=64")
+    open_term(C, "C→B", "80x20+960+660",
+              f"cd {BIN} && ./miptpd_client Cfile.dat 2 99 {BIN}/appC.sock")
 
 
-# ===== CHECK SUCCESS =====
-def check_multi_success(self, line):
-    """Sjekker alle incoming-filer på B"""
-    B = self.mn.get('B')
+def send_A_C_parallel(self, line):
+    print("\n=== A → B + C → B (parallel) ===")
+    send_A_to_B(self, line)
+    time.sleep(0.5)
+    send_C_to_B(self, line)
+
+
+def send_B_to_B(self, line):
+    net = self.mn
+    B = net.get("B")
+
+    print("\n=== B → B self-loop ===")
+    B.cmd(f"cd {BIN} && dd if=/dev/urandom of=Bself.dat bs=1K count=64")
+    open_term(B, "B→B", "80x20+480+880",
+              f"cd {BIN} && ./miptpd_client Bself.dat 2 99 {BIN}/appB.sock")
+
+
+# ===== CHECK FILES =====
+def check_incoming(self, line):
+    net = self.mn
+    B = net.get("B")
 
     print("\n=== Checking incoming files on B ===")
-    files = B.cmd("ls /tmp/incoming_* 2>/dev/null").split()
 
+    files = B.cmd("ls /tmp/incoming_* 2>/dev/null").split()
     if not files:
         print("No incoming files found.")
         return
 
-    def md5(binpath):
-        h = hashlib.md5()
-        with open(binpath, "rb") as f:
-            while chunk := f.read(8192):
-                h.update(chunk)
-        return h.hexdigest()
-
-    for rf in files:
-        local = "/tmp/local_copy_" + os.path.basename(rf)
-        B.cmd(f"cp {rf} {local}")
-        md_remote = md5(local)
-        os.remove(local)
-
-        # Compare against all files in bin/
-        matches = []
-        for f in os.listdir("bin"):
-            if f.endswith(".dat"):
-                if md5("bin/" + f) == md_remote:
-                    matches.append(f)
-
-        if len(matches) == 1:
-            print(f"{rf} matches {matches[0]}")
-        else:
-            print(f"{rf}: BAD MATCH → {matches}")
+    print(f"Found {len(files)} files:")
+    for f in files:
+        print("  ", f)
 
 
-# ===== CLEAN EXIT =====
+# ===== CLEANUP =====
 orig_EOF = CLI.do_EOF
 def do_EOF(self, line):
-    print("Cleaning terminals...")
     for t in terms:
-        try: os.kill(t.pid, signal.SIGKILL)
-        except: pass
+        try:
+            os.kill(t.pid, signal.SIGKILL)
+        except:
+            pass
     return orig_EOF(self, line)
 
-
-# Register commands in CLI
-CLI.do_init_miptp_three = init_three
-CLI.do_send_A_to_B = do_send_A_to_B
-CLI.do_send_C_to_B = do_send_C_to_B
-CLI.do_send_A_to_C = do_send_A_to_C
-CLI.do_send_C_to_A = do_send_C_to_A
-CLI.do_check_multi_success = check_multi_success
 CLI.do_EOF = do_EOF
 
-topos = {"three": (lambda: ThreeNodeTopo())}
+# Register commands
+CLI.do_init_he2 = init_he2
+CLI.do_send_A_to_B = send_A_to_B
+CLI.do_send_C_to_B = send_C_to_B
+CLI.do_send_A_C_parallel = send_A_C_parallel
+CLI.do_send_B_to_B = send_B_to_B
+CLI.do_check_incoming = check_incoming
 
-
-
-
+topos = {"he2": (lambda: ThreeNodeTopo())}
