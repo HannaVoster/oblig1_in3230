@@ -34,6 +34,7 @@ extern int MIP_FD;       // file descriptor til mipd-socket
 // Datastrukturer
 
 #define MAX_TRANSFERS_PER_APP 64
+#define MAX_OUT_TRANSFERS 32
 
 typedef struct {
     uint8_t src_mip;
@@ -62,29 +63,59 @@ typedef struct {
     size_t  len;
 } queued_packet;
 
-// Forbindelsesinformasjon mellom app og MIPTP
+
 typedef struct {
-    int app_fd;             // socket mot appen
-    uint8_t port;           // portnummer
-    uint16_t base_seq;      // første uackede sekvens
-    uint16_t next_seq;      // neste sekvens som skal sendes
+    // Identifikasjon av denne forbindelsen
+    uint8_t src_mip;
+    uint8_t src_port;
 
+    // GBN SEND-STATE (per transfer)
+    uint16_t base_seq;
+    uint16_t next_seq;
     packet_entry window[MIPTP_WINDOW_SIZE];
-    uint8_t window_count;
+    int window_count;
 
-    // Kø for ventende meldinger
+    // Kø for SDUer som venter på sending
     queued_packet queue[MIPTP_MAX_QUEUE];
     int queue_head;
     int queue_tail;
     int queue_count;
 
-    uint8_t peer_mip;       // mottakers MIP-adresse
-    uint8_t src_mip;
-    uint16_t expected_seq;  // neste sekvens som forventes fra mottaker
-    int synced;             // om mottaker er initialisert
+    // GBN RECEIVE-STATE (per transfer)
+    uint16_t expected_seq;
+    int synced;
 
-    transfer_key active_transfers[MAX_TRANSFERS_PER_APP];
+    //time_t last_activity;  ´
+} transfer_state;
+
+
+typedef struct {
+    uint8_t dst_mip;
+    uint8_t dst_port;
+
+    uint16_t base_seq;
+    uint16_t next_seq;
+
+    packet_entry window[MIPTP_WINDOW_SIZE];
+    uint8_t window_count;
+
+    queued_packet queue[MIPTP_MAX_QUEUE];
+    int queue_head;
+    int queue_tail;
+    int queue_count;
+
+} outbound_transfer_state;
+
+
+typedef struct {
+    int app_fd;
+    uint8_t port;  // dst_port
+
+    transfer_state transfers[MAX_TRANSFERS_PER_APP];
     int num_transfers;
+
+    outbound_transfer_state outbound[MAX_OUT_TRANSFERS];
+    int outbound_count;
 } app_connection;
 
 // Global tabell for aktive app-tilkoblinger

@@ -25,7 +25,7 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
                         uint16_t seq, const uint8_t *sdu, size_t sdu_len,
                         size_t *out_len)
 {
-    // Finn hvor mange bytes som må til for 32-bit alignment
+    // Finner hvor mange bytes som må til for 32-bit alignment
     uint8_t padlen = (4 - ((sizeof(miptp_hdr_t) + sdu_len) % 4)) % 4;
 
     // Alloker buffer: header + SDU + pad

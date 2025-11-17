@@ -15,4 +15,14 @@ void hex_debug(const char *prefix, const uint8_t *buf, size_t len);
 
 int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port);
 void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port);
+
+transfer_state *create_transfer_state(app_connection *app,
+                                      uint8_t src_mip,
+                                      uint8_t src_port);
+transfer_state *find_transfer(app_connection *app, uint8_t src_mip, uint8_t src_port);
+
+outbound_transfer_state *
+find_or_create_outbound(app_connection *app,
+                        uint8_t dst_mip,
+                        uint8_t dst_port);
 #endif

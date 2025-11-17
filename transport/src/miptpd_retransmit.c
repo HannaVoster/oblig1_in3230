@@ -25,49 +25,107 @@
     Kalles periodisk fra main-løkken
 */
 
-void check_retransmissions() {
-    time_t now = time(NULL); // henter nåværende tidspunkt
+void check_retransmissions()
+{
+    time_t now = time(NULL);
 
     for (int i = 0; i < MAX_APPS; i++) {
-        app_connection *connection = &app_connections[i];
-        if (connection->app_fd <= 0)
-            continue; //hopper over inaktive forbindelser
+        app_connection *appc = &app_connections[i];
+        if (appc->app_fd <= 0)
+            continue;
 
-        uint16_t base = connection->base_seq;
-        if (base == connection->next_seq)
-            continue; // ingen uackede pakker
+        // Gå gjennom ALLE outbound-transfers
+        for (int t_i = 0; t_i < appc->outbound_count; t_i++) {
 
-        // henter den eldste pakken i vinduet
-        packet_entry *p = &connection->window[base % MIPTP_WINDOW_SIZE];
-        if (p->acked || p->len == 0)
-            continue; // hopper over tomme eller ackede plasser i vinduet
+            outbound_transfer_state *t = &appc->outbound[t_i];
 
-        // sjekker for timeout (2 sek) har utløpt
-        if (difftime(now, p->sent_time) > 0.2) {
-            printf("[MIPTPD][TIMEOUT] base_seq=%u timed out (port=%d) — resending window\n",
-                   base, connection->port);
+            uint16_t base = t->base_seq;
 
-            uint16_t seq = base; //starter fra første uackede pakke
-            while (seq != connection->next_seq) { // går igjennom hele vinduet
-                int slot = seq % MIPTP_WINDOW_SIZE;
-                packet_entry *r = &connection->window[slot];
+            // ingen u-ACKede pakker
+            if (t->next_seq == base)
+                continue;
 
-                //sender kun pakket som ikke har fått ack og har gyldoig data
-                if (!r->acked && r->len > 0) {
-                    // Bruker funksjoner slik at MIP-header legges på
-                    send_miptp_pdu(connection->peer_mip, r->data, r->len);
+            // henert første uackede pakke
+            packet_entry *p = &t->window[base % MIPTP_WINDOW_SIZE];
 
-                    r->sent_time = now; //oppdatter tid for sending
+            if (p->acked || p->len == 0)
+                continue;
 
-                    printf("[MIPTPD][RTX] Resent seq=%u (%zu bytes) to MIP %u\n",
-                           seq, r->len, connection->peer_mip);
+            // sjekker timeout (200 ms)
+            if (difftime(now, p->sent_time) > 0.2) {
+
+                printf("[MIPTPD][TIMEOUT] Transfer %u:%u base=%u timed out → RTX\n",
+                       t->dst_mip, t->dst_port, base);
+
+                uint16_t seq = base;
+
+                // resend alle uackede i vinduet
+                while (seq != t->next_seq) {
+
+                    int slot = seq % MIPTP_WINDOW_SIZE;
+                    packet_entry *r = &t->window[slot];
+
+                    if (!r->acked && r->len > 0) {
+
+                        send_miptp_pdu(t->dst_mip, r->data, r->len);
+                        r->sent_time = now;
+
+                        printf("[MIPTPD][RTX] resent seq=%u (%zu B) → %u:%u\n",
+                               seq, r->len,
+                               t->dst_mip, t->dst_port);
+                    }
+
+                    seq = (seq + 1) % MIPTP_MAX_SEQ;
                 }
-                //øker sekvensnummer, wrap around ved maksverdi
-                seq = (seq + 1) % MIPTP_MAX_SEQ;
             }
         }
     }
 }
+
+
+// void check_retransmissions() {
+//     time_t now = time(NULL); // henter nåværende tidspunkt
+
+//     for (int i = 0; i < MAX_APPS; i++) {
+//         app_connection *connection = &app_connections[i];
+//         if (connection->app_fd <= 0)
+//             continue; //hopper over inaktive forbindelser
+
+//         uint16_t base = connection->base_seq;
+//         if (base == connection->next_seq)
+//             continue; // ingen uackede pakker
+
+//         // henter den eldste pakken i vinduet
+//         packet_entry *p = &connection->window[base % MIPTP_WINDOW_SIZE];
+//         if (p->acked || p->len == 0)
+//             continue; // hopper over tomme eller ackede plasser i vinduet
+
+//         // sjekker for timeout (2 sek) har utløpt
+//         if (difftime(now, p->sent_time) > 0.2) {
+//             printf("[MIPTPD][TIMEOUT] base_seq=%u timed out (port=%d) — resending window\n",
+//                    base, connection->port);
+
+//             uint16_t seq = base; //starter fra første uackede pakke
+//             while (seq != connection->next_seq) { // går igjennom hele vinduet
+//                 int slot = seq % MIPTP_WINDOW_SIZE;
+//                 packet_entry *r = &connection->window[slot];
+
+//                 //sender kun pakket som ikke har fått ack og har gyldoig data
+//                 if (!r->acked && r->len > 0) {
+//                     // Bruker funksjoner slik at MIP-header legges på
+//                     send_miptp_pdu(connection->peer_mip, r->data, r->len);
+
+//                     r->sent_time = now; //oppdatter tid for sending
+
+//                     printf("[MIPTPD][RTX] Resent seq=%u (%zu bytes) to MIP %u\n",
+//                            seq, r->len, connection->peer_mip);
+//                 }
+//                 //øker sekvensnummer, wrap around ved maksverdi
+//                 seq = (seq + 1) % MIPTP_MAX_SEQ;
+//             }
+//         }
+//     }
+// }
 
 
 

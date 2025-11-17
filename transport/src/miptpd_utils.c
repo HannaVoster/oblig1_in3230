@@ -36,46 +36,62 @@ void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *pad) {
 
 /*
   Registrerer en ny applikasjon i tabellen
-  Tildeler port, initierer Go-Back-N-tilstand og tomt sendevindu
-  Returnerer 0 ved suksess, -1 hvis tabellen er full
 */
 int new_app_connection(int fd, uint8_t port) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == 0) {
+
             app_connections[i].app_fd = fd;
             app_connections[i].port = port;
 
-            // Initialiser Go-Back-N tilstand
-            app_connections[i].base_seq = rand() % MIPTP_MAX_SEQ; // starter med tilfeldig sekvensnummer, gitt oppgaven
-            app_connections[i].next_seq = app_connections[i].base_seq;
-            app_connections[i].window_count = 0;
+            app_connections[i].num_transfers = 0;
 
-            // Initialiser mottaker-tilstand
-            app_connections[i].expected_seq = 0; // venter på første pakke med seq=0
-            app_connections[i].synced = 0;
-
-            app_connections[i].queue_head = 0;
-            app_connections[i].queue_tail = 0;
-            app_connections[i].queue_count = 0;
-            app_connections[i].peer_mip = 0;
-
-
-            // Nullstill vinduet
-            for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) {
-                app_connections[i].window[j].acked = 1; // tom plass
-                app_connections[i].window[j].len = 0;
-            }
-
-            printf("[MIPTPD] Registered app fd=%d on port %d (seq start=%u)\n",
-                   fd, port, app_connections[i].base_seq);
-
+            printf("[MIPTPD] Registered app fd=%d on port %d\n", fd, port);
             return 0;
         }
     }
 
-    fprintf(stderr, "[MIPTPD] Connection table full, could not register app fd=%d\n", fd);
+    fprintf(stderr, "[MIPTPD] Connection table full\n");
     return -1;
 }
+
+// int new_app_connection(int fd, uint8_t port) {
+//     for (int i = 0; i < MAX_APPS; i++) {
+//         if (app_connections[i].app_fd == 0) {
+//             app_connections[i].app_fd = fd;
+//             app_connections[i].port = port;
+
+//             // Initialiser Go-Back-N tilstand
+//             app_connections[i].base_seq = rand() % MIPTP_MAX_SEQ; // starter med tilfeldig sekvensnummer, gitt oppgaven
+//             app_connections[i].next_seq = app_connections[i].base_seq;
+//             app_connections[i].window_count = 0;
+
+//             // Initialiser mottaker-tilstand
+//             app_connections[i].expected_seq = 0; // venter på første pakke med seq=0
+//             app_connections[i].synced = 0;
+
+//             app_connections[i].queue_head = 0;
+//             app_connections[i].queue_tail = 0;
+//             app_connections[i].queue_count = 0;
+//             app_connections[i].peer_mip = 0;
+
+
+//             // Nullstill vinduet
+//             for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) {
+//                 app_connections[i].window[j].acked = 1; // tom plass
+//                 app_connections[i].window[j].len = 0;
+//             }
+
+//             printf("[MIPTPD] Registered app fd=%d on port %d (seq start=%u)\n",
+//                    fd, port, app_connections[i].base_seq);
+
+//             return 0;
+//         }
+//     }
+
+//     fprintf(stderr, "[MIPTPD] Connection table full, could not register app fd=%d\n", fd);
+//     return -1;
+// }
 
 /*
   Fjerner en app fra tabellen når socketen lukkes
@@ -142,19 +158,97 @@ void hex_debug(const char *prefix, const uint8_t *buf, size_t len) {
     printf("\n");
 }
 
-int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port) {
-    for (int i = 0; i < conn->num_transfers; i++) {
-        if (conn->active_transfers[i].src_mip == src_mip &&
-            conn->active_transfers[i].src_port == src_port)
-            return 1;
+// int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port) {
+//     for (int i = 0; i < conn->num_transfers; i++) {
+//         if (conn->active_transfers[i].src_mip == src_mip &&
+//             conn->active_transfers[i].src_port == src_port)
+//             return 1;
+//     }
+//     return 0;
+// }
+
+// void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port) {
+//     if (conn->num_transfers < MAX_TRANSFERS_PER_APP) {
+//         conn->active_transfers[conn->num_transfers].src_mip = src_mip;
+//         conn->active_transfers[conn->num_transfers].src_port = src_port;
+//         conn->num_transfers++;
+//     }
+// }
+
+transfer_state *create_transfer_state(app_connection *app,
+                                      uint8_t src_mip,
+                                      uint8_t src_port)
+{
+    if (app->num_transfers >= MAX_TRANSFERS_PER_APP) {
+        fprintf(stderr, "Too many transfers for this app\n");
+        return NULL;
     }
-    return 0;
+
+    transfer_state *t = &app->transfers[app->num_transfers++];
+    memset(t, 0, sizeof(*t));
+
+    t->src_mip = src_mip;
+    t->src_port = src_port;
+
+    // init GBN send
+    t->base_seq = rand() % MIPTP_MAX_SEQ;
+    t->next_seq = t->base_seq;
+
+    for (int i = 0; i < MIPTP_WINDOW_SIZE; i++)
+        t->window[i].acked = 1;
+
+    // init GBN receive
+    t->expected_seq = 0;
+    t->synced = 0;
+
+    printf("[MIPTPD] New transfer src=%u:%u\n", src_mip, src_port);
+
+    return t;
 }
 
-void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port) {
-    if (conn->num_transfers < MAX_TRANSFERS_PER_APP) {
-        conn->active_transfers[conn->num_transfers].src_mip = src_mip;
-        conn->active_transfers[conn->num_transfers].src_port = src_port;
-        conn->num_transfers++;
+transfer_state *find_transfer(app_connection *app, uint8_t src_mip, uint8_t src_port)
+{
+    for (int i = 0; i < app->num_transfers; i++) {
+        if (app->transfers[i].src_mip == src_mip &&
+            app->transfers[i].src_port == src_port)
+            return &app->transfers[i];
     }
+    return NULL;
 }
+
+
+outbound_transfer_state *
+find_or_create_outbound(app_connection *app,
+                        uint8_t dst_mip,
+                        uint8_t dst_port)
+{
+    // Finn eksisterende transfer
+    for (int i = 0; i < app->outbound_count; i++) {
+        outbound_transfer_state *t = &app->outbound[i];
+        if (t->dst_mip == dst_mip && t->dst_port == dst_port) {
+            return t;
+        }
+    }
+
+    // Opprett ny hvis ingen finnes
+    if (app->outbound_count >= MAX_OUT_TRANSFERS) {
+        fprintf(stderr, "[MIPTPD] ERROR: Too many outbound transfers for app_fd=%d\n",
+                app->app_fd);
+        return NULL;
+    }
+
+    outbound_transfer_state *t = &app->outbound[app->outbound_count++];
+    memset(t, 0, sizeof(*t));
+    t->dst_mip  = dst_mip;
+    t->dst_port = dst_port;
+
+    // Init GBN for denne transferen
+    t->base_seq = rand() % MIPTP_MAX_SEQ;
+    t->next_seq = t->base_seq;
+
+    printf("[MIPTPD][TX] Created outbound transfer to %u:%u (seq=%u)\n",
+           dst_mip, dst_port, t->base_seq);
+
+    return t;
+}
+
