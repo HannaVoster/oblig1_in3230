@@ -27,7 +27,7 @@ find_or_create_outbound(app_connection *app,
                         uint8_t dst_port);
 
 outbound_transfer_state *
-find_outbound(app_connection *app,
-              uint8_t dst_mip,
-              uint8_t dst_port);
+find_outbound_for_ack(app_connection *app,
+                      uint8_t ack_src_mip,   
+                      uint8_t ack_src_port);
 #endif

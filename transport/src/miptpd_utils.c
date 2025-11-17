@@ -302,15 +302,21 @@ find_or_create_outbound(app_connection *app,
 }
 
 outbound_transfer_state *
-find_outbound(app_connection *app,
-              uint8_t dst_mip,
-              uint8_t dst_port)
+find_outbound_for_ack(app_connection *app,
+                      uint8_t ack_src_mip,    // hdr->src_mip = server MIP
+                      uint8_t ack_src_port)   // hdr->src_port = server port (99)
 {
     for (int i = 0; i < app->outbound_count; i++) {
         outbound_transfer_state *t = &app->outbound[i];
-        if (t->dst_mip == dst_mip && t->dst_port == dst_port) {
+
+        if (t->dst_mip  == ack_src_mip &&
+            t->dst_port == ack_src_port &&
+            t->app_fd   == app->app_fd)
+        {
             return t;
         }
     }
-    return NULL;  // IMPORTANT: do NOT create
+
+    return NULL;
 }
+
