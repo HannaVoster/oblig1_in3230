@@ -13,8 +13,8 @@ int get_fd_from_port(uint8_t port);
 int get_index(int fd);
 void hex_debug(const char *prefix, const uint8_t *buf, size_t len);
 
-int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port);
-void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port);
+//int transfer_exists(app_connection *conn, uint8_t src_mip, uint8_t src_port);
+//void register_new_transfer(app_connection *conn, uint8_t src_mip, uint8_t src_port);
 
 transfer_state *create_transfer_state(app_connection *app,
                                       uint8_t src_mip,
@@ -25,4 +25,9 @@ outbound_transfer_state *
 find_or_create_outbound(app_connection *app,
                         uint8_t dst_mip,
                         uint8_t dst_port);
+
+outbound_transfer_state *
+find_outbound(app_connection *app,
+              uint8_t dst_mip,
+              uint8_t dst_port);
 #endif

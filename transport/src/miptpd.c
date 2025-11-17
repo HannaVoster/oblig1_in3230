@@ -306,6 +306,7 @@ void handle_app_message(int fd) {
         close(fd);
         return;
     }
+
     printf("[DEBUG][MIPTPD] ------UNIX read len=%zd\n", len);
     if (debug_mode)
         printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
@@ -316,9 +317,7 @@ void handle_app_message(int fd) {
         hex_debug("[MIPTPD][APP->MIPTP]", buf, len);
         send_miptp_data(fd, buf, len);
     }
-    
 }
-
 
 /*
   Lukker alle åpne file descriptors og skriver ut en avslutningsmelding.

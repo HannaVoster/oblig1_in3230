@@ -64,75 +64,77 @@ void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_
   - Lagring av pakker for eventuell retransmisjon
 */
 
-void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
-    printf("[MIPTPD] send_miptp_data() called (fd=%d, len=%zu)\n", app_fd, len);
-
-    if (len < 2) {
-        fprintf(stderr, "[MIPTPD] Invalid payload (too short)\n");
-        return;
-    }
-
-    // ---- Pakker ut felter fra app-meldingen ---
-    // tar vekk metadata så pakken som sendes kun er payload/dataen
-    uint8_t dst_mip  = data[0];  // destinasjons-MIP
-    uint8_t dst_port = data[1];  // mottakerens port
-    uint8_t *payload = data + 2; 
+void send_miptp_data(int app_fd, uint8_t *data, size_t len)
+{
+    uint8_t dst_mip  = data[0];
+    uint8_t dst_port = data[1];
+    uint8_t *payload = data + 2;
     size_t payload_len = len - 2;
 
-    // ---- Finner avsenderport og connection ---
-    uint8_t src_port = get_port_from_fd(app_fd);
     int idx = get_index(app_fd);
-    if (idx < 0) return; // ugyldig tilkobling
+    if (idx < 0) return;
 
-    app_connection *connection = &app_connections[idx];
-    connection->peer_mip = dst_mip; // lagrer mottakerens MIP-adresse, brujes av miptpd_retransmit
+    app_connection *appc = &app_connections[idx];
 
-    // --- Sjekker at vinduet ikke er fullt -----
-    if ((connection->next_seq - connection->base_seq) >= MIPTP_WINDOW_SIZE) {
-        // hvis også køen er full, må forbindelsen avsluttes
-        if (connection->queue_count >= MIPTP_MAX_QUEUE) {
-            fprintf(stderr, "[MIPTPD] Send queue overflow — closing app connection\n");
-            remove_app_connection(app_fd);
+    outbound_transfer_state *t =
+        find_or_create_outbound(appc, dst_mip, dst_port);
+
+    if (!t) return;
+
+    // --- Window full → queue ---
+    if ((t->next_seq - t->base_seq) >= MIPTP_WINDOW_SIZE) {
+
+        if (t->queue_count >= MIPTP_MAX_QUEUE) {
+            fprintf(stderr, "[MIPTPD] outbound queue overflow!\n");
             return;
         }
 
-        // ellers: legger meldingen i kø til senere sending
-        int pos = connection->queue_tail % MIPTP_MAX_QUEUE;
-        memcpy(connection->queue[pos].data, data, len);
-        connection->queue[pos].len = len;
-        connection->queue_tail++;
-        connection->queue_count++;
+        int pos = t->queue_tail % MIPTP_MAX_QUEUE;
+        memcpy(t->queue[pos].data, payload, payload_len);
+        t->queue[pos].len = payload_len;
+        t->queue_tail++;
+        t->queue_count++;
 
-        printf("[MIPTPD][QUEUE] Window full — queued SDU (total queued=%d)\n",
-            connection->queue_count);
+        printf("[MIPTPD][QUEUE] Outbound SDU queued (%u:%u)\n", dst_mip, dst_port);
         return;
     }
 
-    // --- Setter sekvensnummer ----
-    uint16_t seq = connection->next_seq;
-    connection->next_seq = (connection->next_seq + 1) % MIPTP_MAX_SEQ;
+    send_miptp_data_on_transfer(appc, t, payload, payload_len);
+}
 
-    printf("[MIPTPD] Sending seq=%u from port %d\n", seq, src_port);
+void send_miptp_data_on_transfer(app_connection *appc,
+                                 outbound_transfer_state *t,
+                                 uint8_t *payload,
+                                 size_t payload_len)
+{
+    uint8_t dst_mip  = t->dst_mip;
+    uint8_t dst_port = t->dst_port;
+    uint8_t src_port = appc->port;
 
-    // --- Bygg MIPTP PDU ---
+    // --- vindu fullt bør aldri skje her ---
+    if ((t->next_seq - t->base_seq) >= MIPTP_WINDOW_SIZE) {
+        printf("[MIPTPD][BUG] send_miptp_data_on_transfer() called but window full!\n");
+        return;
+    }
+
+    uint16_t seq = t->next_seq;
+    t->next_seq = (t->next_seq + 1) % MIPTP_MAX_SEQ;
+
     size_t pdu_len;
-    uint8_t *pdu = build_data_pdu(src_port, dst_port, seq, payload, payload_len, &pdu_len);
+    uint8_t *pdu =
+        build_data_pdu(src_port, dst_port, seq, payload, payload_len, &pdu_len);
 
-    // --- Lagrer i sendvinduet for retransmisjon ---
     int slot = seq % MIPTP_WINDOW_SIZE;
-    connection->window[slot].seq = seq;
-    connection->window[slot].len = pdu_len;
-    memcpy(connection->window[slot].data, pdu, pdu_len);
-    connection->window[slot].sent_time = time(NULL);
-    connection->window[slot].acked = 0;
-    connection->window_count++;
+    t->window[slot].seq = seq;
+    t->window[slot].len = pdu_len;
+    memcpy(t->window[slot].data, pdu, pdu_len);
+    t->window[slot].acked = 0;
+    t->window[slot].sent_time = time(NULL);
+    t->window_count++;
 
-    hex_debug("[MIPTPD][SEND->MIPD] Payload", payload, payload_len);
-
-    // ----- Sender pdu til mipd -----
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu);
 
-    printf("[MIPTPD] Packet queued and sent (dst_mip=%d, seq=%u, len=%zu)\n",
-           dst_mip, seq, pdu_len);
+    printf("[MIPTPD][SEND] seq=%u to %u:%u\n",
+           seq, dst_mip, dst_port);
 }
