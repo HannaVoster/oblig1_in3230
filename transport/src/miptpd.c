@@ -272,7 +272,8 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
   Hvis forbindelsen er lukket, fjernes den
   Ellers sendes dataen videre via MIPTP (send_miptp_data)
 */
-void handle_app_message(int fd) {
+void handle_app_message(int fd)
+{
     uint8_t buf[4090];
     ssize_t len = read(fd, buf, sizeof(buf));
 
@@ -284,40 +285,43 @@ void handle_app_message(int fd) {
         if (idx >= 0) {
             app_connection *conn = &app_connections[idx];
 
-            if (conn->window_count > 0) {
-                printf("[MIPTPD][CLOSE] Waiting for %u unacked packets (port=%u)...\n",
-                       conn->window_count, conn->port);
+            // sjekker ALLE outbound-transfers
+            int outstanding = 0;
+            for (int i = 0; i < conn->outbound_count; i++) {
+                outbound_transfer_state *t = &conn->outbound[i];
+                if (t->window_count > 0) {
+                    outstanding = 1;
+                    printf("[MIPTPD][CLOSE] Transfer %u:%u has %u outstanding packets\n",
+                           t->dst_mip, t->dst_port, t->window_count);
+                }
+            }
 
-                // Vent i inntil 500 ms for at ACKs skal komme inn
+            if (outstanding) {
+                printf("[MIPTPD][CLOSE] Waiting 500 ms for remaining ACKs…\n");
+
                 struct timespec ts = {0, 500 * 1000000};
                 nanosleep(&ts, NULL);
 
-                // Etter venting, sjekk igjen (valgfritt)
-                if (conn->window_count > 0)
-                    printf("[MIPTPD][CLOSE] Warning: %u packets still unacked after wait\n",
-                           conn->window_count);
+                // optional: sjekker igjen
             }
 
             printf("[MIPTPD][CLOSE] Closing connection for port %u (fd=%d)\n",
                    conn->port, fd);
+
             remove_app_connection(fd);
         }
-
         close(fd);
         return;
     }
+    // Normal case: app har sendt data
+    printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
 
-    printf("[DEBUG][MIPTPD] ------UNIX read len=%zd\n", len);
-    if (debug_mode)
-        printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
-
-    printf("[MIPTPD] Message received from app fd=%d\n", fd);
-
-    if(len > 0){
+    if (len > 0) {
         hex_debug("[MIPTPD][APP->MIPTP]", buf, len);
         send_miptp_data(fd, buf, len);
     }
 }
+
 
 /*
   Lukker alle åpne file descriptors og skriver ut en avslutningsmelding.
