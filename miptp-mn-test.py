@@ -1,177 +1,349 @@
-#!/usr/bin/env python
+# #!/usr/bin/env python
+# """
+# Mininet script for IN3230/IN4230
+# Struktur og rekkefølge følger hjemmeeksamen 1-oppsettet (mipd → routingd → miptpd → apper)
+# """
+
+# from mininet.topo import Topo
+# from mininet.cli import CLI
+# from mininet.term import tunnelX11
+# import os, time, signal
+# import hashlib
+# import glob
+
+# terms = []
+
+# # ===== TOPOLOGY =====
+# class MIPTPTopo(Topo):
+#     def __init__(self):
+#         Topo.__init__(self)
+#         A = self.addHost('A')
+#         B = self.addHost('B')
+#         self.addLink(A, B, bw=10, delay='10ms')
+
+
+# # ===== OPEN TERMINAL =====
+# def openTerm(self, node, title, geometry, cmd="bash"):
+#     display, tunnel = tunnelX11(node)
+#     return node.popen([
+#         "xterm", "-hold",
+#         "-title", title,
+#         "-geometry", geometry,
+#         "-display", display,
+#         "-e", cmd
+#     ])
+   
+
+# def init_miptp_multi(self, line):
+#     net = self.mn
+#     A = net.get('A')
+#     B = net.get('B')
+
+#     print("=== Cleaning old files on B (/tmp) ===")
+#     B.cmd("rm -f /tmp/incoming_*")
+
+#     num_files = 8 # Hvor mange filer som skal sendes parallelt
+
+#     print("\n=== Starting MIP daemons ===")
+#     terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 1"))
+#     time.sleep(1)
+#     terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 2"))
+#     time.sleep(3)
+
+#     print("\n=== Starting routing daemons ===")
+#     terms.append(openTerm(self, A, "ROUTING [A]", "80x14+0+220", "./routingd -d usockA"))
+#     time.sleep(1)
+#     terms.append(openTerm(self, B, "ROUTING [B]", "80x14+555+220", "./routingd -d usockB"))
+#     time.sleep(3)
+
+#     print("\n=== Starting MIPTP daemons ===")
+#     terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd -d usockA miptp_appA.sock"))
+#     time.sleep(1)
+#     terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd -d usockB miptp_appB.sock"))
+#     time.sleep(3)
+
+#     print("\n=== Launching MIPTP server on B ===")
+#     terms.append(openTerm(self, B, "MIPTP SERVER [B:99]", "80x20+1110+440",
+#                           "cd bin && sudo ./miptpd_server 99 miptp_appB.sock /tmp"))
+#     time.sleep(2)
+
+#     print("\n=== Generating files on A ===")
+#     for i in range(num_files):
+#         terms.append(openTerm(
+#             self, A, f"MAKE FILE {i}", f"80x10+0+{660 + i*40}",
+#             f"cd bin && dd if=/dev/urandom of=test{i}.dat bs=1K count=32"
+#         ))
+#         time.sleep(0.3)
+
+#     print("\n=== Starting parallel file transfers from A → B ===")
+#     for i in range(num_files):
+#         terms.append(openTerm(
+#             self, A, f"MIPTP CLIENT [{i}]", f"80x20+0+{900 + i*40}",
+#             f"cd bin && sudo ./miptpd_client test{i}.dat 2 99 miptp_appA.sock"
+#         ))
+#         time.sleep(0.2)
+
+#     print("\nMULTI-FILE MIPTP stress test started.")
+#     print("Monitor the terminals and check using 'check_multi_success' when done")
+
+# import hashlib
+# import glob
+
+# def check_multi_success(self, line):
+#     """
+#     Checks whether all files transferred in init_miptp_multi were received correctly on B
+#     Looks for files in /tmp on host B
+#     """
+    
+#     net = self.mn
+#     B = net.get('B')
+
+#     num_files = 8  # samme som init_miptp_multi
+
+#     print("\n=== Checking transferred files on B (/tmp) ===")
+
+#     ls_output = B.cmd("ls /tmp/incoming_* 2>/dev/null").strip()
+#     if not ls_output:
+#         print("No received files found in /tmp on B")
+#         return
+
+#     received_files = ls_output.split()
+#     print(f"Found {len(received_files)} files on B")
+
+#     if len(received_files) != num_files:
+#         print(f"Expected {num_files} files, but found {len(received_files)}.")
+#         print("Continuing to verify hashes...")
+    
+#     def md5sum(path):
+#         hasher = hashlib.md5()
+#         with open(path, 'rb') as f:
+#             while chunk := f.read(8192):
+#                 hasher.update(chunk)
+#         return hasher.hexdigest()
+
+#     success = True
+
+#     for rf in received_files:
+#         # kopierer fil fra B -> lokal /tmp for hashing
+#         local_copy = f"/tmp/local_copy_{os.path.basename(rf)}"
+#         B.cmd(f"cp {rf} {local_copy}")
+#         received_md5 = md5sum(local_copy)
+#         os.remove(local_copy)
+
+
+#         matches = []
+#         for i in range(num_files):
+#             original_path = f"bin/test{i}.dat"
+#             if not os.path.exists(original_path):
+#                 print(f"Original file missing: {original_path}")
+#                 continue
+#             original_md5 = md5sum(original_path)
+#             if received_md5 == original_md5:
+#                 matches.append(i)
+
+#         if len(matches) == 0:
+#             print(f"Received file {rf} does NOT match any original file")
+#             success = False
+#         elif len(matches) > 1:
+#             print(f"Received file {rf} matches MULTIPLE originals: {matches}")
+#             success = False
+#         else:
+#             print(f"{rf} matches test{matches[0]}.dat")
+
+#     if success:
+#         print("\nSUCCESS!!:))): All transferred files match exactly one original file")
+#     else:
+#         print("\nFAIL: Some files did not match. See logs above")
+
+
+# # ===== CLEAN EXIT =====
+# orig_EOF = CLI.do_EOF
+# def do_EOF(self, line):
+#     for t in terms:
+#         try:
+#             os.kill(t.pid, signal.SIGKILL)
+#         except Exception:
+#             pass
+#     return orig_EOF(self, line)
+
+# CLI.do_EOF = do_EOF
+# CLI.do_init_miptp_multi = init_miptp_multi
+# CLI.do_check_multi_success = check_multi_success
+
+# topos = {"miptp": (lambda: MIPTPTopo())}
+
+
+#!/usr/bin/env python3
 """
-Mininet script for IN3230/IN4230
-Struktur og rekkefølge følger hjemmeeksamen 1-oppsettet (mipd → routingd → miptpd → apper)
+Mininet testscript for MIPTP (IN3230/IN4230)
+Oppsett: A — B — C
+Testscenarioer:
+ - A → B
+ - C → B
+ - A og C → B samtidig
 """
 
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.term import tunnelX11
-import os, time, signal
-import hashlib
-import glob
+import time, os, signal, glob, hashlib
 
 terms = []
 
+# ---------------------- Topologi ----------------------
 
-# ===== TOPOLOGY =====
-class MIPTPTopo(Topo):
+class ThreeNodeTopo(Topo):
     def __init__(self):
         Topo.__init__(self)
-        A = self.addHost('A')
-        B = self.addHost('B')
-        self.addLink(A, B, bw=10, delay='10ms')
 
+        A = self.addHost("A")
+        B = self.addHost("B")
+        C = self.addHost("C")
 
-# ===== OPEN TERMINAL =====
+        # lineær kjede A-B-C
+        self.addLink(A, B, bw=10, delay="10ms")
+        self.addLink(B, C, bw=10, delay="10ms")
+
+# ---------------------- Hjelpefunksjon ----------------------
+
 def openTerm(self, node, title, geometry, cmd="bash"):
+    """Åpner et xterm-vindu på en node."""
     display, tunnel = tunnelX11(node)
-    return node.popen([
+    p = node.popen([
         "xterm", "-hold",
         "-title", title,
         "-geometry", geometry,
         "-display", display,
         "-e", cmd
     ])
-   
+    terms.append(p)
+    return p
 
-def init_miptp_multi(self, line):
+# ---------------------- Init ----------------------
+
+def init_miptp_test(self, line):
+    """Starter full A–B–C test."""
     net = self.mn
-    A = net.get('A')
-    B = net.get('B')
+    A, B, C = net.get('A'), net.get('B'), net.get('C')
 
-    print("=== Cleaning old files on B (/tmp) ===")
+    print("\n=== Cleaning old files ===")
     B.cmd("rm -f /tmp/incoming_*")
 
-    num_files = 8 # Hvor mange filer som skal sendes parallelt
-
-    print("\n=== Starting MIP daemons ===")
-    terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 1"))
+    # ---------- Start MIPD ----------
+    print("\n=== Starting mipd ===")
+    openTerm(self, A, "MIPD A", "80x15+0+0",    "./mipd -d sockA 1")
     time.sleep(1)
-    terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0", "./mipd -d usockB 2"))
+    openTerm(self, B, "MIPD B", "80x15+520+0", "./mipd -d sockB 2")
+    time.sleep(1)
+    openTerm(self, C, "MIPD C", "80x15+1040+0","./mipd -d sockC 3")
     time.sleep(3)
 
-    print("\n=== Starting routing daemons ===")
-    terms.append(openTerm(self, A, "ROUTING [A]", "80x14+0+220", "./routingd -d usockA"))
+    # ---------- Start ROUTINGD ----------
+    print("\n=== Starting routingd ===")
+    openTerm(self, A, "ROUT A", "80x12+0+240",    "./routingd -d sockA")
     time.sleep(1)
-    terms.append(openTerm(self, B, "ROUTING [B]", "80x14+555+220", "./routingd -d usockB"))
+    openTerm(self, B, "ROUT B", "80x12+520+240", "./routingd -d sockB")
+    time.sleep(1)
+    openTerm(self, C, "ROUT C", "80x12+1040+240","./routingd -d sockC")
     time.sleep(3)
 
-    print("\n=== Starting MIPTP daemons ===")
-    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd -d usockA miptp_appA.sock"))
+    # ---------- Start MIPTPD ----------
+    print("\n=== Starting miptpd ===")
+    openTerm(self, A, "MIPTPD A", "80x15+0+450",    "./miptpd -d sockA appA.sock")
     time.sleep(1)
-    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd -d usockB miptp_appB.sock"))
+    openTerm(self, B, "MIPTPD B", "80x15+520+450", "./miptpd -d sockB appB.sock")
+    time.sleep(1)
+    openTerm(self, C, "MIPTPD C", "80x15+1040+450","./miptpd -d sockC appC.sock")
     time.sleep(3)
 
-    print("\n=== Launching MIPTP server on B ===")
-    terms.append(openTerm(self, B, "MIPTP SERVER [B:99]", "80x20+1110+440",
-                          "cd bin && sudo ./miptpd_server 99 miptp_appB.sock /tmp"))
+    # ---------- Start Server på B ----------
+    print("\n=== Starting MIPTP server on B ===")
+    openTerm(self, B, "SERVER B:99", "80x18+520+690",
+             "cd bin && ./miptpd_server 99 ../appB.sock /tmp")
     time.sleep(2)
 
-    print("\n=== Generating files on A ===")
-    for i in range(num_files):
-        terms.append(openTerm(
-            self, A, f"MAKE FILE {i}", f"80x10+0+{660 + i*40}",
-            f"cd bin && dd if=/dev/urandom of=test{i}.dat bs=1K count=32"
-        ))
-        time.sleep(0.3)
+    # ---------- Lag testfiler ----------
+    print("\n=== Generating test files (A and C) ===")
+    A.cmd("cd bin && dd if=/dev/urandom of=Afile.dat bs=1K count=64")
+    C.cmd("cd bin && dd if=/dev/urandom of=Cfile.dat bs=1K count=64")
 
-    print("\n=== Starting parallel file transfers from A → B ===")
-    for i in range(num_files):
-        terms.append(openTerm(
-            self, A, f"MIPTP CLIENT [{i}]", f"80x20+0+{900 + i*40}",
-            f"cd bin && sudo ./miptpd_client test{i}.dat 2 99 miptp_appA.sock"
-        ))
-        time.sleep(0.2)
+    # ---------- Send A → B ----------
+    print("\n=== A → B ===")
+    openTerm(self, A, "A→B", "80x18+0+690",
+             "cd bin && ./miptpd_client Afile.dat 2 99 ../appA.sock")
 
-    print("\nMULTI-FILE MIPTP stress test started.")
-    print("Monitor the terminals and check using 'check_multi_success' when done")
+    time.sleep(3)
 
-import hashlib
-import glob
+    # ---------- Send C → B ----------
+    print("\n=== C → B ===")
+    openTerm(self, C, "C→B", "80x18+1040+690",
+             "cd bin && ./miptpd_client Cfile.dat 3 99 ../appC.sock")
 
-def check_multi_success(self, line):
-    """
-    Checks whether all files transferred in init_miptp_multi were received correctly on B
-    Looks for files in /tmp on host B
-    """
-    
+    time.sleep(3)
+
+    # ---------- Samtidig transfer ----------
+    print("\n=== A→B + C→B simultant ===")
+    openTerm(self, A, "A→B (2)", "80x18+0+900",
+             "cd bin && ./miptpd_client Afile.dat 4 99 ../appA.sock")
+
+    openTerm(self, C, "C→B (2)", "80x18+1040+900",
+             "cd bin && ./miptpd_client Cfile.dat 5 99 ../appC.sock")
+
+    print("\nTest started — use 'check_result' to verify MD5.\n")
+
+# ---------------------- Verifikasjon ----------------------
+
+def check_result(self, line):
+    """Verifiser MD5-sum for mottatte filer på B."""
     net = self.mn
     B = net.get('B')
 
-    num_files = 8  # samme som init_miptp_multi
+    print("\n=== Checking received files on /tmp ===")
 
-    print("\n=== Checking transferred files on B (/tmp) ===")
-
-    ls_output = B.cmd("ls /tmp/incoming_* 2>/dev/null").strip()
-    if not ls_output:
-        print("No received files found in /tmp on B")
+    files = B.cmd("ls /tmp/incoming_* 2>/dev/null").strip().split()
+    if not files:
+        print("No files received.")
         return
 
-    received_files = ls_output.split()
-    print(f"Found {len(received_files)} files on B")
+    def md5(path):
+        h = hashlib.md5()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        return h.hexdigest()
 
-    if len(received_files) != num_files:
-        print(f"Expected {num_files} files, but found {len(received_files)}.")
-        print("Continuing to verify hashes...")
-    
-    def md5sum(path):
-        hasher = hashlib.md5()
-        with open(path, 'rb') as f:
-            while chunk := f.read(8192):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+    # Kopier over til lokal katalog og sammenlikn
+    for f in files:
+        local = "/tmp/_copy_" + os.path.basename(f)
+        B.cmd(f"cp {f} {local}")
 
-    success = True
+        rec = md5(local)
+        ok = False
 
-    for rf in received_files:
-        # kopierer fil fra B -> lokal /tmp for hashing
-        local_copy = f"/tmp/local_copy_{os.path.basename(rf)}"
-        B.cmd(f"cp {rf} {local_copy}")
-        received_md5 = md5sum(local_copy)
-        os.remove(local_copy)
+        # sammenlikn med A og C sine originale
+        for original in ["bin/Afile.dat", "bin/Cfile.dat"]:
+            if os.path.exists(original) and md5(original) == rec:
+                print(f"{f} matches {original}")
+                ok = True
 
+        if not ok:
+            print(f"{f} DOES NOT MATCH any original!")
 
-        matches = []
-        for i in range(num_files):
-            original_path = f"bin/test{i}.dat"
-            if not os.path.exists(original_path):
-                print(f"Original file missing: {original_path}")
-                continue
-            original_md5 = md5sum(original_path)
-            if received_md5 == original_md5:
-                matches.append(i)
+        os.remove(local)
 
-        if len(matches) == 0:
-            print(f"Received file {rf} does NOT match any original file")
-            success = False
-        elif len(matches) > 1:
-            print(f"Received file {rf} matches MULTIPLE originals: {matches}")
-            success = False
-        else:
-            print(f"{rf} matches test{matches[0]}.dat")
+# ---------------------- Exit ----------------------
 
-    if success:
-        print("\nSUCCESS!!:))): All transferred files match exactly one original file")
-    else:
-        print("\nFAIL: Some files did not match. See logs above")
-
-
-# ===== CLEAN EXIT =====
 orig_EOF = CLI.do_EOF
 def do_EOF(self, line):
     for t in terms:
         try:
             os.kill(t.pid, signal.SIGKILL)
-        except Exception:
+        except:
             pass
     return orig_EOF(self, line)
 
 CLI.do_EOF = do_EOF
-CLI.do_init_miptp_multi = init_miptp_multi
-CLI.do_check_multi_success = check_multi_success
+CLI.do_init_miptp_test = init_miptp_test
+CLI.do_check_result = check_result
 
-
-
-topos = {"miptp": (lambda: MIPTPTopo())}
-
+topos = {"miptp": (lambda: ThreeNodeTopo())}
