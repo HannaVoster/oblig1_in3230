@@ -188,9 +188,10 @@ from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.term import tunnelX11
 import time, os, signal
+import inspect
 
-# Finn absolutt path til bin/-mappa relativt til dette scriptet
-BASE = os.path.dirname(os.path.abspath(__file__))
+# Finn mappen til dette scriptet, selv om __file__ ikke eksisterer
+BASE = os.path.dirname(os.path.realpath(inspect.getfile(inspect.currentframe())))
 BIN = os.path.join(BASE, "bin")
 
 terms = []
