@@ -117,6 +117,7 @@ typedef struct {
 
     outbound_transfer_state outbound[MAX_OUT_TRANSFERS];
     int outbound_count;
+    int registered;
 } app_connection;
 
 // Global tabell for aktive app-tilkoblinger

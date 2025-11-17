@@ -38,6 +38,14 @@ void unpack_seq_pad(uint16_t seq_pad, uint16_t *seq, uint8_t *pad) {
   Registrerer en ny applikasjon i tabellen
 */
 int new_app_connection(int fd, uint8_t port) {
+
+    for (int i = 0; i < MAX_APPS; i++) {
+        if (app_connections[i].app_fd != 0 &&
+            app_connections[i].port == port) {
+            printf("[MIPTPD] Port %d already in use — rejecting app\n", port);
+            return -1;
+        }
+    }
     for (int i = 0; i < MAX_APPS; i++) {
         if (app_connections[i].app_fd == 0) {
 
@@ -45,6 +53,7 @@ int new_app_connection(int fd, uint8_t port) {
             app_connections[i].port = port;
 
             app_connections[i].num_transfers = 0;
+            app_connections[i].registered = 1;
 
             printf("[MIPTPD] Registered app fd=%d on port %d\n", fd, port);
             return 0;
