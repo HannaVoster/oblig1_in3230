@@ -250,8 +250,9 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
         return;
     }
 
-    if (new_app_connection(new_fd, port) == 0)
+    if (new_app_connection(new_fd, port) == 0){
         if(debug_mode) printf("[MIPTPD] Registered app on port %d (fd=%d)\n", port, new_fd);
+    }
     else {
         fprintf(stderr, "[MIPTPD] Could not register new app (fd=%d)\n", new_fd);
         close(new_fd);
