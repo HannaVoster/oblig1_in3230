@@ -224,9 +224,6 @@ void handle_mip_event(int mip_fd) {
     uint8_t *payload = buf + 1;
     size_t payload_len = len - 1;
 
-   
-    printf("[MIPTPD] -----Received %zd bytes from mipd\n", len);
-
     handle_incoming_miptp_packet(payload, payload_len, src_mip);
 }
 
@@ -243,7 +240,7 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
         return;
     }
 
-    printf("[MIPTPD] New app connected (fd=%d)\n", new_fd);
+    if(debug_mode) printf("[MIPTPD] New app connected (fd=%d)\n", new_fd);
 
     uint8_t port = 0;
     ssize_t n = read(new_fd, &port, 1);
@@ -254,7 +251,7 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
     }
 
     if (new_app_connection(new_fd, port) == 0)
-        printf("[MIPTPD] Registered app on port %d (fd=%d)\n", port, new_fd);
+        if(debug_mode) printf("[MIPTPD] Registered app on port %d (fd=%d)\n", port, new_fd);
     else {
         fprintf(stderr, "[MIPTPD] Could not register new app (fd=%d)\n", new_fd);
         close(new_fd);
@@ -274,123 +271,72 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
 */
 void handle_app_message(int fd)
 {
-    uint8_t buf[4090];
-    ssize_t len = read(fd, buf, sizeof(buf));
-
-    // --- APP CLOSED SOCKET ---
-    if (len <= 0) {
-
-        int idx = get_index(fd);
-        if (idx >= 0) {
-
-            app_connection *conn = &app_connections[idx];
-
-            printf("[MIPTPD][CLOSE] App fd=%d closed — checking outstanding packets...\n", fd);
-
-            // --- WAIT UNTIL ALL OUTBOUND TRANSFERS ARE ACKED ---
-            int waited_ms = 0;
-            const int MAX_WAIT_MS = 10000; // 10 seconds timeout
-
-            while (1) {
-
-                int outstanding = 0;
-
-                for (int i = 0; i < conn->outbound_count; i++) {
-                    outbound_transfer_state *t = &conn->outbound[i];
-
-                    if (t->window_count > 0) {
-                        outstanding = 1;
-                        printf("[MIPTPD][CLOSE] Transfer %u:%u still has %u unacked packets\n",
-                               t->dst_mip, t->dst_port, t->window_count);
-                    }
-                }
-
-                if (!outstanding) {
-                    printf("[MIPTPD][CLOSE] All outbound packets fully ACKed.\n");
-                    break;
-                }
-
-                // Timeout to avoid infinite wait
-                if (waited_ms >= MAX_WAIT_MS) {
-                    printf("[MIPTPD][CLOSE] WARNING: Still outstanding packets after %d ms, closing anyway!\n",
-                           waited_ms);
-                    break;
-                }
-
-                struct timespec ts = {0, 200 * 1000000}; // 200 ms
-                nanosleep(&ts, NULL);
-                waited_ms += 200;
-            }
-
-            // --- NOW SAFE TO REMOVE CONNECTION ---
-            printf("[MIPTPD][CLOSE] Closing app connection on port %u (fd=%d)\n",
-                   conn->port, fd);
-
-            remove_app_connection(fd);
-        }
-
+    // Finner tilkoblingen for denne app-socketen
+    int idx = get_index(fd);
+    if (idx < 0) {
         close(fd);
         return;
     }
 
-    // --- NORMAL DATA FROM APP ---
-    printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
+    app_connection *conn = &app_connections[idx];
 
-    if (len > 0) {
-        hex_debug("[MIPTPD][APP->MIPTP]", buf, len);
-        send_miptp_data(fd, buf, len);
+    // Første byte fra app er portnummeret den vil bruke
+    if (!conn->registered) {
+        uint8_t port;
+        if (read(fd, &port, 1) != 1) {
+            close(fd);
+            return;
+        }
+        // Prøver å registrere porten
+        if (new_app_connection(fd, port) != 0) {
+            close(fd);
+            return;
+        }
+
+        conn->registered = 1;
+        return;
     }
+    // Leser data fra app
+    uint8_t buf[4096];
+    ssize_t len = read(fd, buf, sizeof(buf));
+
+    // Hvis appen lukker forbindelsen
+    if (len <= 0) {
+        // Venter litt for å la outstanding ACKs komme inn
+        int waits = 0;
+        const int MAX_WAITS = 2;   // ca. 400 ms totalt
+
+        while (waits < MAX_WAITS) {
+            int outstanding = 0;
+
+            // Sjekk om noen overføringer fortsatt har pakker i vinduet
+            for (int i = 0; i < conn->outbound_count; i++) {
+                outbound_transfer_state *t = &conn->outbound[i];
+                if (t->window_count > 0) {
+                    outstanding = 1;
+                    break;
+                }
+            }
+            // Alt er ferdig, kan avslutte
+            if (!outstanding)
+                break;
+
+            // Venter litt og prøv igjen
+            struct timespec ts = {0, 200 * 1000000};
+            nanosleep(&ts, NULL);
+            waits++;
+        }
+        if (debug_mode)
+            printf("[MIPTPD] App fd=%d closed; removing connection.\n", fd);
+
+        // Fjerner apptilkoblingen
+        remove_app_connection(fd);
+        close(fd);
+        return;
+    }
+    // Vanlig data fra app - send som MIPTP
+    send_miptp_data(fd, buf, len);
 }
-
-// void handle_app_message(int fd)
-// {
-//     uint8_t buf[4090];
-//     ssize_t len = read(fd, buf, sizeof(buf));
-
-//     if (len <= 0) {
-//         if (debug_mode)
-//             printf("[MIPTPD][CLOSE] App fd=%d closed — checking outstanding packets...\n", fd);
-
-//         int idx = get_index(fd);
-//         if (idx >= 0) {
-//             app_connection *conn = &app_connections[idx];
-
-//             // sjekker ALLE outbound-transfers
-//             int outstanding = 0;
-//             for (int i = 0; i < conn->outbound_count; i++) {
-//                 outbound_transfer_state *t = &conn->outbound[i];
-//                 if (t->window_count > 0) {
-//                     outstanding = 1;
-//                     printf("[MIPTPD][CLOSE] Transfer %u:%u has %u outstanding packets\n",
-//                            t->dst_mip, t->dst_port, t->window_count);
-//                 }
-//             }
-
-//             if (outstanding) {
-//                 printf("[MIPTPD][CLOSE] Waiting 500 ms for remaining ACKs…\n");
-
-//                 struct timespec ts = {0, 500 * 1000000};
-//                 nanosleep(&ts, NULL);
-
-//                 // optional: sjekker igjen
-//             }
-
-//             printf("[MIPTPD][CLOSE] Closing connection for port %u (fd=%d)\n",
-//                    conn->port, fd);
-
-//             remove_app_connection(fd);
-//         }
-//         close(fd);
-//         return;
-//     }
-//     // Normal case: app har sendt data
-//     printf("[MIPTPD] Received %zd bytes from app fd=%d\n", len, fd);
-
-//     if (len > 0) {
-//         hex_debug("[MIPTPD][APP->MIPTP]", buf, len);
-//         send_miptp_data(fd, buf, len);
-//     }
-// }
 
 
 /*
