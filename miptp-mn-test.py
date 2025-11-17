@@ -58,9 +58,9 @@ def init_miptp_multi(self, line):
     time.sleep(3)
 
     print("\n=== Starting MIPTP daemons ===")
-    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd usockA miptp_appA.sock"))
+    terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440", "./miptpd -d usockA miptp_appA.sock"))
     time.sleep(1)
-    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd usockB miptp_appB.sock"))
+    terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440", "./miptpd -d usockB miptp_appB.sock"))
     time.sleep(3)
 
     print("\n=== Launching MIPTP server on B ===")
