@@ -144,24 +144,11 @@ int main(int argc, char *argv[]) {
     uint8_t buffer[CHUNK_SIZE];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-
-        // Vis hva som faktisk ble lest fra testfilen
-        printf("[CLIENT][FILE] Read %zu bytes, first_bytes=", bytes_read);
-        for (int i = 0; i < (int)(bytes_read < 16 ? bytes_read : 16); i++)
-            printf("%02x ", buffer[i]);
-        printf("\n");
-
         // Setter sammen pakke med destinasjonsinfo
         uint8_t packet[2 + bytes_read];
         packet[0] = dst_mip;
         packet[1] = dst_port;
         memcpy(packet + 2, buffer, bytes_read);
-
-        // Vis hva som sendes (uten de to første bytene)
-        printf("[CLIENT][SEND] len=%zu first_bytes=", bytes_read);
-        for (int i = 0; i < (int)(bytes_read < 16 ? bytes_read : 16); i++)
-            printf("%02x ", packet[i + 2]);
-        printf("\n");
 
         // Sender selve pakken
         ssize_t sent = write(fd, packet, 2 + bytes_read);

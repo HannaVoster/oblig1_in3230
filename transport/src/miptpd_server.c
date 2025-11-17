@@ -175,15 +175,10 @@ int main(int argc, char *argv[]) {
         // Finner hvilken overføring som pakken tilhører
         transfer_t *t = find_transfer(src_mip, src_port);
         if (!t) {
-            fprintf(stderr, "[SERVER][WARN] Got data from unknown %u:%u\n",
+            fprintf(stderr, "[SERVER][WARNING] Got data from unknown %u:%u\n",
                     src_mip, src_port);
             continue;
         }
-
-        printf("[CLIENT][RX] len=%zd first_bytes=", n);
-        for (int i = 0; i < (n < 16 ? n : 16); i++)
-            printf("%02x ", buf[i]);
-        printf("\n");
 
         // === Første melding med filstørrelse = 4 byte) ===
         if (t->expected_size == 0 && payload_len == 4) {
