@@ -39,6 +39,8 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
         return;
     }
 
+    if(debug_mode) printf("[MIPTPD] got packet from mip %d", src_mip);
+
     //pakker ut header og felt 
     miptp_hdr_t hdr;
     memcpy(&hdr, buf, sizeof(hdr));
@@ -48,9 +50,6 @@ void handle_incoming_miptp_packet(uint8_t *buf, size_t len, uint8_t src_mip) {
     uint16_t seq;
     uint8_t pad;
     unpack_seq_pad(ntohs(hdr.seq_pad), &seq, &pad);
-
-    printf("[MIPTPD] Got packet from MIP %d, src_port=%d dst_port=%d len=%zu seq=%u pad=%u\n",
-           src_mip, hdr.src_port, hdr.dst_port, payload_len, seq, pad);
 
     // skiller mellom ACK og DATA s
     if (payload_len == 0)
@@ -154,8 +153,6 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip) {
 void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
                           uint16_t seq, uint8_t pad, uint8_t src_mip) {
 
-    hex_debug("[MIPTPD][FROM MIPD] Raw payload", payload, len);
-
     uint8_t src_port = hdr->src_port;
     uint8_t dst_port = hdr->dst_port;
 
@@ -211,8 +208,6 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     msg[0] = src_mip;           // mip addressen til avsender
     msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
     memcpy(msg + 2, payload, len);
-
-    hex_debug("[MIPTPD][TO APP] Deliver", payload, len);
 
     if (len >= pad) len -= pad;
     //ssize_t sent = write(app, payload, len);  

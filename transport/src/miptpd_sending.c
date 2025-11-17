@@ -30,12 +30,9 @@ void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len) {
 
     // skriver til mipd-socket (MIP_FD)
     ssize_t sent = write(MIP_FD, buffer, 2 + pdu_len);
-    printf("[MIPTPD] Sent %zd/%zu bytes to mipd (dst=%u, ttl=%u)\n", sent, 2 + pdu_len, dst_mip, ttl);
 
     if (sent < 0)
         perror("[MIPTPD] write to mipd");
-    else
-        printf("[MIPTPD] Sent %zd bytes to mipd (dst=%d)\n", sent, dst_mip);
 }
 
 /*
@@ -134,7 +131,4 @@ void send_miptp_data_on_transfer(app_connection *appc,
 
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu);
-
-    printf("[MIPTPD][SEND] seq=%u to %u:%u\n",
-           seq, dst_mip, dst_port);
 }
