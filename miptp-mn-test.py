@@ -40,6 +40,9 @@ def init_miptp(self, line):
     net = self.mn
     A = net.get('A')
     B = net.get('B')
+    
+    print("=== Cleaning old files on B (/tmp) ===")
+    B.cmd("rm -f /tmp/incoming_*")
 
     print("\n=== Starting MIP daemons ===")
     terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0", "./mipd -d usockA 1"))
@@ -148,7 +151,6 @@ def check_multi_success(self, line):
     
     net = self.mn
     B = net.get('B')
-    B.cmd("rm -f /tmp/incoming_*")
 
     num_files = 6  # same number as in init_miptp_multi
 
