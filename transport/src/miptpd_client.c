@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 
     // Registrerer en tilfeldig port hos MIPTPD
     // Hvis MIPTPD avviser (eks. allerede i bruk), prøver opptil 3 ganger
-    srand(time(NULL));
+    srand(time(NULL) ^ getpid()); 
     uint8_t my_port;
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         do { my_port = (rand() % 255) + 1; } while (my_port == dst_port);
