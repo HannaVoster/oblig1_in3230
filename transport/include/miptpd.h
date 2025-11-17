@@ -90,6 +90,7 @@ typedef struct {
 
 
 typedef struct {
+    int app_fd;
     uint8_t dst_mip;
     uint8_t dst_port;
 

@@ -273,7 +273,7 @@ find_or_create_outbound(app_connection *app,
     // Finn eksisterende transfer
     for (int i = 0; i < app->outbound_count; i++) {
         outbound_transfer_state *t = &app->outbound[i];
-        if (t->dst_mip == dst_mip && t->dst_port == dst_port) {
+        if (t->dst_mip == dst_mip && t->dst_port == dst_port && t->app_fd == app->app_fd) {
             return t;
         }
     }
@@ -289,6 +289,7 @@ find_or_create_outbound(app_connection *app,
     memset(t, 0, sizeof(*t));
     t->dst_mip  = dst_mip;
     t->dst_port = dst_port;
+    t->app_fd = app->app_fd;
 
     // Init GBN for denne transferen
     t->base_seq = rand() % MIPTP_MAX_SEQ;
