@@ -20,7 +20,7 @@
   Legger på MIP-routing-header (MIP + TTL) før utsending via UNIX-socket
 */
 void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len) {
-    uint8_t ttl = 10; // kan være standard
+    uint8_t ttl = 10; 
     uint8_t buffer[2 + pdu_len];
 
     buffer[0] = dst_mip; // destinasjons-MIP, mipd bruker denne for routing
@@ -73,9 +73,10 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len) {
     }
 
     // ---- Pakker ut felter fra app-meldingen ---
+    // tar vekk metadata så pakken som sendes kun er payload/dataen
     uint8_t dst_mip  = data[0];  // destinasjons-MIP
     uint8_t dst_port = data[1];  // mottakerens port
-    uint8_t *payload = data + 2; // selve nyttelasten 
+    uint8_t *payload = data + 2; 
     size_t payload_len = len - 2;
 
     // ---- Finner avsenderport og connection ---

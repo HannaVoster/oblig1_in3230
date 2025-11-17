@@ -125,8 +125,6 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq) {
         printf("[MIPTPD][GBN] Waiting for more ACKs (base=%u next=%u)\n",
                conn->base_seq, conn->next_seq);
 }
-
-
 /*
  *  handle_incoming_data()
  *
@@ -200,8 +198,7 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
         return; // Ignorerer denne pakken (venter på riktig sekvens)
     }
 
-    // // In-order pakke, leveres til applikasjonen
-    // if (len >= pad) len -= pad; // fjerner padding som ble lagt til ved sending
+    // In-order pakke, leveres til applikasjonen
     uint8_t msg[2 + len];       // buffer for å sende opp til appen, 2 ekstra byte til metadata
     msg[0] = src_mip;           // mip addressen til avsender
     msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender

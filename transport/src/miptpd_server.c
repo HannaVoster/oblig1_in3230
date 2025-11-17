@@ -1,3 +1,13 @@
+/*
+ *  Enkel MIPTP filmottaker (server)
+ *
+ *  Formål:
+ *  - Tar imot filer via MIPTPD og lagrer dem til disk
+ *  - Hver ny overføring identifiseres av (src_mip, src_port)
+ *  - Kan håndtere flere samtidige overføringer
+ *  - Kjører kontinuerlig til brukeren stopper programmet
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -8,8 +18,14 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#define MAX_TRANSFERS 32
+#define MAX_TRANSFERS 32 // Hvor mange samtidige overføringer som støttes
 
+/*
+ *  transfer_t
+ *
+ *  Holder informasjon om én aktiv filoverføring.
+ *  Hver avsender (src_mip, src_port) får sin egen entry i tabellen
+ */
 typedef struct {
     uint8_t src_mip;
     uint8_t src_port;
@@ -19,37 +35,15 @@ typedef struct {
     int active;
 } transfer_t;
 
-transfer_t transfers[MAX_TRANSFERS];
-transfer_t *active_transfer = NULL;
+transfer_t transfers[MAX_TRANSFERS]; // Tabell over alle pågående overføringer
 
-// transfer_t *find_or_create_transfer(const char *dir) {
-//     // Finn en inaktiv slot (ikke aktiv = kan brukes)
-//     for (int i = 0; i < MAX_TRANSFERS; i++) {
-//         if (!transfers[i].active) {
-//             printf("[DEBUG] Creating new transfer slot %d — opening file now!\n", i);
-//             transfers[i].active = 1;
-//             transfers[i].received = 0;
-//             transfers[i].expected_size = 0;
-
-//             char filename[256];
-//             snprintf(filename, sizeof(filename), "%s/incoming", dir);
-//             transfers[i].fp = fopen(filename, "wb");
-//             if (!transfers[i].fp) {
-//                 perror("fopen");
-//                 transfers[i].active = 0;
-//                 return NULL;
-//             }
-
-//             printf("[SERVER] New file: %s\n", filename);
-//             return &transfers[i];
-//         }
-//     }
-
-//     fprintf(stderr, "[SERVER] No available transfer slots!\n");
-//     return NULL;
-// }
-
-
+/*
+ *  find_transfer()
+ *
+ *  Søker i tabellen etter en pågående overføring
+ *  som matcher gitt (src_mip, src_port)
+ *  Returnerer peker til overføringen hvis den finnes, ellers NULL
+ */
 transfer_t *find_transfer(uint8_t src_mip, uint8_t src_port) {
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (transfers[i].active &&
@@ -60,6 +54,13 @@ transfer_t *find_transfer(uint8_t src_mip, uint8_t src_port) {
     return NULL;
 }
 
+/*
+ *  create_transfer()
+ *
+ *  Oppretter en ny overføring i første ledige slot.
+ *  Lager en ny fil med navn "incoming_<src_mip>_<src_port>" (gitt fra oppgaven) i valgt katalog
+ *  Returnerer peker til den nye overføringen.
+ */
 transfer_t *create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) {
     for (int i = 0; i < MAX_TRANSFERS; i++) {
         if (!transfers[i].active) {
@@ -69,10 +70,12 @@ transfer_t *create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) 
             transfers[i].received = 0;
             transfers[i].expected_size = 0;
 
+            // Lager filnavn basert på avsender
             char filename[256];
             snprintf(filename, sizeof(filename),
                      "%s/incoming_%u_%u", dir, src_mip, src_port);
 
+            // Åpner fil for skriving
             transfers[i].fp = fopen(filename, "wb");
             if (!transfers[i].fp) {
                 perror("fopen");
@@ -90,9 +93,13 @@ transfer_t *create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) 
     return NULL;
 }
 
-
-
-
+/*
+ *  main()
+ *
+ *  Starter serveren.
+ *  Kobler til MIPTPD, registrerer portnummer, og går deretter inn i evig løkke
+ *  som tar imot pakker fra MIPTPD (både kontrollmeldinger og data).
+ */
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
@@ -110,13 +117,13 @@ int main(int argc, char *argv[]) {
     else
         strncpy(socket_path, socket_arg, sizeof(socket_path) - 1);
 
-    // Create socket
+    // Lager sti til MIPTPD-socketen
     int fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (fd < 0) {
         perror("socket");
         return EXIT_FAILURE;
     }
-
+    // Oppretter UNIX socket for kommunikasjon med miptpd
     struct sockaddr_un addr = {0};
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
@@ -127,23 +134,31 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Register port
+    // Registrerer portnummer hos miptpd
     if (write(fd, &my_port, 1) != 1) {
         perror("register port");
         close(fd);
         return EXIT_FAILURE;
     }
 
-    printf("[SERVER] Listening on port %d, saving to %s\n", my_port, out_dir);
+    printf("[SERVER] Listening on port %d", my_port);
     printf("[SERVER] Starting recv loop...\n");
+    
+    /*
+     *  Hovedløkke:
+     *  Leser meldinger fra MIPTPD kontinuerlig
+     *  Hver melding kan være enten
+     *   - en kontrollmelding (0xFF + src_mip + src_port)
+     *   - eller en datapakke (src_mip, src_port + payload)
+     */
 
     while (1) {
         uint8_t buf[1500];
         ssize_t n = read(fd, buf, sizeof(buf));
-        if (n <= 0) break;
+        if (n <= 0) break; // Avslutter hvis forbindelsen brytes
 
 
-        // ===  Kontrollmelding fra MIPTPD ===
+        // ===  Kontrollmelding fra MIPTPD om at ny overføring starter ===
         if (buf[0] == 0xFF && n == 3) {
             uint8_t src_mip = buf[1];
             uint8_t src_port = buf[2];
@@ -151,11 +166,13 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // === vanlig datapakke ===
         uint8_t src_mip = buf[0];
         uint8_t src_port = buf[1];
         uint8_t *payload = buf + 2;
         size_t payload_len = n - 2;
 
+        // Finner hvilken overføring som pakken tilhører
         transfer_t *t = find_transfer(src_mip, src_port);
         if (!t) {
             fprintf(stderr, "[SERVER][WARN] Got data from unknown %u:%u\n",
@@ -168,7 +185,7 @@ int main(int argc, char *argv[]) {
             printf("%02x ", buf[i]);
         printf("\n");
 
-            // === 3️⃣ Første melding (filstørrelse 4 byte) ===
+        // === Første melding med filstørrelse = 4 byte) ===
         if (t->expected_size == 0 && payload_len == 4) {
             uint32_t net_size;
             memcpy(&net_size, payload, 4);
@@ -178,7 +195,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-            // === 4️⃣ Faktiske data ===
+        // === fildata ===
         fwrite(payload, 1, payload_len, t->fp);
         t->received += payload_len;
 
@@ -186,6 +203,7 @@ int main(int argc, char *argv[]) {
            t->src_mip, t->src_port,
            payload_len, t->received, t->expected_size);
 
+        // == filoverføring ferdig ==
         if (t->expected_size && t->received >= t->expected_size) {
             printf("[SERVER] Transfer complete from %u:%u (%u bytes)\n",
                 t->src_mip, t->src_port, t->received);
@@ -193,63 +211,6 @@ int main(int argc, char *argv[]) {
             t->fp = NULL;
             t->active = 0;
         }
-
-        // Dersom vi ikke har startet en overføring enda:
-        // if (!active_transfer) {
-        //     // Forvent at dette er meldingen med filstørrelse
-        //     if (n == 4) { //  4 størrelse
-        //         uint32_t net_size;
-        //         memcpy(&net_size, payload, 4);
-        //         uint32_t filesize = ntohl(net_size);
-
-        //         active_transfer = &transfers[0];
-        //         active_transfer->expected_size = filesize;
-        //         active_transfer->received = 0;
-        //         active_transfer->active = 1;
-
-        //         char filename[256];
-        //         snprintf(filename, sizeof(filename), "%s/incoming", out_dir);
-        //         active_transfer->fp = fopen(filename, "wb");
-        //         printf("[DEBUG] fopen() called — new file descriptor!\n");
-
-        //         if (!active_transfer->fp) {
-        //             perror("fopen");
-        //             active_transfer->active = 0;
-        //             active_transfer = NULL;
-        //             continue;
-        //         }
-
-        //         printf("[SERVER] New file: %s\n", filename);
-        //         printf("[SERVER] File size = %u bytes\n", filesize);
-        //         continue; // vent på neste pakke
-        //     } else {
-        //         printf("[SERVER][WARN] Got data before size message — ignoring\n");
-        //         continue;
-        //     }
-        // }
-
-
-        // === Her er vi midt i overføringen ===
-        // if (active_transfer && active_transfer->active) {
-        
-        //     uint8_t *filedata = payload;
-        //     size_t data_len = payload_len;
-
-        //     fwrite(filedata, 1, data_len, active_transfer->fp);
-        //     active_transfer->received += data_len;
-
-        //     printf("[SERVER][DATA] Wrote %zu bytes (%u/%u total)\n",
-        //         data_len, active_transfer->received, active_transfer->expected_size);
-
-        //     // Fullført?
-        //     if (active_transfer->received >= active_transfer->expected_size) {
-        //         printf("[SERVER] Transfer complete (%u bytes)\n", active_transfer->received);
-        //         fflush(active_transfer->fp);
-        //         fclose(active_transfer->fp);
-        //         active_transfer->active = 0;
-        //         active_transfer = NULL;
-        //     }
-        // }
     }
 
     sleep(1);
