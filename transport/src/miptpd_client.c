@@ -1,5 +1,5 @@
 /*
- *  Enkel MIPTP-klient (file sender)
+ *  MIPTP-klient (file sender)
  *
  *  Formål:
  *  - Leser en fil fra disk og sender den via MIPTPD til en mottaker
@@ -95,8 +95,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Registrerer en tilfeldig port hos MIPTPD
-    // Hvis MIPTPD avviser (eks. allerede i bruk), prøver opptil 3 ganger
-    srand(time(NULL) ^ getpid()); 
+    // Hvis MIPTPD avviser (eks allerede i bruk), prøver opptil 3 ganger
+    srand(time(NULL) ^ getpid()); // gjør unik, hvis ikke blir det kollisjon siden alle starter samtidig
     uint8_t my_port;
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         do { my_port = (rand() % 255) + 1; } while (my_port == dst_port);

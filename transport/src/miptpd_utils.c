@@ -1,10 +1,17 @@
-
 /*
-Ansvar:
-- Sekvensnummer-logikk (inkl. wrap-around)
-- Paddingberegning (for 32-bit justering)
-- Generelle verktøy som brukes av flere filer
-*/
+ * Ansvar:
+ *  - Holder global state for alle app-forbindelser (app_connections[])
+ *  - Registrerer og fjerner apper som kobler til MIPTPD
+ *  - Oppslag mellom fd - port og fd - index
+ *  - Hjelpefunksjoner for inbound- og outbound-transfers:
+ *        - Opprette nye transfers (inbound + outbound)
+ *        - Finne eksisterende transfers
+ *  - Go-Back-N grunnlogikk:
+ *        - Initiering av base_seq og next_seq
+ *        - Håndtering av vindusbuffer for både send og mottak
+ *  - Sekvensnummer- og pad-pakking/oppløsning
+ */
+
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -14,6 +21,7 @@ Ansvar:
 #include <time.h>
 
 #include "miptpd_utils.h"
+#include "miptpd.h"  
 
 app_connection app_connections[MAX_APPS] = {0}; //liste over aktive app forbinndelser
 
@@ -63,74 +71,15 @@ int new_app_connection(int fd, uint8_t port) {
     fprintf(stderr, "[MIPTPD] Connection table full\n");
     return -1;
 }
-
-// int new_app_connection(int fd, uint8_t port) {
-//     for (int i = 0; i < MAX_APPS; i++) {
-//         if (app_connections[i].app_fd == 0) {
-//             app_connections[i].app_fd = fd;
-//             app_connections[i].port = port;
-
-//             // Initialiser Go-Back-N tilstand
-//             app_connections[i].base_seq = rand() % MIPTP_MAX_SEQ; // starter med tilfeldig sekvensnummer, gitt oppgaven
-//             app_connections[i].next_seq = app_connections[i].base_seq;
-//             app_connections[i].window_count = 0;
-
-//             // Initialiser mottaker-tilstand
-//             app_connections[i].expected_seq = 0; // venter på første pakke med seq=0
-//             app_connections[i].synced = 0;
-
-//             app_connections[i].queue_head = 0;
-//             app_connections[i].queue_tail = 0;
-//             app_connections[i].queue_count = 0;
-//             app_connections[i].peer_mip = 0;
-
-
-//             // Nullstill vinduet
-//             for (int j = 0; j < MIPTP_WINDOW_SIZE; j++) {
-//                 app_connections[i].window[j].acked = 1; // tom plass
-//                 app_connections[i].window[j].len = 0;
-//             }
-
-//             printf("[MIPTPD] Registered app fd=%d on port %d (seq start=%u)\n",
-//                    fd, port, app_connections[i].base_seq);
-
-//             return 0;
-//         }
-//     }
-
-//     fprintf(stderr, "[MIPTPD] Connection table full, could not register app fd=%d\n", fd);
-//     return -1;
-// }
-
 /*
-  Fjerner en app fra tabellen når socketen lukkes
-  Nullstiller all tilstand slik at plassen kan brukes på nytt
-*/
-// int remove_app_connection(int fd) {
-//     for (int i = 0; i < MAX_APPS; i++) {
-
-//         app_connection *c = &app_connections[i];
-
-//         if (c->app_fd == fd) {
-//             printf("[MIPTPD] Removing app fd=%d (port=%u)\n",
-//                    fd, c->port);
-
-//             // Markér som inaktiv
-//             c->app_fd = 0;
-//             // Slett outbound transfers
-//             c->outbound_count = 0;
-//             // Slett inbound transfers
-//             c->num_transfers = 0;
-
-//             // (Alt dette ligger i strukturen, så memset kan brukes)
-//             memset(c, 0, sizeof(app_connection));
-
-//             return 0;
-//         }
-//     }
-//     return -1;
-// }
-
+ * Fjerner en app-forbindelse når appens socket lukkes
+ *
+ * - Finner riktig entry basert på fd
+ * - Stopper alle retransmisjoner ved å merke alle uackede vindusplasser som tomme
+ * - Nullstiller outbound- og inbound-transferstate for appen
+ * - Setter app_fd til 0, men lar porten stå slik at ingen andre tar samme port
+ * Returnerer 0 ved suksess
+ */
 int remove_app_connection(int fd) {
     for (int i = 0; i < MAX_APPS; i++) {
 
@@ -140,7 +89,6 @@ int remove_app_connection(int fd) {
             printf("[MIPTPD] Removing app fd=%d (port=%u)\n",
                    fd, c->port);
 
-            // 1. Stopp retransmissions ved å markere alle som ACKED
             for (int t = 0; t < c->outbound_count; t++) {
                 outbound_transfer_state *ot = &c->outbound[t];
                 for (int w = 0; w < MIPTP_WINDOW_SIZE; w++) {
@@ -150,21 +98,15 @@ int remove_app_connection(int fd) {
                 ot->window_count = 0;
             }
 
-            // 2. Nullstill kun det som trengs
             c->app_fd = 0;
             c->outbound_count = 0;
             c->num_transfers = 0;
-
-            // MEN BEHOLD c->port !!!
-            // IKKE bruk memset.
 
             return 0;
         }
     }
     return -1;
 }
-
-
 
 /*
   Returnerer portnummeret som er knyttet til en gitt app_fd
@@ -215,30 +157,39 @@ void hex_debug(const char *prefix, const uint8_t *buf, size_t len) {
     printf("\n");
 }
 
+/*
+    Oppretter en ny inbound-transfer for en app.
+    Brukes når appen mottar data fra en ny avsender (MIP + port) for første gang
+    Setter opp både send- og mottaksdelen av Go-Back-N for denne forbindelsen
+    Holder styr på forventet seq, base_seq og vinduet som skal brukes senere
+*/
 
 transfer_state *create_transfer_state(app_connection *app,
                                       uint8_t src_mip,
                                       uint8_t src_port)
 {
+    // sjekker om appen allerede har maks antall transfers
     if (app->num_transfers >= MAX_TRANSFERS_PER_APP) {
         fprintf(stderr, "Too many transfers for this app\n");
         return NULL;
     }
 
+    // lager en ny transfer i arrayet
     transfer_state *t = &app->transfers[app->num_transfers++];
     memset(t, 0, sizeof(*t));
 
     t->src_mip = src_mip;
     t->src_port = src_port;
 
-    // init GBN send
+      // starter GBN-send side
     t->base_seq = rand() % MIPTP_MAX_SEQ;
     t->next_seq = t->base_seq;
 
+    // marker alle vindusplasser som tomme/ACKed
     for (int i = 0; i < MIPTP_WINDOW_SIZE; i++)
         t->window[i].acked = 1;
 
-    // init GBN receive
+    // init mottaksdelen
     t->expected_seq = 0;
     t->synced = 0;
 
@@ -247,6 +198,11 @@ transfer_state *create_transfer_state(app_connection *app,
     return t;
 }
 
+/*
+    Leter etter en eksisterende inbound-transfer basert på MIP-adresse og port
+    Brukes for å finne riktig forbindelse når det kommer en datapakke fra nettverket
+    Returnerer transferen hvis den finnes, ellers NULL
+*/
 transfer_state *find_transfer(app_connection *app, uint8_t src_mip, uint8_t src_port)
 {
     for (int i = 0; i < app->num_transfers; i++) {
@@ -257,7 +213,12 @@ transfer_state *find_transfer(app_connection *app, uint8_t src_mip, uint8_t src_
     return NULL;
 }
 
-
+/*
+    Finner en outbound-transfer for gitt destinasjon (dst_mip + dst_port)
+    Hvis den finnes - returner eksisterende
+    Hvis ikke - opprett en ny outbound-transfer og initialiser GBN-senderstate
+    Brukes når appen ønsker å sende data til en bestemt MIP/port
+*/
 outbound_transfer_state *
 find_or_create_outbound(app_connection *app,
                         uint8_t dst_mip,
@@ -294,11 +255,18 @@ find_or_create_outbound(app_connection *app,
     return t;
 }
 
+/*
+    Finner en outbound-transfer for gitt destinasjon (dst_mip + dst_port)
+    Hvis den finnes - returner eksisterende
+    Hvis ikke - opprett en ny outbound-transfer og initialiser GBN-senderstate
+    Brukes når appen ønsker å sende data til en bestemt MIP/port
+*/
 outbound_transfer_state *
 find_outbound_for_ack(app_connection *app,
-                      uint8_t ack_src_mip,    // hdr->src_mip = server MIP
-                      uint8_t ack_src_port)   // hdr->src_port = server port (99)
+                      uint8_t ack_src_mip,    
+                      uint8_t ack_src_port)   
 {
+    // leter etter outbound-transfer som matcher avsenderen av ACKen
     for (int i = 0; i < app->outbound_count; i++) {
         outbound_transfer_state *t = &app->outbound[i];
 
@@ -306,10 +274,9 @@ find_outbound_for_ack(app_connection *app,
             t->dst_port == ack_src_port &&
             t->app_fd   == app->app_fd)
         {
-            return t;
+            return t; // fant hvilken transfer ACK hører til
         }
     }
-
     return NULL;
 }
 

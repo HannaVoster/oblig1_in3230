@@ -53,8 +53,8 @@ void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_
 
 
 /*
-  Tar data fra en applikasjon og pakker det inn i en MIPTP PDU.
-  Sender deretter PDU-en til mipd for videresending over nettverket.
+  Tar data fra en applikasjon og pakker det inn i en MIPTP DATA-PDU
+  Startpunktet for outbound transfers fra applikasjonen
 
   Funksjonen håndterer også:
   - Go-Back-N vindustyring
@@ -64,22 +64,25 @@ void send_miptp_ack(uint8_t dst_mip, uint8_t src_port, uint8_t dst_port, uint16_
 
 void send_miptp_data(int app_fd, uint8_t *data, size_t len)
 {
+    // henter ut destinasjonsinfo fra app-meldingen
     uint8_t dst_mip  = data[0];
     uint8_t dst_port = data[1];
     uint8_t *payload = data + 2;
     size_t payload_len = len - 2;
 
+    // finner hvilken app som sendt
     int idx = get_index(app_fd);
     if (idx < 0) return;
 
     app_connection *appc = &app_connections[idx];
 
+    // finner eksisterende transfer eller lager en ny
     outbound_transfer_state *t =
         find_or_create_outbound(appc, dst_mip, dst_port);
 
     if (!t) return;
 
-    // --- Window full → queue ---
+    // vinduet er fullt - legegr SDU i kø
     if ((t->next_seq - t->base_seq) >= MIPTP_WINDOW_SIZE) {
 
         if (t->queue_count >= MIPTP_MAX_QUEUE) {
@@ -96,15 +99,34 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len)
         if(debug_mode) printf("[MIPTPD][QUEUE] Outbound SDU queued (%u:%u)\n", dst_mip, dst_port);
         return;
     }
-
+    // vinduet har plass - sender direkte
     send_miptp_data_on_transfer(appc, t, payload, payload_len);
 }
+
+/*
+  Sender en datapakke på en eksisterende outbound-transfer
+
+  Brukes når:
+    - Vinduet har plass (det er lov å sende nå)
+    - send_miptp_data() enten starter sending direkte
+    - eller tømmer køen etter at ACKer har åpnet vinduet
+
+  Funksjonen:
+    - Tildeler sekvensnummer (seq = next_seq)
+    - Bygger en MIPTP DATA-PDU (header + payload)
+    - Lagrer PDU i windowbuffer for eventuell retransmisjon
+    - Oppdaterer vindutellere og tidsstempel
+    - Sender pakken til mipd via send_miptp_pdu()
+
+  kjernen i Go-Back-N-senderlogikken
+*/
 
 void send_miptp_data_on_transfer(app_connection *appc,
                                  outbound_transfer_state *t,
                                  uint8_t *payload,
                                  size_t payload_len)
 {
+    // henter ut info fra transfer
     uint8_t dst_mip  = t->dst_mip;
     uint8_t dst_port = t->dst_port;
     uint8_t src_port = appc->port;
@@ -114,10 +136,11 @@ void send_miptp_data_on_transfer(app_connection *appc,
         printf("[MIPTPD][BUG] send_miptp_data_on_transfer() called but window full!\n");
         return;
     }
-
+    // tildeler neste sekvensnummer og øker telleren
     uint16_t seq = t->next_seq;
     t->next_seq = (t->next_seq + 1) % MIPTP_MAX_SEQ;
 
+    // bygger selve PDU-en (header + payload)
     size_t pdu_len;
     uint8_t *pdu =
         build_data_pdu(src_port, dst_port, seq, payload, payload_len, &pdu_len);
@@ -133,7 +156,7 @@ void send_miptp_data_on_transfer(app_connection *appc,
     if(debug_mode) printf("[MIPTPD][SEND] seq=%u → %d:%d (%zu bytes, slot=%d)\n",
        seq, dst_mip, dst_port, payload_len, slot);
 
-
+    // sender PDU-en ned til mipd
     send_miptp_pdu(dst_mip, pdu, pdu_len);
     free(pdu);
 }

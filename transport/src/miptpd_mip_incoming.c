@@ -4,6 +4,8 @@
  *  - Skiller mellom datapakker (DATA-PDU) og kvitteringer (ACK-PDU)
  *  - Oppdaterer Go-Back-N vinduet ved ACK
  *  - Leverer in-order data til riktig applikasjon
+ *  - Håndterer flere samtidige inbound og outbound transfers per app
+ *  - Bruker src_mip + src_port til å identifisere riktig transfer
  */
 
 #include "miptpd_incoming.h"
@@ -98,7 +100,8 @@ void handle_incoming_ack(miptp_hdr_t *hdr, uint16_t seq, uint8_t src_mip) {
 
     // --- Flytter vindu fremover ---
     uint16_t old_base = t->base_seq;
-    t->base_seq = (seq + 1) % MIPTP_MAX_SEQ;  // ACK indikerer at alle pakker opp til seq er mottatt
+    t->base_seq = (seq + 1) % MIPTP_MAX_SEQ;     // ACK betyr at alle sekvenser opp til og med `seq` er mottatt
+                                                // Oppdaterer base_seq for akkurat denne transferen (src_mip, src_port)
 
     if (t->base_seq != old_base && debug_mode) {
         if(debug_mode) printf("[MIPTPD][GBN] Window advanced → base=%u\n", t->base_seq);
@@ -161,20 +164,24 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     if (idx < 0) return;
     app_connection *appc = &app_connections[idx];
 
+    // Finner eksisterende inbound-transfer basert på (src_mip, src_port)
+    // Hvis dette er en ny avsender (ny fil), opprettes en ny transfer
     transfer_state *t = find_transfer(appc, src_mip, src_port);
     if (!t) {
         t = create_transfer_state(appc, src_mip, src_port);
         printf("[MIPTPD] New inbound transfer %d:%d → port %d\n",
             src_mip, src_port, dst_port);
 
+        // Legger på metadata (src_mip, src_port) slik at applikasjonen kan vite
+        // hvilken avsenders transfer denne pakken kommer fra
         uint8_t ctrl_msg[3] = {0xFF, src_mip, src_port};
         write(app, ctrl_msg, 3);
     }
 
     // Init synkronisering på første mottatte pakke
     if (!t->synced) {
-        t->expected_seq = seq; // Setter forventet sekvensnummer til neste etter den som nettopp ble mottatt
-        t->synced = 1;                               // Merker forbindelsen som “synkronisert” (klar for Go-Back-N)
+        t->expected_seq = seq; // forventer at første pakke i en ny transfer har dette sekvensnummeret
+        t->synced = 1;         // Merker forbindelsen som “synkronisert” (klar for Go-Back-N)
 
         if(debug_mode) printf("[MIPTPD][INIT] First packet seq=%u → synced\n", seq);
     }

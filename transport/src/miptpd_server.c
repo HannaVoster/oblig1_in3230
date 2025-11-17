@@ -1,5 +1,5 @@
 /*
- *  Enkel MIPTP filmottaker (server)
+ *  MIPTP filmottaker (server)
  *
  *  Formål:
  *  - Tar imot filer via MIPTPD og lagrer dem til disk
@@ -23,7 +23,7 @@
 /*
  *  transfer_t
  *
- *  Holder informasjon om én aktiv filoverføring.
+ *  Holder informasjon om én aktiv filoverføring
  *  Hver avsender (src_mip, src_port) får sin egen entry i tabellen
  */
 typedef struct {
@@ -57,9 +57,9 @@ transfer_t *find_transfer(uint8_t src_mip, uint8_t src_port) {
 /*
  *  create_transfer()
  *
- *  Oppretter en ny overføring i første ledige slot.
+ *  Oppretter en ny overføring i første ledige slot
  *  Lager en ny fil med navn "incoming_<src_mip>_<src_port>" (gitt fra oppgaven) i valgt katalog
- *  Returnerer peker til den nye overføringen.
+ *  Returnerer peker til den nye overføringen
  */
 transfer_t *create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) {
     for (int i = 0; i < MAX_TRANSFERS; i++) {
@@ -96,9 +96,9 @@ transfer_t *create_transfer(uint8_t src_mip, uint8_t src_port, const char *dir) 
 /*
  *  main()
  *
- *  Starter serveren.
+ *  Starter serveren
  *  Kobler til MIPTPD, registrerer portnummer, og går deretter inn i evig løkke
- *  som tar imot pakker fra MIPTPD (både kontrollmeldinger og data).
+ *  som tar imot pakker fra MIPTPD (både kontrollmeldinger og data)
  */
 
 int main(int argc, char *argv[]) {
@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // === fildata ===
+        // === fildata ====
         fwrite(payload, 1, payload_len, t->fp);
         t->received += payload_len;
 
@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
 
         // == filoverføring ferdig ==
         if (t->expected_size && t->received >= t->expected_size) {
-            printf("[SERVER] Transfer ---COMPLETE--- from %u:%u (%u bytes)\n",
+            printf("[SERVER] Transfer <---COMPLETE---> from %u:%u (%u bytes)\n",
                 t->src_mip, t->src_port, t->received);
             fclose(t->fp);
             t->fp = NULL;

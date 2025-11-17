@@ -4,7 +4,6 @@
  *    ved Go-Back-N timeout
  *  - Sikre pålitelig levering ved å sende uackede pakker på nytt
  *    dersom tidsfristen overskrides
- *  - Kalles periodisk fra main-løkken i MIPTP-daemonen
  */
 
 #include <time.h>
@@ -16,11 +15,11 @@
 #include "miptpd_send.h"
 
 /*
-    Sjekker alle aktive forbindelser (app_connections) for
-    pakker som ikke har blitt ACKet innen tidsfristen (timeout).
+    Sjekker alle aktive forbindelser for
+    pakker som ikke har blitt ACKet innen tidsfristen (timeout)
     Dersom den første uackede pakken i vinduet har gått ut på tid,
     utføres Go-Back-N retransmisjon — dvs. alle uackede pakker
-    i vinduet sendes på nytt.
+    i vinduet sendes på nytt
 
     Kalles periodisk fra main-løkken
 */

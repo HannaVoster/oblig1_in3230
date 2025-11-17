@@ -31,7 +31,7 @@
 
 
 #define MAX_EVENTS 32
-int debug_mode = 0;
+int debug_mode = 0; //flagg
 int MIP_FD; // global referanse til mipd-socket
 
 // ......Main .....
@@ -203,7 +203,6 @@ void run_event_loop(int epollfd, int mip_fd, int app_listen_fd) {
                 handle_app_message(fd);
             }
         }
-
         check_retransmissions();
     }
 }
@@ -250,7 +249,7 @@ void handle_new_app_connection(int app_listen_fd, int epollfd) {
         return;
     }
 
-    if (new_app_connection(new_fd, port) == 0){
+    if (new_app_connection(new_fd, port) == 0){ //miptpd_utils.c
         if(debug_mode) printf("[MIPTPD] Registered app on port %d (fd=%d)\n", port, new_fd);
     }
     else {
@@ -305,7 +304,7 @@ void handle_app_message(int fd)
     if (len <= 0) {
         // Venter litt for å la outstanding ACKs komme inn
         int waits = 0;
-        const int MAX_WAITS = 2;   // ca. 400 ms totalt
+        const int MAX_WAITS = 2; 
 
         while (waits < MAX_WAITS) {
             int outstanding = 0;
@@ -322,7 +321,7 @@ void handle_app_message(int fd)
             if (!outstanding)
                 break;
 
-            // Venter litt og prøv igjen
+            // Venter litt og prøver igjen
             struct timespec ts = {0, 200 * 1000000};
             nanosleep(&ts, NULL);
             waits++;
@@ -335,10 +334,9 @@ void handle_app_message(int fd)
         close(fd);
         return;
     }
-    // Vanlig data fra app - send som MIPTP
+    // Vanlig data fra app - sender som MIPTP
     send_miptp_data(fd, buf, len);
 }
-
 
 /*
   Lukker alle åpne file descriptors og skriver ut en avslutningsmelding.
@@ -348,6 +346,6 @@ void cleanup(int epollfd, int mip_fd, int app_listen_fd) {
     close(epollfd);
     close(mip_fd);
     close(app_listen_fd);
-    printf("[MIPTPD] Shutting down.\n");
+    printf("[MIPTPD] Shutting down\n");
 }
 
