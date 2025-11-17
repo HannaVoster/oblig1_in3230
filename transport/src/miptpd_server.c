@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
 
         // == filoverføring ferdig ==
         if (t->expected_size && t->received >= t->expected_size) {
-            printf("[SERVER] Transfer complete from %u:%u (%u bytes)\n",
+            printf("[SERVER] Transfer ---COMPLETE--- from %u:%u (%u bytes)\n",
                 t->src_mip, t->src_port, t->received);
             fclose(t->fp);
             t->fp = NULL;
