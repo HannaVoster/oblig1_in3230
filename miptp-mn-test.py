@@ -176,20 +176,21 @@
 #!/usr/bin/env python3
 """
 Three-node Mininet test for IN3230/IN4230 MIPTP implementation
-Matches the teacher’s HE2 testing logic:
+
+Testmønster inspirert av HE2:
  - A → B
  - C → B
- - A → B and C → B simultaneously
- - B → B (self transfer)
+ - A → B og C → B samtidig
+ - B → B (self-transfer)
 """
 
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.term import tunnelX11
-import time, os, signal, hashlib
+import time, os, signal
 
-# Dynamically detect absolute path to ./bin
-BASE = os.path.abspath(os.getcwd())
+# Finn absolutt path til bin/-mappa relativt til dette scriptet
+BASE = os.path.dirname(os.path.abspath(__file__))
 BIN = os.path.join(BASE, "bin")
 
 terms = []
@@ -203,7 +204,7 @@ class ThreeNodeTopo(Topo):
         B = self.addHost("B")
         C = self.addHost("C")
 
-        # Simple chain: A — B — C
+        # Enkel kjede: A — B — C
         self.addLink(A, B, bw=10, delay="10ms")
         self.addLink(B, C, bw=10, delay="10ms")
 
@@ -229,50 +230,62 @@ def init_he2(self, line):
     B = net.get("B")
     C = net.get("C")
 
-    print("\n=== Launching 3-node HE2 MIPTP test ===")
+    print("\n=== Launching 3-node MIPTP test ===")
     print(f"Binary path: {BIN}")
 
-    # Cleanup old incoming files
-    B.cmd("rm -f /tmp/incoming_*")
-    C.cmd("rm -f /tmp/incoming_*")
-    A.cmd("rm -f /tmp/incoming_*")
+    # Rydd vekk gamle incoming-filer
+    for host in (A, B, C):
+        host.cmd("rm -f /tmp/incoming_*")
 
-    # --- Start mipd ---
-    open_term(A, "MIPD A", "80x14+0+0", f"{BIN}/mipd -d {BIN}/usockA 1")
+    # --- Start mipd (socket-navn er bare 'usockX') ---
+    open_term(A, "MIPD A", "80x14+0+0",
+              f"cd {BIN} && ./mipd -d usockA 1")
     time.sleep(2)
-    open_term(B, "MIPD B", "80x14+480+0", f"{BIN}/mipd -d {BIN}/usockB 2")
+
+    open_term(B, "MIPD B", "80x14+480+0",
+              f"cd {BIN} && ./mipd -d usockB 2")
     time.sleep(2)
-    open_term(C, "MIPD C", "80x14+960+0", f"{BIN}/mipd -d {BIN}/usockC 3")
+
+    open_term(C, "MIPD C", "80x14+960+0",
+              f"cd {BIN} && ./mipd -d usockC 3")
     time.sleep(3)
 
     # --- Start routingd ---
-    open_term(A, "ROUTING A", "80x14+0+220", f"{BIN}/routingd -d {BIN}/usockA")
-    open_term(B, "ROUTING B", "80x14+480+220", f"{BIN}/routingd -d {BIN}/usockB")
-    open_term(C, "ROUTING C", "80x14+960+220", f"{BIN}/routingd -d {BIN}/usockC")
+    open_term(A, "ROUTING A", "80x14+0+220",
+              f"cd {BIN} && ./routingd -d usockA")
+    open_term(B, "ROUTING B", "80x14+480+220",
+              f"cd {BIN} && ./routingd -d usockB")
+    open_term(C, "ROUTING C", "80x14+960+220",
+              f"cd {BIN} && ./routingd -d usockC")
     time.sleep(3)
 
-    # --- Start miptpd ---
-    open_term(A, "MIPTPD A", "80x14+0+440", f"{BIN}/miptpd -d {BIN}/usockA {BIN}/appA.sock")
+    # --- Start miptpd (app-socket ligger i bin/, men vi bruker bare navn) ---
+    open_term(A, "MIPTPD A", "80x14+0+440",
+              f"cd {BIN} && ./miptpd -d usockA appA.sock")
     time.sleep(1)
-    open_term(B, "MIPTPD B", "80x14+480+440", f"{BIN}/miptpd -d {BIN}/usockB {BIN}/appB.sock")
+
+    open_term(B, "MIPTPD B", "80x14+480+440",
+              f"cd {BIN} && ./miptpd -d usockB appB.sock")
     time.sleep(1)
-    open_term(C, "MIPTPD C", "80x14+960+440", f"{BIN}/miptpd -d {BIN}/usockC {BIN}/appC.sock")
+
+    open_term(C, "MIPTPD C", "80x14+960+440",
+              f"cd {BIN} && ./miptpd -d usockC appC.sock")
     time.sleep(3)
 
-    # --- Server on B ---
+    # --- File transfer server på B (lytter på appB.sock, lagrer i /tmp) ---
     open_term(B, "SERVER B", "80x20+480+660",
-              f"cd {BIN} && sudo ./miptpd_server 99 {BIN}/appB.sock /tmp")
+              f"cd {BIN} && sudo ./miptpd_server 99 appB.sock /tmp")
     time.sleep(3)
 
     print("\n=== TEST COMMANDS READY ===")
-    print("Use:")
+    print("I Mininet-CLI kan du bruke:")
+    print("  init_he2            # (allerede kjørt nå)")
     print("  send_A_to_B")
     print("  send_C_to_B")
     print("  send_A_C_parallel")
     print("  send_B_to_B")
     print("  check_incoming")
     print()
-    print("Open a new Mininet CLI and run those commands.\n")
 
 
 # ===== TRANSFER COMMANDS =====
@@ -283,7 +296,7 @@ def send_A_to_B(self, line):
     print("\n=== A → B ===")
     A.cmd(f"cd {BIN} && dd if=/dev/urandom of=Afile.dat bs=1K count=64")
     open_term(A, "A→B", "80x20+0+660",
-              f"cd {BIN} && ./miptpd_client Afile.dat 2 99 {BIN}/appA.sock")
+              f"cd {BIN} && ./miptpd_client Afile.dat 2 99 appA.sock")
 
 
 def send_C_to_B(self, line):
@@ -293,7 +306,7 @@ def send_C_to_B(self, line):
     print("\n=== C → B ===")
     C.cmd(f"cd {BIN} && dd if=/dev/urandom of=Cfile.dat bs=1K count=64")
     open_term(C, "C→B", "80x20+960+660",
-              f"cd {BIN} && ./miptpd_client Cfile.dat 2 99 {BIN}/appC.sock")
+              f"cd {BIN} && ./miptpd_client Cfile.dat 2 99 appC.sock")
 
 
 def send_A_C_parallel(self, line):
@@ -310,7 +323,7 @@ def send_B_to_B(self, line):
     print("\n=== B → B self-loop ===")
     B.cmd(f"cd {BIN} && dd if=/dev/urandom of=Bself.dat bs=1K count=64")
     open_term(B, "B→B", "80x20+480+880",
-              f"cd {BIN} && ./miptpd_client Bself.dat 2 99 {BIN}/appB.sock")
+              f"cd {BIN} && ./miptpd_client Bself.dat 2 99 appB.sock")
 
 
 # ===== CHECK FILES =====
@@ -319,7 +332,6 @@ def check_incoming(self, line):
     B = net.get("B")
 
     print("\n=== Checking incoming files on B ===")
-
     files = B.cmd("ls /tmp/incoming_* 2>/dev/null").split()
     if not files:
         print("No incoming files found.")
@@ -336,13 +348,13 @@ def do_EOF(self, line):
     for t in terms:
         try:
             os.kill(t.pid, signal.SIGKILL)
-        except:
+        except Exception:
             pass
     return orig_EOF(self, line)
 
 CLI.do_EOF = do_EOF
 
-# Register commands
+# Register CLI-kommandoer
 CLI.do_init_he2 = init_he2
 CLI.do_send_A_to_B = send_A_to_B
 CLI.do_send_C_to_B = send_C_to_B
@@ -350,4 +362,5 @@ CLI.do_send_A_C_parallel = send_A_C_parallel
 CLI.do_send_B_to_B = send_B_to_B
 CLI.do_check_incoming = check_incoming
 
+# Toponavn brukt av mn --topo
 topos = {"he2": (lambda: ThreeNodeTopo())}
