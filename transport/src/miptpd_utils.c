@@ -97,6 +97,31 @@ int new_app_connection(int fd, uint8_t port) {
   Fjerner en app fra tabellen når socketen lukkes
   Nullstiller all tilstand slik at plassen kan brukes på nytt
 */
+// int remove_app_connection(int fd) {
+//     for (int i = 0; i < MAX_APPS; i++) {
+
+//         app_connection *c = &app_connections[i];
+
+//         if (c->app_fd == fd) {
+//             printf("[MIPTPD] Removing app fd=%d (port=%u)\n",
+//                    fd, c->port);
+
+//             // Markér som inaktiv
+//             c->app_fd = 0;
+//             // Slett outbound transfers
+//             c->outbound_count = 0;
+//             // Slett inbound transfers
+//             c->num_transfers = 0;
+
+//             // (Alt dette ligger i strukturen, så memset kan brukes)
+//             memset(c, 0, sizeof(app_connection));
+
+//             return 0;
+//         }
+//     }
+//     return -1;
+// }
+
 int remove_app_connection(int fd) {
     for (int i = 0; i < MAX_APPS; i++) {
 
@@ -106,21 +131,30 @@ int remove_app_connection(int fd) {
             printf("[MIPTPD] Removing app fd=%d (port=%u)\n",
                    fd, c->port);
 
-            // Markér som inaktiv
+            // 1. Stopp retransmissions ved å markere alle som ACKED
+            for (int t = 0; t < c->outbound_count; t++) {
+                outbound_transfer_state *ot = &c->outbound[t];
+                for (int w = 0; w < MIPTP_WINDOW_SIZE; w++) {
+                    ot->window[w].acked = 1;
+                    ot->window[w].len = 0;
+                }
+                ot->window_count = 0;
+            }
+
+            // 2. Nullstill kun det som trengs
             c->app_fd = 0;
-            // Slett outbound transfers
             c->outbound_count = 0;
-            // Slett inbound transfers
             c->num_transfers = 0;
 
-            // (Alt dette ligger i strukturen, så memset kan brukes)
-            memset(c, 0, sizeof(app_connection));
+            // MEN BEHOLD c->port !!!
+            // IKKE bruk memset.
 
             return 0;
         }
     }
     return -1;
 }
+
 
 
 /*
