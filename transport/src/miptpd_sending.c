@@ -17,7 +17,7 @@
 
 /*
   Sender en ferdigbygget MIPTP-PDU til MIP-daemonen
-  Legger på MIP-routing-header (MIP + TTL) før utsending via UNIX-socket
+  Legger på MIP-routing-header (MIP + TTL) før utsending via UNIX-socket (samme som hjemmeeksamen 1)
 */
 void send_miptp_pdu(uint8_t dst_mip, uint8_t *miptp_pdu, size_t pdu_len) {
     uint8_t ttl = 10; 
@@ -117,8 +117,6 @@ void send_miptp_data(int app_fd, uint8_t *data, size_t len)
     - Lagrer PDU i windowbuffer for eventuell retransmisjon
     - Oppdaterer vindutellere og tidsstempel
     - Sender pakken til mipd via send_miptp_pdu()
-
-  kjernen i Go-Back-N-senderlogikken
 */
 
 void send_miptp_data_on_transfer(app_connection *appc,
@@ -131,7 +129,7 @@ void send_miptp_data_on_transfer(app_connection *appc,
     uint8_t dst_port = t->dst_port;
     uint8_t src_port = appc->port;
 
-    // vindu fullt bør aldri skje
+    // vindu fullt (bør aldri skje hvis denne kalles)
     if ((t->next_seq - t->base_seq) >= MIPTP_WINDOW_SIZE) {
         printf("[MIPTPD][BUG] send_miptp_data_on_transfer() called but window full!\n");
         return;

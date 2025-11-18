@@ -26,8 +26,8 @@
  *  - Pakker ut headeren og identifiserer om den er DATA eller ACK
  *
  *  Parametere:
- *      buf     - hele mottatte PDU fra mipd
- *      len     - total lengde på pakken
+ *      buf - hele mottatte PDU fra mipd
+ *      len - total lengde på pakken
  *      src_mip - MIP-adressen til avsender
  *
  *  Logikk:
@@ -212,8 +212,7 @@ void handle_incoming_data(miptp_hdr_t *hdr, uint8_t *payload, size_t len,
     msg[1] = hdr->src_port;     // kildeport, hvilken port på avsender
     memcpy(msg + 2, payload, len);
 
-    if (len >= pad) len -= pad;
-    //ssize_t sent = write(app, payload, len);  
+    if (len >= pad) len -= pad; 
     ssize_t sent = write(app, msg, len + 2);  
 
     if (sent > 0)

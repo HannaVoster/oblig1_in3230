@@ -6,7 +6,7 @@
  *  - Hjelpefunksjoner for inbound- og outbound-transfers:
  *        - Opprette nye transfers (inbound + outbound)
  *        - Finne eksisterende transfers
- *  - Go-Back-N grunnlogikk:
+ *  - Go-Back-N:
  *        - Initiering av base_seq og next_seq
  *        - Håndtering av vindusbuffer for både send og mottak
  *  - Sekvensnummer- og pad-pakking/oppløsning
@@ -26,8 +26,8 @@
 app_connection app_connections[MAX_APPS] = {0}; //liste over aktive app forbinndelser
 
 /*
-  Pakker sammen sekvensnummer og pad-lengde i ett 16-bit-felt.
-  Øverste 2 bits brukes til pad, nederste 14 til sekvensnummer.
+  Pakker sammen sekvensnummer og pad-lengde i ett 16-bit-felt
+  Øverste 2 bits brukes til pad, nederste 14 til sekvensnummer
 */
 uint16_t pack_seq_pad(uint16_t seq, uint8_t padlen) {
     return ((padlen & 0x03) << 14) | (seq & 0x3FFF);
@@ -135,8 +135,8 @@ int get_fd_from_port(uint8_t port) {
 }
 
 /*
-  Finner indexen i app_connections-tabellen for en gitt fd.
-  Returnerer -1 hvis ingen match finnes.
+  Finner indexen i app_connections-tabellen for en gitt fd
+  Returnerer -1 hvis ingen match finnes
 */
 int get_index(int fd){
     for (int i = 0; i < MAX_APPS; i++) {
@@ -145,16 +145,6 @@ int get_index(int fd){
     }
     fprintf(stderr, "[MIPTPD] No index found for fd=%d\n", fd);
     return -1;
-}
-
-
-void hex_debug(const char *prefix, const uint8_t *buf, size_t len) {
-    printf("%s (len=%zu): ", prefix, len);
-    size_t show = len < 16 ? len : 16;
-    for (size_t i = 0; i < show; i++)
-        printf("%02x ", buf[i]);
-    if (len > 16) printf("...");
-    printf("\n");
 }
 
 /*

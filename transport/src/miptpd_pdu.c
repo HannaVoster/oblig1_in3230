@@ -19,7 +19,7 @@
     - SDU (Service Data Unit) fra applikasjonen
     - Padding slik at total lengde blir 32-bit aligned
 
-  Returnerer en allokert buffer (må frigjøres av kallende funksjon).
+  Returnerer en buffer (må frigjøres av kallende funksjon)
 */
 uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
                         uint16_t seq, const uint8_t *sdu, size_t sdu_len,
@@ -55,9 +55,9 @@ uint8_t *build_data_pdu(uint8_t src_port, uint8_t dst_port,
 }
 
 /*
-  Bygger en MIPTP ACK-PDU (uten nyttelast).
+  Bygger en MIPTP ACK-PDU (uten payload)
   Inneholder kun header med sekvensnummeret som bekreftes,
-  samt eventuell padding for 32-bit alignment.
+  samt eventuell padding for 32-bit alignment
 */
 uint8_t *build_ack_pdu(uint8_t src_port, uint8_t dst_port,
                        uint16_t seq, size_t *out_len)

@@ -1,6 +1,5 @@
-# ================================
+
 # Makefile for transport-laget (MIPTP)
-# ================================
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -g -Iinclude
@@ -9,9 +8,7 @@ SRC_DIR = src
 
 TARGETS = $(BIN_DIR)/miptpd \
            $(BIN_DIR)/miptpd_client \
-           $(BIN_DIR)/miptpd_server \
-           $(BIN_DIR)/test_app \
-           $(BIN_DIR)/test_server
+           $(BIN_DIR)/miptpd_server
 
 all: $(BIN_DIR) $(TARGETS)
 
@@ -40,19 +37,10 @@ $(BIN_DIR)/miptpd_client: $(SRC_DIR)/miptpd_client.c
 $(BIN_DIR)/miptpd_server: $(SRC_DIR)/miptpd_server.c
 	$(CC) $(CFLAGS) -o $@ $^
 
-# Tester
-$(BIN_DIR)/test_app: $(SRC_DIR)/test_app.c
-	$(CC) $(CFLAGS) -o $@ $^
-
-$(BIN_DIR)/test_server: $(SRC_DIR)/test_server.c
-	$(CC) $(CFLAGS) -o $@ $^
-
 # Rydd opp
 clean:
 	rm -f $(BIN_DIR)/miptpd \
 	      $(BIN_DIR)/miptpd_client \
-	      $(BIN_DIR)/miptpd_server \
-	      $(BIN_DIR)/test_app \
-	      $(BIN_DIR)/test_server
+	      $(BIN_DIR)/miptpd_server 
 
 

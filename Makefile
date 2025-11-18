@@ -8,7 +8,7 @@ all:
 	$(MAKE) -C transport
 	$(MAKE) install
 
-# Kopier binærfiler til prosjektroten (for kompatibilitet med testskript)
+# Kopier binærfiler til prosjektroten 
 install:
 	cp -u bin/mipd .
 	cp -u bin/miptpd .
@@ -17,13 +17,11 @@ install:
 	cp -u bin/ping_client .
 	cp -u bin/ping_server .
 	cp -u bin/routingd .
-	cp -u bin/test_app .
-	cp -u bin/test_server .
 
 # Rydd opp i alt
 clean:
 	$(MAKE) -C mipd_and_routing clean
 	$(MAKE) -C transport clean
-	rm -f mipd miptpd miptpd_client miptpd_server ping_client ping_server routingd test_app test_server
+	rm -f mipd miptpd miptpd_client miptpd_server ping_client ping_server routingd 
 
 

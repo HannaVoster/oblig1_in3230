@@ -13,8 +13,8 @@
  *
  *  Inneholder:
  *   - Globale konstanter
- *   - Datastrukturer brukt på tvers av moduler
- *   - Globale variabler (extern)
+ *   - Datastrukturer brukt på tvers av prosjektet
+ *   - Globale variabler
  */
 
 // Konstanter og begrensninger
@@ -30,16 +30,10 @@
 extern int debug_mode;   // styrer logging, settes som flagg til main
 extern int MIP_FD;       // file descriptor til mipd-socket
 
-
 // Datastrukturer
 
 #define MAX_TRANSFERS_PER_APP 64
 #define MAX_OUT_TRANSFERS 32
-
-typedef struct {
-    uint8_t src_mip;
-    uint8_t src_port;
-} transfer_key;
 
 // MIPTP-header (brukes både ved bygging og parsing)
 typedef struct {
@@ -48,7 +42,7 @@ typedef struct {
     uint16_t seq_pad; // [sequence number (14 bits) | pad length (2 bits)]
 } __attribute__((packed)) miptp_hdr_t;
 
-// Oppføring i Go-Back-N sendvindu
+// Oppføring i Go-Back-N window
 typedef struct {
     uint8_t  data[1500];
     ssize_t  len;
@@ -63,9 +57,10 @@ typedef struct {
     size_t  len;
 } queued_packet;
 
-
+// transfer state holder på inbound state
+// brukes når den andre siden starter en transfer
 typedef struct {
-    // Identifikasjon av denne forbindelsen
+    // Identifikasjon av forbindelsen
     uint8_t src_mip;
     uint8_t src_port;
 
@@ -84,11 +79,10 @@ typedef struct {
     // GBN RECEIVE-STATE (per transfer)
     uint16_t expected_seq;
     int synced;
-
-    //time_t last_activity;  ´
 } transfer_state;
 
-
+// holder på outbound state
+// brukes når egen miptp starter en transfer 
 typedef struct {
     int app_fd;
     uint8_t dst_mip;
@@ -107,7 +101,8 @@ typedef struct {
 
 } outbound_transfer_state;
 
-
+// apper registreres her når de først kobles til
+// apper kan ha flere transfers, både inbound og outbound, denne strukturen holder på disse
 typedef struct {
     int app_fd;
     uint8_t port;  // dst_port
@@ -117,14 +112,13 @@ typedef struct {
 
     outbound_transfer_state outbound[MAX_OUT_TRANSFERS];
     int outbound_count;
-    int registered;
+    int registered; //flagg som sikrer at registrering ikke skjer flere ganger
 } app_connection;
 
 // Global tabell for aktive app-tilkoblinger
 extern app_connection app_connections[MAX_APPS];
 
 // Grunnfunksjoner fra miptpd.c
-
 void parse_socket_paths(char *mipd_arg, char *app_arg,
                         char *mipd_path, char *app_path);
 void handle_flags(int argc, char *argv[]);

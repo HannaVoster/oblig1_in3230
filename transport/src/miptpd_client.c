@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     else
         strncpy(socket_path, socket_arg, sizeof(socket_path) - 1);
 
-    // Viser MD5-hash av filen (for verifisering etterpå)
+    // Viser MD5-hash av filen (for ev verifisering etterpå)
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "md5sum %s", filename);
     printf("[CLIENT] Checking source file hash:\n");
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 
     // Registrerer en tilfeldig port hos MIPTPD
     // Hvis MIPTPD avviser (eks allerede i bruk), prøver opptil 3 ganger
-    srand(time(NULL) ^ getpid()); // gjør unik, hvis ikke blir det kollisjon siden alle starter samtidig
+    srand(time(NULL) ^ getpid()); // OBS, getpid -> gjør unik, hvis ikke blir det kollisjon/samme port siden alle kleinter i script starter samtidig
     uint8_t my_port;
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         do { my_port = (rand() % 255) + 1; } while (my_port == dst_port);

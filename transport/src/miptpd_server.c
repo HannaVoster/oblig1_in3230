@@ -23,14 +23,14 @@
 /*
  *  transfer_t
  *
- *  Holder informasjon om én aktiv filoverføring
+ *  Holder informasjon om en aktiv filoverføring
  *  Hver avsender (src_mip, src_port) får sin egen entry i tabellen
  */
 typedef struct {
     uint8_t src_mip;
     uint8_t src_port;
     FILE *fp;
-    uint32_t expected_size;
+    uint32_t expected_size; // vet når fullført
     uint32_t received;
     int active;
 } transfer_t;
@@ -167,9 +167,9 @@ int main(int argc, char *argv[]) {
         }
 
         // === vanlig datapakke ===
-        uint8_t src_mip = buf[0];
+        uint8_t src_mip = buf[0]; 
         uint8_t src_port = buf[1];
-        uint8_t *payload = buf + 2;
+        uint8_t *payload = buf + 2; //fjerner metadata, skal ikke skrives til fil
         size_t payload_len = n - 2;
 
         // Finner hvilken overføring som pakken tilhører
@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
             printf("[SERVER] Transfer <---COMPLETE---> from %u:%u (%u bytes)\n",
                 t->src_mip, t->src_port, t->received);
             fclose(t->fp);
-            t->fp = NULL;
+            t->fp = NULL; // nullstiller 
             t->active = 0;
         }
     }

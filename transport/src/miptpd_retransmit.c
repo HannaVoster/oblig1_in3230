@@ -3,7 +3,7 @@
  *  - Overvåke alle aktive forbindelser og håndtere retransmisjon
  *    ved Go-Back-N timeout
  *  - Sikre pålitelig levering ved å sende uackede pakker på nytt
- *    dersom tidsfristen overskrides
+ *    dersom tidsfristen går ut
  */
 
 #include <time.h>
@@ -18,7 +18,7 @@
     Sjekker alle aktive forbindelser for
     pakker som ikke har blitt ACKet innen tidsfristen (timeout)
     Dersom den første uackede pakken i vinduet har gått ut på tid,
-    utføres Go-Back-N retransmisjon — dvs. alle uackede pakker
+    utføres Go-Back-N retransmisjon — dvs alle uackede pakker
     i vinduet sendes på nytt
 
     Kalles periodisk fra main-løkken

@@ -1,11 +1,9 @@
 /*
- * 
  *  Ansvar:
  *  - Opprette og håndtere UNIX domain sockets brukt av MIPTP-daemonen
  *  - Koble til MIP-daemon (mipd)
  *  - Vente på at nødvendige socket-filer blir tilgjengelige
  *  - Opprette server-socket for applikasjoner (f.eks. MIPTP-klienter)
- * 
  */
 
 #include <stdio.h>
