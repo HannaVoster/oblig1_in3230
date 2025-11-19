@@ -75,35 +75,35 @@ def init_miptp_multi(self, line):
 
     print("\n=== Starting MIP daemons ===")
     terms.append(openTerm(self, A, "MIPD [A]", "80x14+0+0",
-                          "./bin/mipd -d usockA 1"))
+                          "./mipd -d usockA 1"))
     time.sleep(1)
     terms.append(openTerm(self, B, "MIPD [B]", "80x14+555+0",
-                          "./bin/mipd -d usockB 2"))
+                          "./mipd -d usockB 2"))
     time.sleep(1)
     terms.append(openTerm(self, C, "MIPD [C]", "80x14+1110+0",
-                          "./bin/mipd -d usockC 3"))
+                          "./mipd -d usockC 3"))
     time.sleep(3)
 
     print("\n=== Starting routing daemons ===")
     terms.append(openTerm(self, A, "ROUTING [A]", "80x14+0+220",
-                          ".bin//routingd -d usockA"))
+                          "./routingd -d usockA"))
     time.sleep(1)
     terms.append(openTerm(self, B, "ROUTING [B]", "80x14+555+220",
-                          "./bin/routingd -d usockB"))
+                          "./routingd -d usockB"))
     time.sleep(1)
     terms.append(openTerm(self, C, "ROUTING [C]", "80x14+1110+220",
-                          "./bin/routingd -d usockC"))
+                          "./routingd -d usockC"))
     time.sleep(3)
 
     print("\n=== Starting MIPTP daemons ===")
     terms.append(openTerm(self, A, "MIPTPD [A]", "80x14+0+440",
-                          "./bin/miptpd -d usockA miptp_appA.sock"))
+                          "./miptpd -d usockA miptp_appA.sock"))
     time.sleep(1)
     terms.append(openTerm(self, B, "MIPTPD [B]", "80x14+555+440",
-                          "./bin/miptpd -d usockB miptp_appB.sock"))
+                          "./miptpd -d usockB miptp_appB.sock"))
     time.sleep(1)
     terms.append(openTerm(self, C, "MIPTPD [C]", "80x14+1110+440",
-                          "./bin/miptpd -d usockC miptp_appC.sock"))
+                          "./miptpd -d usockC miptp_appC.sock"))
     time.sleep(3)
 
     print("\n=== Launching MIPTP server on B ===")
