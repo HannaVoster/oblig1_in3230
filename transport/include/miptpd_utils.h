@@ -12,7 +12,7 @@ uint8_t get_port_from_fd(int fd);
 int get_fd_from_port(uint8_t port);
 int get_index(int fd);
 
-// funskjoner for å legge til og fjerne appper
+// funksjoner for å legge til og fjerne appper
 int remove_app_connection(int fd);
 int new_app_connection(int fd, uint8_t port);
 
