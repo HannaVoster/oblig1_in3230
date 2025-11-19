@@ -10,13 +10,13 @@ all:
 
 # Kopier binærfiler til prosjektroten 
 install:
-	cp -u bin/mipd .
-	cp -u bin/miptpd .
-	cp -u bin/miptpd_client .
-	cp -u bin/miptpd_server .
-	cp -u bin/ping_client .
-	cp -u bin/ping_server .
-	cp -u bin/routingd .
+	cp  bin/mipd .
+	cp  bin/miptpd .
+	cp  bin/miptpd_client .
+	cp  bin/miptpd_server .
+	cp  bin/ping_client .
+	cp  bin/ping_server .
+	cp  bin/routingd .
 
 # Rydd opp i alt
 clean:
