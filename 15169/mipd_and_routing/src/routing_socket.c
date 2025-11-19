@@ -116,19 +116,46 @@ int connect_to_mipd(const char *socket_path) {
 
 // Venter på at MIP-daemonens UNIX-socket-fil skal dukke opp før routing deamon prøver å koble til
 // Brukes for å unngå at routingd starter før MIPd faktisk har laget socketen
+// void wait_for_socket(const char *path) {
+//     struct stat sb; // en struktur som lagrer filinfo, bruket den til å sjekke om path finnes
+//     int tries = 0;
+
+//     // Sjekker gjentatte ganger om socket-filen finnes
+//     while (stat(path, &sb) != 0) {
+//         if (tries++ > 100) {
+//             fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
+//             exit(EXIT_FAILURE);
+//         }
+//         usleep(100000); // 0.1 sek
+//     }
+// }
+
 void wait_for_socket(const char *path) {
-    struct stat sb; // en struktur som lagrer filinfo, bruket den til å sjekke om path finnes
+    char full_path[108];
+
+    // Hvis path ikke allerede starter med '/', legg til /tmp/
+    if (path[0] != '/') {
+        snprintf(full_path, sizeof(full_path), "/tmp/%s", path);
+    } else {
+        strncpy(full_path, path, sizeof(full_path) - 1);
+        full_path[sizeof(full_path) - 1] = '\0';
+    }
+
+    struct stat sb;
     int tries = 0;
 
     // Sjekker gjentatte ganger om socket-filen finnes
-    while (stat(path, &sb) != 0) {
+    while (stat(full_path, &sb) != 0) {
         if (tries++ > 100) {
-            fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", path);
+            fprintf(stderr, "[ROUTINGD] Timeout waiting for socket %s\n", full_path);
             exit(EXIT_FAILURE);
         }
         usleep(100000); // 0.1 sek
     }
+
+    fprintf(stderr, "[ROUTINGD] Socket %s is now available\n", full_path);
 }
+
 
 // Generisk metode til å kommuniserer med MIPD over unix socket
 // Pakker destinasjon, TTL og payload inn i en buffer og skriver den ut på ROUTING_SOCK
